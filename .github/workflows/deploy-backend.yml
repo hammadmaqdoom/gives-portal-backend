@@ -1,0 +1,156 @@
+name: Deploy Backend to Azure VM
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME || github.actor }}
+          password: ${{ secrets.GHCR_TOKEN || github.token }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:latest
+          cache-to: type=inline
+          provenance: false
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH to Azure VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            
+            # Install Docker if missing (fallback)
+            if ! command -v docker >/dev/null 2>&1; then
+              curl -fsSL https://get.docker.com | sh
+              sudo usermod -aG docker $USER || true
+            fi
+            
+            # Install Docker Compose plugin if missing (fallback)
+            if ! docker compose version >/dev/null 2>&1; then
+              DOCKER_COMPOSE_VERSION="v2.27.0"
+              sudo mkdir -p /usr/libexec/docker/cli-plugins
+              sudo curl -SL https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64 -o /usr/libexec/docker/cli-plugins/docker-compose
+              sudo chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+            fi
+
+            # Login to GHCR
+            echo ${{ secrets.GHCR_TOKEN || github.token }} | docker login ghcr.io -u ${{ secrets.GHCR_USERNAME || github.actor }} --password-stdin
+
+            # App home (no repo-name-specific path)
+            APP_HOME=/opt/backend
+            sudo mkdir -p $APP_HOME
+            cd $APP_HOME
+
+            # Write backend .env from secrets
+            if [ -n "${{ secrets.BACKEND_ENV }}" ]; then
+              echo "Writing backend .env from secret BACKEND_ENV"
+              printf "%s" "${{ secrets.BACKEND_ENV }}" | sed 's/\r$//' | sudo tee $APP_HOME/.env >/dev/null
+            else
+              echo "Composing backend .env from individual GitHub Secrets"
+              sudo tee $APP_HOME/.env >/dev/null <<ENV
+                NODE_ENV=production
+                APP_PORT=3000
+
+                # Database
+                DATABASE_TYPE=postgres
+                DATABASE_HOST=postgres
+                DATABASE_PORT=5432
+                DATABASE_USERNAME=${{ secrets.DB_USERNAME }}
+                DATABASE_PASSWORD=${{ secrets.DB_PASSWORD }}
+                DATABASE_NAME=${{ secrets.DB_NAME }}
+                DATABASE_SYNCHRONIZE=false
+
+                # File storage
+                FILE_DRIVER=${{ secrets.FILE_DRIVER }}
+
+                # AWS (if using s3-presigned)
+                ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+                SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                AWS_S3_REGION=${{ secrets.AWS_REGION }}
+                AWS_DEFAULT_S3_BUCKET=${{ secrets.AWS_BUCKET }}
+
+                # Azure (if using azure-blob-sas)
+                AZURE_STORAGE_ACCOUNT_NAME=${{ secrets.AZURE_ACCOUNT_NAME }}
+                AZURE_STORAGE_ACCOUNT_KEY=${{ secrets.AZURE_ACCOUNT_KEY }}
+                AZURE_CONTAINER_NAME=${{ secrets.AZURE_CONTAINER_NAME }}
+                AZURE_BLOB_SAS_EXPIRY_SECONDS=${{ secrets.AZURE_SAS_EXPIRY_SECONDS }}
+                AZURE_BLOB_PUBLIC_BASE_URL=${{ secrets.AZURE_PUBLIC_BASE_URL }}
+
+                # JWT (recommended to set)
+                AUTH_JWT_SECRET=${{ secrets.AUTH_JWT_SECRET }}
+                AUTH_REFRESH_SECRET=${{ secrets.AUTH_REFRESH_SECRET }}
+                AUTH_FORGOT_SECRET=${{ secrets.AUTH_FORGOT_SECRET }}
+                AUTH_CONFIRM_EMAIL_SECRET=${{ secrets.AUTH_CONFIRM_EMAIL_SECRET }}
+                ENV
+            fi
+
+            # Create docker-compose.yml if missing or update it idempotently
+            COMPOSE_FILE=$APP_HOME/docker-compose.yml
+            if [ ! -f "$COMPOSE_FILE" ]; then
+              echo "Creating docker-compose.yml"
+              cat <<'YAML' | sudo tee $COMPOSE_FILE >/dev/null
+            services:
+              postgres:
+                image: postgres:16
+                restart: unless-stopped
+                environment:
+                  POSTGRES_DB: ${DATABASE_NAME}
+                  POSTGRES_USER: ${DATABASE_USERNAME}
+                  POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+                volumes:
+                  - ./postgres:/var/lib/postgresql/data
+
+              backend:
+                image: ${{ env.IMAGE_NAME }}:latest
+                restart: unless-stopped
+                env_file:
+                  - ./.env
+                ports:
+                  - "3000:3000"
+                depends_on:
+                  - postgres
+            YAML
+            fi
+
+            # Pull and run
+            docker pull ${{ env.IMAGE_NAME }}:latest
+            docker compose -f $COMPOSE_FILE up -d
+
+            # Cleanup old images
+            docker image prune -f || true
+
+            echo "Deployment completed."
+
+
