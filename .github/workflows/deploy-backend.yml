@@ -80,40 +80,49 @@ jobs:
             else
               echo "Composing backend .env from individual GitHub Secrets"
               sudo tee $APP_HOME/.env >/dev/null <<ENV
-                NODE_ENV=production
-                APP_PORT=3000
+              NODE_ENV=production
+              APP_PORT=3000
+              APP_NAME=${{ secrets.APP_NAME }}
+              API_PREFIX=api
+              APP_FALLBACK_LANGUAGE=en
+              APP_HEADER_LANGUAGE=x-custom-lang
 
-                # Database
-                DATABASE_TYPE=postgres
-                DATABASE_HOST=postgres
-                DATABASE_PORT=5432
-                DATABASE_USERNAME=${{ secrets.DB_USERNAME }}
-                DATABASE_PASSWORD=${{ secrets.DB_PASSWORD }}
-                DATABASE_NAME=${{ secrets.DB_NAME }}
-                DATABASE_SYNCHRONIZE=false
+              # Database
+              DATABASE_TYPE=postgres
+              DATABASE_HOST=pgbouncer
+              DATABASE_PORT=6432
+              DATABASE_USERNAME=${{ secrets.POSTGRES_USER }}
+              DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}
+              DATABASE_NAME=${{ secrets.DATABASE_NAME }}
+              DATABASE_SYNCHRONIZE=false
 
-                # File storage
-                FILE_DRIVER=${{ secrets.FILE_DRIVER }}
+              # File storage
+              FILE_DRIVER=${{ secrets.FILE_DRIVER }}
 
-                # AWS (if using s3-presigned)
-                ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-                SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-                AWS_S3_REGION=${{ secrets.AWS_REGION }}
-                AWS_DEFAULT_S3_BUCKET=${{ secrets.AWS_BUCKET }}
+              # Azure (if using azure-blob-sas)
+              AZURE_STORAGE_ACCOUNT_NAME=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}
+              AZURE_STORAGE_ACCOUNT_KEY=${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}
+              AZURE_CONTAINER_NAME=${{ secrets.AZURE_CONTAINER_NAME }}
+              AZURE_BLOB_SAS_EXPIRY_SECONDS=3600
 
-                # Azure (if using azure-blob-sas)
-                AZURE_STORAGE_ACCOUNT_NAME=${{ secrets.AZURE_ACCOUNT_NAME }}
-                AZURE_STORAGE_ACCOUNT_KEY=${{ secrets.AZURE_ACCOUNT_KEY }}
-                AZURE_CONTAINER_NAME=${{ secrets.AZURE_CONTAINER_NAME }}
-                AZURE_BLOB_SAS_EXPIRY_SECONDS=${{ secrets.AZURE_SAS_EXPIRY_SECONDS }}
-                AZURE_BLOB_PUBLIC_BASE_URL=${{ secrets.AZURE_PUBLIC_BASE_URL }}
+              # JWT (set via repo secrets or leave empty to use defaults)
+              AUTH_JWT_SECRET=198enUBCbIgkGJdOySdKvfckFRJcggDVN5tD3Ly4N8c4WjZbQHRBwKVyC7uXeVD4
+              AUTH_REFRESH_SECRET=NADNDwoqIsTTgGFOdc1wjidwxircxUsKOF68XnjQBQNwVB0LYr6Mw70dInXdyIH0
+              AUTH_FORGOT_SECRET=FoCPY3j0q0qkvWDYXx3X4iBNRUsOQpz2uDxpj8zCAEFnoNpzi2Q7soVVnH8eRY6N
+              AUTH_CONFIRM_EMAIL_SECRET=zitWttyUXHbfEE5fMy8Bxtjy7kyTmWfy4Bvxil6GBkTCYNI10YvPjA73EX8GrkyV
 
-                # JWT (recommended to set)
-                AUTH_JWT_SECRET=${{ secrets.AUTH_JWT_SECRET }}
-                AUTH_REFRESH_SECRET=${{ secrets.AUTH_REFRESH_SECRET }}
-                AUTH_FORGOT_SECRET=${{ secrets.AUTH_FORGOT_SECRET }}
-                AUTH_CONFIRM_EMAIL_SECRET=${{ secrets.AUTH_CONFIRM_EMAIL_SECRET }}
-                ENV
+              # Optional domains and Zoom OAuth
+              BACKEND_DOMAIN=${{ secrets.BACKEND_DOMAIN }}
+              FRONTEND_DOMAIN=${{ secrets.FRONTEND_DOMAIN }}
+              ZOOM_OAUTH_CLIENT_ID=${{ secrets.ZOOM_OAUTH_CLIENT_ID }}
+              ZOOM_OAUTH_CLIENT_SECRET=${{ secrets.ZOOM_OAUTH_CLIENT_SECRET }}
+              ZOOM_OAUTH_REDIRECT_URI=${{ secrets.ZOOM_OAUTH_REDIRECT_URI }}
+
+              # PgBouncer tuning (optional)
+              PGBOUNCER_DEFAULT_POOL_SIZE=20
+              PGBOUNCER_POOL_MODE=transaction
+              PGBOUNCER_MAX_CLIENT_CONN=200
+              ENV
             fi
 
             # Create docker-compose.yml if missing or update it idempotently
