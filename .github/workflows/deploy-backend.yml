@@ -99,10 +99,10 @@ jobs:
               printf "%s" "${{ secrets.BACKEND_ENV }}" | sed 's/\r$//' | sudo tee $APP_HOME/.env >/dev/null
             else
               echo "Composing backend .env from individual GitHub Secrets"
-              sudo tee $APP_HOME/.env >/dev/null <<ENV
+              sudo tee $APP_HOME/.env >/dev/null <<'ENV'
               NODE_ENV=production
               APP_PORT=3000
-              APP_NAME=${{ secrets.APP_NAME }}
+              APP_NAME=***
               API_PREFIX=api
               APP_FALLBACK_LANGUAGE=en
               APP_HEADER_LANGUAGE=x-custom-lang
@@ -111,18 +111,18 @@ jobs:
               DATABASE_TYPE=postgres
               DATABASE_HOST=pgbouncer
               DATABASE_PORT=6432
-              DATABASE_USERNAME=${{ secrets.POSTGRES_USER }}
-              DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}
-              DATABASE_NAME=${{ secrets.DATABASE_NAME }}
+              DATABASE_USERNAME=***
+              DATABASE_PASSWORD=***
+              DATABASE_NAME=***
               DATABASE_SYNCHRONIZE=false
 
               # File storage
-              FILE_DRIVER=${{ secrets.FILE_DRIVER }}
+              FILE_DRIVER=***
 
-              # Azure (if using azure-blob-sas)
-              AZURE_STORAGE_ACCOUNT_NAME=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}
-              AZURE_STORAGE_ACCOUNT_KEY=${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}
-              AZURE_CONTAINER_NAME=${{ secrets.AZURE_CONTAINER_NAME }}
+              # Azure (if using ***)
+              AZURE_STORAGE_ACCOUNT_NAME=***
+              AZURE_STORAGE_ACCOUNT_KEY=***
+              AZURE_CONTAINER_NAME=***
               AZURE_BLOB_SAS_EXPIRY_SECONDS=3600
 
               # JWT (set via repo secrets or leave empty to use defaults)
@@ -132,17 +132,17 @@ jobs:
               AUTH_CONFIRM_EMAIL_SECRET=zitWttyUXHbfEE5fMy8Bxtjy7kyTmWfy4Bvxil6GBkTCYNI10YvPjA73EX8GrkyV
 
               # Optional domains and Zoom OAuth
-              BACKEND_DOMAIN=${{ secrets.BACKEND_DOMAIN }}
-              FRONTEND_DOMAIN=${{ secrets.FRONTEND_DOMAIN }}
-              ZOOM_OAUTH_CLIENT_ID=${{ secrets.ZOOM_OAUTH_CLIENT_ID }}
-              ZOOM_OAUTH_CLIENT_SECRET=${{ secrets.ZOOM_OAUTH_CLIENT_SECRET }}
-              ZOOM_OAUTH_REDIRECT_URI=${{ secrets.ZOOM_OAUTH_REDIRECT_URI }}
+              BACKEND_DOMAIN=***
+              FRONTEND_DOMAIN=***
+              ZOOM_OAUTH_CLIENT_ID=***
+              ZOOM_OAUTH_CLIENT_SECRET=***
+              ZOOM_OAUTH_REDIRECT_URI=***
 
               # PgBouncer tuning (optional)
               PGBOUNCER_DEFAULT_POOL_SIZE=20
               PGBOUNCER_POOL_MODE=transaction
               PGBOUNCER_MAX_CLIENT_CONN=200
-            ENV
+              ENV
             fi
 
             # Create docker-compose.yml if missing or update it idempotently
