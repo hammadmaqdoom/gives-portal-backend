@@ -65,8 +65,14 @@ jobs:
               sudo chmod +x /usr/libexec/docker/cli-plugins/docker-compose
             fi
 
-            # Configure Docker to use pass as credential helper (if available)
+            # Install docker-credential-pass if pass is available
             if command -v pass >/dev/null 2>&1; then
+              # Install docker-credential-pass
+              DOCKER_CREDENTIAL_PASS_VERSION="0.6.4"
+              sudo curl -L "https://github.com/docker/docker-credential-helpers/releases/download/v${DOCKER_CREDENTIAL_PASS_VERSION}/docker-credential-pass-v${DOCKER_CREDENTIAL_PASS_VERSION}-linux-amd64" -o /usr/local/bin/docker-credential-pass
+              sudo chmod +x /usr/local/bin/docker-credential-pass
+              
+              # Configure Docker to use pass
               mkdir -p ~/.docker
               echo '{"credsStore":"pass"}' | tee ~/.docker/config.json >/dev/null
             fi
