@@ -74,29 +74,20 @@ jobs:
               echo "Docker Compose not found, but skipping installation as requested"
             fi
 
-            echo "=== STEP 4: Installing docker-credential-pass ==="
-            # Install docker-credential-pass if pass is available
-            if command -v pass >/dev/null 2>&1; then
-              echo "Pass found, installing docker-credential-pass..."
-              # Detect architecture and install correct docker-credential-pass
-              ARCH=$(uname -m)
-              case $ARCH in
-                x86_64) ARCH_SUFFIX="linux-amd64" ;;
-                aarch64|arm64) ARCH_SUFFIX="linux-arm64" ;;
-                armv7l) ARCH_SUFFIX="linux-arm" ;;
-                *) echo "Unsupported architecture: $ARCH" && exit 1 ;;
-              esac
-              
-              DOCKER_CREDENTIAL_PASS_VERSION="0.6.4"
-              sudo curl -L "https://github.com/docker/docker-credential-helpers/releases/download/v${DOCKER_CREDENTIAL_PASS_VERSION}/docker-credential-pass-v${DOCKER_CREDENTIAL_PASS_VERSION}-${ARCH_SUFFIX}" -o /usr/local/bin/docker-credential-pass
-              sudo chmod +x /usr/local/bin/docker-credential-pass
-              
-              # Configure Docker to use pass
-              mkdir -p ~/.docker
-              echo '{"credsStore":"pass"}' | tee ~/.docker/config.json >/dev/null
-              echo "docker-credential-pass installed and configured"
+            echo "=== STEP 4: Checking docker-credential-pass ==="
+            # Check if docker-credential-pass is available
+            if command -v docker-credential-pass >/dev/null 2>&1; then
+              echo "docker-credential-pass is already installed and available"
+              docker-credential-pass version || echo "Version check failed, but binary exists"
             else
-              echo "Pass not found, skipping credential helper"
+              echo "docker-credential-pass not found, but skipping installation as requested"
+            fi
+            
+            # Check if pass is available
+            if command -v pass >/dev/null 2>&1; then
+              echo "Pass is available"
+            else
+              echo "Pass not found, skipping credential helper setup"
             fi
             
             echo "=== STEP 5: Logging into GHCR ==="
