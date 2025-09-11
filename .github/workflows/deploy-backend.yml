@@ -90,8 +90,13 @@ jobs:
               echo "Pass not found, skipping credential helper setup"
             fi
             
-            echo "=== STEP 5: Logging into GHCR ==="
-            # Login to GHCR (credentials will be stored via pass if available)
+            echo "=== STEP 5: Preparing isolated Docker config and logging into GHCR ==="
+            # Use an isolated, temporary Docker config so creds don't persist on disk
+            DOCKER_TMP_CONFIG=$(mktemp -d)
+            export DOCKER_CONFIG="$DOCKER_TMP_CONFIG"
+            echo "Using temporary DOCKER_CONFIG at: $DOCKER_CONFIG"
+            
+            # Login to GHCR (credentials stored only in the temp config)
             echo "${{ secrets.GHCR_TOKEN || github.token }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME || github.actor }}" --password-stdin
             echo "Successfully logged into GHCR"
 
@@ -218,6 +223,11 @@ jobs:
             # Cleanup old images
             docker image prune -f || true
             echo "Old images cleaned up"
+
+            # Logout and remove temporary Docker config to avoid persisting credentials
+            echo "Logging out from GHCR and removing temporary Docker config"
+            docker logout ghcr.io || true
+            rm -rf "$DOCKER_CONFIG" || true
 
             echo "=== DEPLOYMENT COMPLETED SUCCESSFULLY ==="
 
