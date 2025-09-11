@@ -56,47 +56,22 @@ jobs:
             echo "Current user: $(whoami)"
             echo "Available commands: $(which docker || echo 'docker not found')"
             
-            echo "=== STEP 2: Installing Docker ==="
-            # Install Docker if missing (fallback)
-            if ! command -v docker >/dev/null 2>&1; then
-              echo "Docker not found, installing..."
-              set +e  # Temporarily disable exit on error
-              curl -fsSL https://get.docker.com | sh
-              DOCKER_INSTALL_EXIT_CODE=$?
-              set -e  # Re-enable exit on error
-              
-              if [ $DOCKER_INSTALL_EXIT_CODE -eq 0 ]; then
-                echo "Docker installation completed successfully"
-                # Add current user to docker group (skip if fails)
-                CURRENT_USER=$(whoami)
-                echo "Current user: $CURRENT_USER"
-                set +e  # Temporarily disable exit on error
-                sudo usermod -aG docker "$CURRENT_USER"
-                USER_ADD_EXIT_CODE=$?
-                set -e  # Re-enable exit on error
-                
-                if [ $USER_ADD_EXIT_CODE -eq 0 ]; then
-                  echo "User added to docker group successfully"
-                else
-                  echo "Failed to add user to docker group, but continuing..."
-                fi
-              else
-                echo "Docker installation failed, but continuing..."
-              fi
+            echo "=== STEP 2: Checking Docker ==="
+            # Check if Docker is available
+            if command -v docker >/dev/null 2>&1; then
+              echo "Docker is already installed and available"
+              docker --version
             else
-              echo "Docker already installed"
+              echo "Docker not found, but skipping installation as requested"
             fi
             
-            echo "=== STEP 3: Installing Docker Compose ==="
-            # Install Docker Compose plugin if missing (fallback)
-            if ! docker compose version >/dev/null 2>&1; then
-              echo "Docker Compose not found, installing..."
-              DOCKER_COMPOSE_VERSION="v2.27.0"
-              sudo mkdir -p /usr/libexec/docker/cli-plugins
-              sudo curl -SL https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64 -o /usr/libexec/docker/cli-plugins/docker-compose
-              sudo chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+            echo "=== STEP 3: Checking Docker Compose ==="
+            # Check if Docker Compose is available
+            if docker compose version >/dev/null 2>&1; then
+              echo "Docker Compose is already installed and available"
+              docker compose version
             else
-              echo "Docker Compose already installed"
+              echo "Docker Compose not found, but skipping installation as requested"
             fi
 
             echo "=== STEP 4: Installing docker-credential-pass ==="
