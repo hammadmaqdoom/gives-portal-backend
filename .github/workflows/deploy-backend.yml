@@ -65,7 +65,13 @@ jobs:
               sudo chmod +x /usr/libexec/docker/cli-plugins/docker-compose
             fi
 
-            # Login to GHCR
+            # Configure Docker to use pass as credential helper (if available)
+            if command -v pass >/dev/null 2>&1; then
+              echo '{"credsStore":"pass"}' | sudo tee /root/.docker/config.json >/dev/null
+              echo '{"credsStore":"pass"}' | tee ~/.docker/config.json >/dev/null
+            fi
+            
+            # Login to GHCR (credentials will be stored via pass if available)
             echo ${{ secrets.GHCR_TOKEN || github.token }} | docker login ghcr.io -u ${{ secrets.GHCR_USERNAME || github.actor }} --password-stdin
 
             # App home (no repo-name-specific path)
