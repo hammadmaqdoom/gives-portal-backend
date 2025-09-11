@@ -79,7 +79,7 @@ jobs:
             NEED_INSTALL_HELPER=false
             if command -v docker-credential-pass >/dev/null 2>&1; then
               echo "docker-credential-pass found at: $(command -v docker-credential-pass)"
-              docker-credential-pass list >/dev/null 2>&1
+              docker-credential-pass list >/dev/null 2>&1 || true
               HELPER_STATUS=$?
               if [ $HELPER_STATUS -ne 0 ]; then
                 echo "Existing docker-credential-pass fails to execute; will replace with correct architecture"
