@@ -75,32 +75,17 @@ jobs:
             fi
 
             echo "=== STEP 4: Ensuring docker-credential-pass (with correct architecture) ==="
-            # Ensure docker-credential-pass exists and is executable for this architecture
-            NEED_INSTALL_HELPER=false
+            # Simplified: only detect presence; do not attempt install here
             if command -v docker-credential-pass >/dev/null 2>&1; then
               echo "docker-credential-pass found at: $(command -v docker-credential-pass)"
             else
-              echo "docker-credential-pass not found; will install"
-              NEED_INSTALL_HELPER=true
+              echo "docker-credential-pass not found; continuing (Docker will still attempt login via pass)"
             fi
 
-            if [ "$NEED_INSTALL_HELPER" = true ]; then
-              ARCH=$(uname -m)
-              case "$ARCH" in
-                x86_64)   SUFFIX="linux-amd64" ;;
-                aarch64|arm64) SUFFIX="linux-arm64" ;;
-                armv7l)   SUFFIX="linux-armv7" ;;
-                *) echo "Unsupported arch: $ARCH" && exit 1 ;;
-              esac
-              VER="0.9.3"
-              URL="https://github.com/docker/docker-credential-helpers/releases/download/v${VER}/docker-credential-pass-v${VER}.${SUFFIX}"
-              echo "Downloading helper: $URL"
-              sudo curl -fsSL "$URL" -o /usr/local/bin/docker-credential-pass
-              sudo chmod +x /usr/local/bin/docker-credential-pass
+            # Non-fatal validation (skip execution if not present)
+            if command -v docker-credential-pass >/dev/null 2>&1; then
+              /usr/local/bin/docker-credential-pass list >/dev/null 2>&1 || echo "helper present; list non-zero (ok)"
             fi
-
-            # Non-fatal validation (don't abort under set -e)
-            /usr/local/bin/docker-credential-pass list >/dev/null 2>&1 || echo "helper present; list non-zero (ok)"
 
             echo "=== STEP 4.1: Ensuring pass is initialized (non-interactive) ==="
             # Install deps if missing
