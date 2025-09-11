@@ -138,11 +138,11 @@ jobs:
               ZOOM_OAUTH_CLIENT_SECRET=${{ secrets.ZOOM_OAUTH_CLIENT_SECRET }}
               ZOOM_OAUTH_REDIRECT_URI=${{ secrets.ZOOM_OAUTH_REDIRECT_URI }}
 
-  # PgBouncer tuning (optional)
-  PGBOUNCER_DEFAULT_POOL_SIZE=20
-  PGBOUNCER_POOL_MODE=transaction
-  PGBOUNCER_MAX_CLIENT_CONN=200
-ENV
+              # PgBouncer tuning (optional)
+              PGBOUNCER_DEFAULT_POOL_SIZE=20
+              PGBOUNCER_POOL_MODE=transaction
+              PGBOUNCER_MAX_CLIENT_CONN=200
+            ENV
             fi
 
             # Create docker-compose.yml if missing or update it idempotently
