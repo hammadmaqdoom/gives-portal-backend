@@ -52,13 +52,37 @@ jobs:
             set -e
             
             echo "=== STEP 1: Starting deployment script ==="
+            echo "Current working directory: $(pwd)"
+            echo "Current user: $(whoami)"
+            echo "Available commands: $(which docker || echo 'docker not found')"
             
             echo "=== STEP 2: Installing Docker ==="
             # Install Docker if missing (fallback)
             if ! command -v docker >/dev/null 2>&1; then
               echo "Docker not found, installing..."
+              set +e  # Temporarily disable exit on error
               curl -fsSL https://get.docker.com | sh
-              sudo usermod -aG docker $USER || true
+              DOCKER_INSTALL_EXIT_CODE=$?
+              set -e  # Re-enable exit on error
+              
+              if [ $DOCKER_INSTALL_EXIT_CODE -eq 0 ]; then
+                echo "Docker installation completed successfully"
+                # Add current user to docker group (skip if fails)
+                CURRENT_USER=$(whoami)
+                echo "Current user: $CURRENT_USER"
+                set +e  # Temporarily disable exit on error
+                sudo usermod -aG docker "$CURRENT_USER"
+                USER_ADD_EXIT_CODE=$?
+                set -e  # Re-enable exit on error
+                
+                if [ $USER_ADD_EXIT_CODE -eq 0 ]; then
+                  echo "User added to docker group successfully"
+                else
+                  echo "Failed to add user to docker group, but continuing..."
+                fi
+              else
+                echo "Docker installation failed, but continuing..."
+              fi
             else
               echo "Docker already installed"
             fi
@@ -167,6 +191,7 @@ jobs:
               echo "Backend .env created from individual secrets"
             fi
 
+            echo "=== STEP 8: Creating docker-compose.yml ==="
             # Create docker-compose.yml if missing or update it idempotently
             COMPOSE_FILE=$APP_HOME/docker-compose.yml
             if [ ! -f "$COMPOSE_FILE" ]; then
@@ -209,15 +234,25 @@ jobs:
                 echo "    depends_on:"
                 echo "      - pgbouncer"
               } | sudo tee $COMPOSE_FILE >/dev/null
+              echo "docker-compose.yml created successfully"
+            else
+              echo "docker-compose.yml already exists"
             fi
 
+            echo "=== STEP 9: Pulling Docker image ==="
             # Pull and run
             docker pull "${{ env.IMAGE_NAME }}:latest"
-            docker compose -f $COMPOSE_FILE up -d
+            echo "Docker image pulled successfully"
 
+            echo "=== STEP 10: Starting services ==="
+            docker compose -f $COMPOSE_FILE up -d
+            echo "Services started successfully"
+
+            echo "=== STEP 11: Cleanup ==="
             # Cleanup old images
             docker image prune -f || true
+            echo "Old images cleaned up"
 
-            echo "Deployment completed."
+            echo "=== DEPLOYMENT COMPLETED SUCCESSFULLY ==="
 
 
