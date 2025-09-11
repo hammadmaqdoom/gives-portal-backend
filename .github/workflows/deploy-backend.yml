@@ -86,7 +86,7 @@ jobs:
             fi
             
             # Login to GHCR (credentials will be stored via pass if available)
-            echo ${{ secrets.GHCR_TOKEN || github.token }} | docker login ghcr.io -u ${{ secrets.GHCR_USERNAME || github.actor }} --password-stdin
+            echo "${{ secrets.GHCR_TOKEN || github.token }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME || github.actor }}" --password-stdin
 
             # App home (no repo-name-specific path)
             APP_HOME=/opt/backend
@@ -190,7 +190,7 @@ jobs:
             fi
 
             # Pull and run
-            docker pull ${{ env.IMAGE_NAME }}:latest
+            docker pull "${{ env.IMAGE_NAME }}:latest"
             docker compose -f $COMPOSE_FILE up -d
 
             # Cleanup old images
