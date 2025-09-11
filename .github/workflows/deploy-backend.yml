@@ -94,7 +94,7 @@ jobs:
             cd $APP_HOME
 
             # Write backend .env from secrets
-            if [ -n "${{ secrets.BACKEND_ENV }}" ]; then
+            if [ -n "" ]; then
               echo "Writing backend .env from secret BACKEND_ENV"
               printf "%s" "${{ secrets.BACKEND_ENV }}" | sed 's/\r$//' | sudo tee $APP_HOME/.env >/dev/null
             else
