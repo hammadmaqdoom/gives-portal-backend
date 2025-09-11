@@ -67,7 +67,7 @@ jobs:
 
             # Configure Docker to use pass as credential helper (if available)
             if command -v pass >/dev/null 2>&1; then
-              echo '{"credsStore":"pass"}' | sudo tee /root/.docker/config.json >/dev/null
+              mkdir -p ~/.docker
               echo '{"credsStore":"pass"}' | tee ~/.docker/config.json >/dev/null
             fi
             
