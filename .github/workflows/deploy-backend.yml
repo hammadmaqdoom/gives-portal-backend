@@ -67,9 +67,17 @@ jobs:
 
             # Install docker-credential-pass if pass is available
             if command -v pass >/dev/null 2>&1; then
-              # Install docker-credential-pass
+              # Detect architecture and install correct docker-credential-pass
+              ARCH=$(uname -m)
+              case $ARCH in
+                x86_64) ARCH_SUFFIX="linux-amd64" ;;
+                aarch64|arm64) ARCH_SUFFIX="linux-arm64" ;;
+                armv7l) ARCH_SUFFIX="linux-arm" ;;
+                *) echo "Unsupported architecture: $ARCH" && exit 1 ;;
+              esac
+              
               DOCKER_CREDENTIAL_PASS_VERSION="0.6.4"
-              sudo curl -L "https://github.com/docker/docker-credential-helpers/releases/download/v${DOCKER_CREDENTIAL_PASS_VERSION}/docker-credential-pass-v${DOCKER_CREDENTIAL_PASS_VERSION}-linux-amd64" -o /usr/local/bin/docker-credential-pass
+              sudo curl -L "https://github.com/docker/docker-credential-helpers/releases/download/v${DOCKER_CREDENTIAL_PASS_VERSION}/docker-credential-pass-v${DOCKER_CREDENTIAL_PASS_VERSION}-${ARCH_SUFFIX}" -o /usr/local/bin/docker-credential-pass
               sudo chmod +x /usr/local/bin/docker-credential-pass
               
               # Configure Docker to use pass
