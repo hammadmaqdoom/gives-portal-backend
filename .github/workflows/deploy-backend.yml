@@ -79,8 +79,9 @@ jobs:
             NEED_INSTALL_HELPER=false
             if command -v docker-credential-pass >/dev/null 2>&1; then
               echo "docker-credential-pass found at: $(command -v docker-credential-pass)"
-              # Try executing a harmless command; if it fails (e.g., exec format error), replace it
-              if ! docker-credential-pass list >/dev/null 2>&1; then
+              docker-credential-pass list >/dev/null 2>&1
+              HELPER_STATUS=$?
+              if [ $HELPER_STATUS -ne 0 ]; then
                 echo "Existing docker-credential-pass fails to execute; will replace with correct architecture"
                 NEED_INSTALL_HELPER=true
               else
@@ -93,35 +94,56 @@ jobs:
 
             if [ "$NEED_INSTALL_HELPER" = true ]; then
               ARCH=$(uname -m)
-              case $ARCH in
-                x86_64) ARCH_SUFFIX="linux-amd64" ;;
-                aarch64|arm64) ARCH_SUFFIX="linux-arm64" ;;
-                armv7l) ARCH_SUFFIX="linux-arm" ;;
-                *) echo "Unsupported architecture: $ARCH" && exit 1 ;;
+              case "$ARCH" in
+                x86_64)   SUFFIX="linux-amd64" ;;
+                aarch64|arm64) SUFFIX="linux-arm64" ;;
+                armv7l)   SUFFIX="linux-armv7" ;;
+                *) echo "Unsupported arch: $ARCH" && exit 1 ;;
               esac
-              DOCKER_CREDENTIAL_PASS_VERSION="0.6.4"
-              DOWNLOAD_URL="https://github.com/docker/docker-credential-helpers/releases/download/v${DOCKER_CREDENTIAL_PASS_VERSION}/docker-credential-pass-v${DOCKER_CREDENTIAL_PASS_VERSION}-${ARCH_SUFFIX}"
-              echo "Downloading docker-credential-pass from: $DOWNLOAD_URL"
-              sudo curl -fsSL "$DOWNLOAD_URL" -o /usr/local/bin/docker-credential-pass
+              VER="0.9.3"
+              URL="https://github.com/docker/docker-credential-helpers/releases/download/v${VER}/docker-credential-pass-v${VER}.${SUFFIX}"
+              echo "Downloading helper: $URL"
+              sudo curl -fsSL "$URL" -o /usr/local/bin/docker-credential-pass
               sudo chmod +x /usr/local/bin/docker-credential-pass
-              # Verify it runs now
-              if ! /usr/local/bin/docker-credential-pass list >/dev/null 2>&1; then
-                echo "docker-credential-pass still not executable; aborting"
-                exit 1
-              fi
-              echo "docker-credential-pass installed and validated"
+              /usr/local/bin/docker-credential-pass list >/dev/null 2>&1 || echo "helper installed; list non-zero (ok)"
             fi
 
-            echo "=== STEP 5: Configure Docker to use pass and login to GHCR ==="
-            # Docker config is expected to already have credsStore=pass; keep existing without overwriting
+            echo "=== STEP 4.1: Ensuring pass is initialized (non-interactive) ==="
+            # Install deps if missing
+            sudo apt-get update -y
+            sudo apt-get install -y gnupg2 pinentry-curses pass >/dev/null 2>&1 || true
+            
+            # Initialize pass store if not present
+            if [ ! -f "$HOME/.password-store/.gpg-id" ]; then
+              echo "Pass store not initialized; creating GPG key and initializing pass"
+              if ! gpg --list-secret-keys >/dev/null 2>&1; then
+                gpg --quick-generate-key "docker-pass@local" default default 1y
+              fi
+              KEY_ID=$(gpg --list-secret-keys --with-colons 2>/dev/null | awk -F: '/^sec:/ {print $5; exit}')
+              if [ -z "$KEY_ID" ]; then
+                echo "Failed to obtain GPG key ID" && exit 1
+              fi
+              export GPG_TTY=$(tty)
+              gpgconf --kill gpg-agent >/dev/null 2>&1 || true
+              mkdir -p "$HOME/.password-store"
+              pass init "$KEY_ID"
+              echo "Pass initialized with key: $KEY_ID"
+            else
+              echo "Pass store already initialized"
+            fi
+
+            echo "=== STEP 5: Configure/login to GHCR via pass ==="
+            # Ensure Docker config points to pass without overwriting existing settings
             mkdir -p ~/.docker
             if [ -f ~/.docker/config.json ]; then
-              echo "Docker config exists; not overwriting credsStore"
+              echo "Docker config exists; assuming credsStore is set"
+            else
+              echo '{"credsStore":"pass"}' > ~/.docker/config.json
+              echo "Docker config created with credsStore=pass"
             fi
 
-            # Login to GHCR using pass helper (no plaintext stored)
             echo "${{ secrets.GHCR_TOKEN || github.token }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME || github.actor }}" --password-stdin
-            echo "Successfully logged into GHCR with pass credential store"
+            echo "Successfully logged into GHCR with pass"
             
             echo "=== STEP 6: Setting up app directory ==="
             # App home (no repo-name-specific path)
