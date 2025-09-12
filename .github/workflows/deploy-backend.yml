@@ -4,43 +4,12 @@ on:
   push:
     branches: [ main ]
 
-permissions:
-  contents: read
-  packages: write
-
-env:
-  IMAGE_NAME: ghcr.io/${{ github.repository }}
-
 jobs:
-  build-and-push:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ secrets.GHCR_USERNAME || github.actor }}
-          password: ${{ secrets.GHCR_TOKEN || github.token }}
-
-      - name: Build and push image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: |
-            ${{ env.IMAGE_NAME }}:latest
-            ${{ env.IMAGE_NAME }}:${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:latest
-          cache-to: type=inline
-          provenance: false
-
-  deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
+      
       - name: Deploy over SSH to Azure VM
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -54,200 +23,75 @@ jobs:
             echo "=== STEP 1: Starting deployment script ==="
             echo "Current working directory: $(pwd)"
             echo "Current user: $(whoami)"
-            echo "Available commands: $(which docker || echo 'docker not found')"
             
-            echo "=== STEP 2: Checking Docker ==="
-            # Check if Docker is available
-            if command -v docker >/dev/null 2>&1; then
-              echo "Docker is already installed and available"
-              docker --version
-            else
-              echo "Docker not found, but skipping installation as requested"
-            fi
-            
-            echo "=== STEP 3: Checking Docker Compose ==="
-            # Check if Docker Compose is available
-            if docker compose version >/dev/null 2>&1; then
-              echo "Docker Compose is already installed and available"
-              docker compose version
-            else
-              echo "Docker Compose not found, but skipping installation as requested"
-            fi
-
-            echo "=== STEP 4: Ensuring docker-credential-pass (with correct architecture) ==="
-            # Simplified: only detect presence; do not attempt install here
-            if command -v docker-credential-pass >/dev/null 2>&1; then
-              echo "docker-credential-pass found at: $(command -v docker-credential-pass)"
-            else
-              echo "docker-credential-pass not found; continuing (Docker will still attempt login via pass)"
-            fi
-
-            # Non-fatal validation (skip execution if not present)
-            if command -v docker-credential-pass >/dev/null 2>&1; then
-              /usr/local/bin/docker-credential-pass list >/dev/null 2>&1 || echo "helper present; list non-zero (ok)"
-            fi
-
-            echo "=== STEP 4.1: Ensuring pass is initialized (non-interactive) ==="
-            # Install deps if missing
-            sudo apt-get update -y
-            sudo apt-get install -y gnupg2 pinentry-curses pass >/dev/null 2>&1 || true
-            
-            # Initialize pass store if not present
-            if [ ! -f "$HOME/.password-store/.gpg-id" ]; then
-              echo "Pass store not initialized; creating GPG key and initializing pass"
-              if ! gpg --list-secret-keys >/dev/null 2>&1; then
-                gpg --quick-generate-key "docker-pass@local" default default 1y
-              fi
-              KEY_ID=$(gpg --list-secret-keys --with-colons 2>/dev/null | awk -F: '/^sec:/ {print $5; exit}')
-              if [ -z "$KEY_ID" ]; then
-                echo "Failed to obtain GPG key ID" && exit 1
-              fi
-              export GPG_TTY=$(tty)
-              gpgconf --kill gpg-agent >/dev/null 2>&1 || true
-              mkdir -p "$HOME/.password-store"
-              pass init "$KEY_ID"
-              echo "Pass initialized with key: $KEY_ID"
-            else
-              echo "Pass store already initialized"
-            fi
-
-            echo "=== STEP 5: Configure/login to GHCR via pass ==="
-            # Ensure Docker config points to pass without overwriting existing settings
-            mkdir -p ~/.docker
-            if [ -f ~/.docker/config.json ]; then
-              echo "Docker config exists; assuming credsStore is set"
-            else
-              echo '{"credsStore":"pass"}' > ~/.docker/config.json
-              echo "Docker config created with credsStore=pass"
-            fi
-
-            echo "${{ secrets.GHCR_TOKEN || github.token }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME || github.actor }}" --password-stdin
-            echo "Successfully logged into GHCR with pass"
-            
-            echo "=== STEP 6: Setting up app directory ==="
-            # App home (no repo-name-specific path)
+            echo "=== STEP 2: Setting up app directory ==="
             APP_HOME=/opt/backend
             sudo mkdir -p $APP_HOME
-            cd $APP_HOME
             echo "App directory set to: $APP_HOME"
 
-            echo "=== STEP 7: Creating .env file ==="
-            # Write backend .env from secrets
-            if [ -n "${{ secrets.BACKEND_ENV }}" ]; then
-              echo "Writing backend .env from secret BACKEND_ENV"
-              printf "%s" "${{ secrets.BACKEND_ENV }}" | sed 's/\r$//' | sudo tee $APP_HOME/.env >/dev/null
-              echo "Backend .env created from BACKEND_ENV secret"
+            echo "=== STEP 3: Copying backend code ==="
+            echo "Copying backend code from GitHub to VM..."
+            rsync -avz --delete --exclude='.git/' --exclude='node_modules/' --exclude='dist/' --exclude='.env' . $APP_HOME/
+            cd $APP_HOME
+            echo "Backend code copied successfully"
+
+            echo "=== STEP 4: Checking .env file ==="
+            if [ ! -f "$APP_HOME/.env" ]; then
+              echo "Creating new .env file"
+              sudo tee $APP_HOME/.env >/dev/null <<ENV
+              NODE_ENV=production
+              APP_PORT=3000
+              APP_NAME=${{ secrets.APP_NAME }}
+              API_PREFIX=api
+              APP_FALLBACK_LANGUAGE=en
+              APP_HEADER_LANGUAGE=x-custom-lang
+
+              # Database
+              DATABASE_TYPE=postgres
+              DATABASE_HOST=pgbouncer
+              DATABASE_PORT=6432
+              DATABASE_USERNAME=${{ secrets.POSTGRES_USER }}
+              DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}
+              DATABASE_NAME=${{ secrets.DATABASE_NAME }}
+              DATABASE_SYNCHRONIZE=false
+
+              # File storage
+              FILE_DRIVER=${{ secrets.FILE_DRIVER }}
+
+              # Azure (if using azure-blob-sas)
+              AZURE_STORAGE_ACCOUNT_NAME=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}
+              AZURE_STORAGE_ACCOUNT_KEY=${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}
+              AZURE_CONTAINER_NAME=${{ secrets.AZURE_CONTAINER_NAME }}
+              AZURE_BLOB_SAS_EXPIRY_SECONDS=3600
+
+              # JWT (set via repo secrets or leave empty to use defaults)
+              AUTH_JWT_SECRET=${{ secrets.AUTH_JWT_SECRET }}
+              AUTH_REFRESH_SECRET=${{ secrets.AUTH_REFRESH_SECRET }}
+              AUTH_FORGOT_SECRET=${{ secrets.AUTH_FORGOT_SECRET }}
+              AUTH_CONFIRM_EMAIL_SECRET=${{ secrets.AUTH_CONFIRM_EMAIL_SECRET }}
+
+              # Optional domains and Zoom OAuth
+              BACKEND_DOMAIN=${{ secrets.BACKEND_DOMAIN }}
+              FRONTEND_DOMAIN=${{ secrets.FRONTEND_DOMAIN }}
+              ZOOM_OAUTH_CLIENT_ID=${{ secrets.ZOOM_OAUTH_CLIENT_ID }}
+              ZOOM_OAUTH_CLIENT_SECRET=${{ secrets.ZOOM_OAUTH_CLIENT_SECRET }}
+              ZOOM_OAUTH_REDIRECT_URI=${{ secrets.ZOOM_OAUTH_REDIRECT_URI }}
+
+              # PgBouncer tuning (optional)
+              PGBOUNCER_DEFAULT_POOL_SIZE=20
+              PGBOUNCER_POOL_MODE=transaction
+              PGBOUNCER_MAX_CLIENT_CONN=200
+              ENV
             else
-              echo "Composing backend .env from individual GitHub Secrets"
-              {
-                echo "NODE_ENV=production"
-                echo "APP_PORT=3000"
-                echo "APP_NAME=${{ secrets.APP_NAME }}"
-                echo "API_PREFIX=api"
-                echo "APP_FALLBACK_LANGUAGE=en"
-                echo "APP_HEADER_LANGUAGE=x-custom-lang"
-                echo ""
-                echo "# Database"
-                echo "DATABASE_TYPE=postgres"
-                echo "DATABASE_HOST=pgbouncer"
-                echo "DATABASE_PORT=6432"
-                echo "DATABASE_USERNAME=${{ secrets.POSTGRES_USER }}"
-                echo "DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}"
-                echo "DATABASE_NAME=${{ secrets.DATABASE_NAME }}"
-                echo "DATABASE_SYNCHRONIZE=false"
-                echo ""
-                echo "# File storage"
-                echo "FILE_DRIVER=${{ secrets.FILE_DRIVER }}"
-                echo ""
-                echo "# Azure (if using azure-blob-sas)"
-                echo "AZURE_STORAGE_ACCOUNT_NAME=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}"
-                echo "AZURE_STORAGE_ACCOUNT_KEY=${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}"
-                echo "AZURE_CONTAINER_NAME=${{ secrets.AZURE_CONTAINER_NAME }}"
-                echo "AZURE_BLOB_SAS_EXPIRY_SECONDS=3600"
-                echo ""
-                echo "# JWT (set via repo secrets or leave empty to use defaults)"
-                echo "AUTH_JWT_SECRET=${{ secrets.AUTH_JWT_SECRET }}"
-                echo "AUTH_REFRESH_SECRET=${{ secrets.AUTH_REFRESH_SECRET }}"
-                echo "AUTH_FORGOT_SECRET=${{ secrets.AUTH_FORGOT_SECRET }}"
-                echo "AUTH_CONFIRM_EMAIL_SECRET=${{ secrets.AUTH_CONFIRM_EMAIL_SECRET }}"
-                echo ""
-                echo "# Optional domains and Zoom OAuth"
-                echo "BACKEND_DOMAIN=${{ secrets.BACKEND_DOMAIN }}"
-                echo "FRONTEND_DOMAIN=${{ secrets.FRONTEND_DOMAIN }}"
-                echo "ZOOM_OAUTH_CLIENT_ID=${{ secrets.ZOOM_OAUTH_CLIENT_ID }}"
-                echo "ZOOM_OAUTH_CLIENT_SECRET=${{ secrets.ZOOM_OAUTH_CLIENT_SECRET }}"
-                echo "ZOOM_OAUTH_REDIRECT_URI=${{ secrets.ZOOM_OAUTH_REDIRECT_URI }}"
-                echo ""
-                echo "# PgBouncer tuning (optional)"
-                echo "PGBOUNCER_DEFAULT_POOL_SIZE=20"
-                echo "PGBOUNCER_POOL_MODE=transaction"
-                echo "PGBOUNCER_MAX_CLIENT_CONN=200"
-              } | sudo tee $APP_HOME/.env >/dev/null
-              echo "Backend .env created from individual secrets"
+              echo ".env file already exists, keeping existing configuration"
             fi
 
-            echo "=== STEP 8: Creating docker-compose.yml ==="
-            # Create docker-compose.yml if missing or update it idempotently
-            COMPOSE_FILE=$APP_HOME/docker-compose.yml
-            if [ ! -f "$COMPOSE_FILE" ]; then
-              echo "Creating docker-compose.yml"
-              {
-                echo "services:"
-                echo "  postgres:"
-                echo "    image: postgres:16"
-                echo "    restart: unless-stopped"
-                echo "    environment:"
-                echo "      POSTGRES_DB: \${DATABASE_NAME}"
-                echo "      POSTGRES_USER: \${DATABASE_USERNAME}"
-                echo "      POSTGRES_PASSWORD: \${DATABASE_PASSWORD}"
-                echo "    volumes:"
-                echo "      - ./postgres:/var/lib/postgresql/data"
-                echo ""
-                echo "  pgbouncer:"
-                echo "    image: bitnami/pgbouncer:1"
-                echo "    restart: unless-stopped"
-                echo "    environment:"
-                echo "      POSTGRESQL_HOST: postgres"
-                echo "      POSTGRESQL_PORT_NUMBER: 5432"
-                echo "      POSTGRESQL_DATABASE: \${DATABASE_NAME}"
-                echo "      POSTGRESQL_USERNAME: \${DATABASE_USERNAME}"
-                echo "      POSTGRESQL_PASSWORD: \${DATABASE_PASSWORD}"
-                echo "      PGBOUNCER_PORT: 6432"
-                echo "      PGBOUNCER_DEFAULT_POOL_SIZE: \${PGBOUNCER_DEFAULT_POOL_SIZE:-20}"
-                echo "      PGBOUNCER_POOL_MODE: \${PGBOUNCER_POOL_MODE:-transaction}"
-                echo "      PGBOUNCER_MAX_CLIENT_CONN: \${PGBOUNCER_MAX_CLIENT_CONN:-200}"
-                echo "    depends_on:"
-                echo "      - postgres"
-                echo ""
-                echo "  backend:"
-                echo "    image: ghcr.io/hammadmaqdoom/gives-portal-backend:latest"
-                echo "    restart: unless-stopped"
-                echo "    env_file:"
-                echo "      - ./.env"
-                echo "    ports:"
-                echo "      - \"3000:3000\""
-                echo "    depends_on:"
-                echo "      - pgbouncer"
-              } | sudo tee $COMPOSE_FILE >/dev/null
-              echo "docker-compose.yml created successfully"
-            else
-              echo "docker-compose.yml already exists"
-            fi
+            echo "=== STEP 5: Building and starting services ==="
+            docker compose -f $APP_HOME/docker-compose.yml down || true
+            docker compose -f $APP_HOME/docker-compose.yml build --no-cache
+            docker compose -f $APP_HOME/docker-compose.yml up -d
 
-            echo "=== STEP 9: Pulling Docker image ==="
-            # Pull and run
-            docker pull "${{ env.IMAGE_NAME }}:latest"
-            echo "Docker image pulled successfully"
-
-            echo "=== STEP 10: Starting services ==="
-            docker compose -f $COMPOSE_FILE up -d
-            echo "Services started successfully"
-
-            echo "=== STEP 11: Cleanup ==="
-            # Cleanup old images
+            echo "=== STEP 6: Cleanup ==="
             docker image prune -f || true
-            echo "Old images cleaned up"
 
             echo "=== DEPLOYMENT COMPLETED SUCCESSFULLY ==="
-
-
