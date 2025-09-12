@@ -12,8 +12,11 @@ jobs:
       
       - name: Copy code to VM
         run: |
+          # Wait a moment for checkout to complete
+          sleep 2
+          
           # Create tar archive excluding unnecessary files
-          tar --exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='.env' -czf backend.tar.gz .
+          tar --exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='.env' --exclude='backend.tar.gz' -czf backend.tar.gz .
           
           # Copy to VM using scp
           scp -o StrictHostKeyChecking=no -i ${{ secrets.VM_SSH_KEY }} backend.tar.gz ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/tmp/
