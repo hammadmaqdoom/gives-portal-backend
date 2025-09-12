@@ -12,22 +12,32 @@ jobs:
       
       - name: Setup deploy key on VM
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          G_H_DEPLOYKEY: ${{ secrets.G_H_DEPLOYKEY }}
+          G_H_PRIVKEY: ${{ secrets.G_H_PRIVKEY }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
+          envs: G_H_DEPLOYKEY,G_H_PRIVKEY
           script: |
             # Create .ssh directory
             mkdir -p ~/.ssh
             chmod 700 ~/.ssh
             
-            # Write deploy key (normalize line endings) to avoid libcrypto errors
-            printf "%s" "${{ secrets.G_H_DEPLOYKEY }}" | tr -d '\r' > ~/.ssh/deploy_key
+            # Ensure deploy key is present via env
+            if [ -z "$G_H_DEPLOYKEY" ]; then
+              echo "Deploy key is empty (G_H_DEPLOYKEY)." >&2
+              exit 1
+            fi
+
+            # Write deploy key (normalize CRLF) to avoid libcrypto errors
+            printf "%s" "$G_H_DEPLOYKEY" | tr -d '\r' > ~/.ssh/deploy_key
             chmod 600 ~/.ssh/deploy_key
 
             # Optionally write an additional GitHub SSH private key (if provided)
-            if [ -n "${{ secrets.G_H_PRIVKEY }}" ]; then
-              printf "%s" "${{ secrets.G_H_PRIVKEY }}" | tr -d '\r' > ~/.ssh/github_key
+            if [ -n "$G_H_PRIVKEY" ]; then
+              printf "%s" "$G_H_PRIVKEY" | tr -d '\r' > ~/.ssh/github_key
               chmod 600 ~/.ssh/github_key
             fi
 
