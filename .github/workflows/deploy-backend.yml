@@ -10,19 +10,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Copy code to VM
-        run: |
-          # Wait a moment for checkout to complete
-          sleep 2
-          
-          # Create tar archive excluding unnecessary files
-          tar --exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='.env' --exclude='backend.tar.gz' -czf backend.tar.gz .
-          
-          # Copy to VM using scp
-          scp -o StrictHostKeyChecking=no -i ${{ secrets.VM_SSH_KEY }} backend.tar.gz ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/tmp/
-          
-          # Clean up local tar
-          rm backend.tar.gz
+      - name: Setup deploy key on VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            # Create .ssh directory
+            mkdir -p ~/.ssh
+            chmod 700 ~/.ssh
+            
+            # Write deploy key (read-only deploy access)
+            cat > ~/.ssh/deploy_key << 'EOF'
+            ${{ secrets.G_H_DEPLOYKEY }}
+            EOF
+            chmod 600 ~/.ssh/deploy_key
+
+            # Optionally write an additional GitHub SSH private key (if provided)
+            if [ -n "${{ secrets.G_H_PRIVKEY }}" ]; then
+              cat > ~/.ssh/github_key << 'EOF'
+              ${{ secrets.G_H_PRIVKEY }}
+              EOF
+              chmod 600 ~/.ssh/github_key
+            fi
 
       - name: Deploy over SSH to Azure VM
         uses: appleboy/ssh-action@v1.0.3
@@ -43,14 +54,38 @@ jobs:
             sudo mkdir -p $APP_HOME
             echo "App directory set to: $APP_HOME"
 
-            echo "=== STEP 3: Extracting backend code ==="
-            echo "Extracting backend code from tar archive..."
-            # Extract the tar file that was copied via scp
-            sudo tar -xzf /tmp/backend.tar.gz -C $APP_HOME/
-            # Clean up the tar file
-            rm /tmp/backend.tar.gz
+            echo "=== STEP 3: Setting up GitHub deploy key ==="
+            # Create .ssh directory if it doesn't exist
+            mkdir -p ~/.ssh
+            chmod 700 ~/.ssh
+            
+            # Add GitHub to known hosts
+            ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+            
+            # Configure git to use deploy key
+            echo "Host github.com" >> ~/.ssh/config
+            echo "  HostName github.com" >> ~/.ssh/config
+            echo "  User git" >> ~/.ssh/config
+            echo "  IdentityFile ~/.ssh/deploy_key" >> ~/.ssh/config
+            if [ -f ~/.ssh/github_key ]; then
+              echo "  IdentityFile ~/.ssh/github_key" >> ~/.ssh/config
+            fi
+            echo "  IdentitiesOnly yes" >> ~/.ssh/config
+            chmod 600 ~/.ssh/config
+            
+            echo "=== STEP 4: Cloning backend code ==="
+            echo "Cloning backend code from GitHub using deploy key..."
+            # Remove existing directory if it exists
+            sudo rm -rf $APP_HOME/*
+            
+            # Clone the repository using deploy key
+            sudo -u $USER git clone git@github.com:${{ github.repository }}.git $APP_HOME
             cd $APP_HOME
-            echo "Backend code extracted successfully"
+            
+            # Checkout the specific commit that triggered this workflow
+            git checkout ${{ github.sha }}
+            
+            echo "Backend code cloned successfully"
 
             echo "=== STEP 4: Checking .env file ==="
             if [ ! -f "$APP_HOME/.env" ]; then
