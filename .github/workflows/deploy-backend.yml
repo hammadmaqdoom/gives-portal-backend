@@ -21,13 +21,13 @@ jobs:
             mkdir -p ~/.ssh
             chmod 700 ~/.ssh
             
-            # Write deploy key (read-only deploy access) without heredoc
-            printf "%s" "${{ secrets.G_H_DEPLOYKEY }}" > ~/.ssh/deploy_key
+            # Write deploy key (normalize line endings) to avoid libcrypto errors
+            printf "%s" "${{ secrets.G_H_DEPLOYKEY }}" | tr -d '\r' > ~/.ssh/deploy_key
             chmod 600 ~/.ssh/deploy_key
 
             # Optionally write an additional GitHub SSH private key (if provided)
             if [ -n "${{ secrets.G_H_PRIVKEY }}" ]; then
-              printf "%s" "${{ secrets.G_H_PRIVKEY }}" > ~/.ssh/github_key
+              printf "%s" "${{ secrets.G_H_PRIVKEY }}" | tr -d '\r' > ~/.ssh/github_key
               chmod 600 ~/.ssh/github_key
             fi
 
@@ -76,8 +76,9 @@ jobs:
             sudo mkdir -p $APP_HOME
             sudo chown "$USER":"$USER" $APP_HOME
 
-            # Clone the repository using deploy key
-            sudo -u $USER git clone git@github.com:${{ github.repository }}.git $APP_HOME
+            # Clone the repository using deploy key (force identity usage)
+            export GIT_SSH_COMMAND="ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no"
+            sudo -u $USER GIT_SSH_COMMAND="$GIT_SSH_COMMAND" git clone git@github.com:${{ github.repository }}.git $APP_HOME
             cd $APP_HOME
             
             # Checkout the specific commit that triggered this workflow
