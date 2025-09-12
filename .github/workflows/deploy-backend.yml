@@ -10,6 +10,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Copy code to VM
+        run: |
+          # Create tar archive excluding unnecessary files
+          tar --exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='.env' -czf backend.tar.gz .
+          
+          # Copy to VM using scp
+          scp -o StrictHostKeyChecking=no -i ${{ secrets.VM_SSH_KEY }} backend.tar.gz ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/tmp/
+          
+          # Clean up local tar
+          rm backend.tar.gz
+
       - name: Deploy over SSH to Azure VM
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -29,16 +40,14 @@ jobs:
             sudo mkdir -p $APP_HOME
             echo "App directory set to: $APP_HOME"
 
-            echo "=== STEP 3: Copying backend code ==="
-            echo "Copying backend code from GitHub to VM..."
-            # Create a temporary tar archive excluding unnecessary files
-            tar --exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='.env' -czf /tmp/backend.tar.gz .
-            # Extract to app directory
+            echo "=== STEP 3: Extracting backend code ==="
+            echo "Extracting backend code from tar archive..."
+            # Extract the tar file that was copied via scp
             sudo tar -xzf /tmp/backend.tar.gz -C $APP_HOME/
-            # Clean up
+            # Clean up the tar file
             rm /tmp/backend.tar.gz
             cd $APP_HOME
-            echo "Backend code copied successfully"
+            echo "Backend code extracted successfully"
 
             echo "=== STEP 4: Checking .env file ==="
             if [ ! -f "$APP_HOME/.env" ]; then
