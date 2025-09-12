@@ -31,7 +31,12 @@ jobs:
 
             echo "=== STEP 3: Copying backend code ==="
             echo "Copying backend code from GitHub to VM..."
-            rsync -avz --delete --exclude='.git/' --exclude='node_modules/' --exclude='dist/' --exclude='.env' . $APP_HOME/
+            # Create a temporary tar archive excluding unnecessary files
+            tar --exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='.env' -czf /tmp/backend.tar.gz .
+            # Extract to app directory
+            sudo tar -xzf /tmp/backend.tar.gz -C $APP_HOME/
+            # Clean up
+            rm /tmp/backend.tar.gz
             cd $APP_HOME
             echo "Backend code copied successfully"
 
