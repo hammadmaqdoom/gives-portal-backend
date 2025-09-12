@@ -71,9 +71,11 @@ jobs:
             
             echo "=== STEP 4: Cloning backend code ==="
             echo "Cloning backend code from GitHub using deploy key..."
-            # Remove existing directory if it exists
-            sudo rm -rf $APP_HOME/*
-            
+            # Ensure target directory is empty (remove and recreate to include dotfiles)
+            sudo rm -rf $APP_HOME
+            sudo mkdir -p $APP_HOME
+            sudo chown "$USER":"$USER" $APP_HOME
+
             # Clone the repository using deploy key
             sudo -u $USER git clone git@github.com:${{ github.repository }}.git $APP_HOME
             cd $APP_HOME
