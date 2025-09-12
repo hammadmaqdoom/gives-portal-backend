@@ -21,17 +21,13 @@ jobs:
             mkdir -p ~/.ssh
             chmod 700 ~/.ssh
             
-            # Write deploy key (read-only deploy access)
-            cat > ~/.ssh/deploy_key << 'EOF'
-            ${{ secrets.G_H_DEPLOYKEY }}
-            EOF
+            # Write deploy key (read-only deploy access) without heredoc
+            printf "%s" "${{ secrets.G_H_DEPLOYKEY }}" > ~/.ssh/deploy_key
             chmod 600 ~/.ssh/deploy_key
 
             # Optionally write an additional GitHub SSH private key (if provided)
             if [ -n "${{ secrets.G_H_PRIVKEY }}" ]; then
-              cat > ~/.ssh/github_key << 'EOF'
-              ${{ secrets.G_H_PRIVKEY }}
-              EOF
+              printf "%s" "${{ secrets.G_H_PRIVKEY }}" > ~/.ssh/github_key
               chmod 600 ~/.ssh/github_key
             fi
 
@@ -90,50 +86,49 @@ jobs:
             echo "=== STEP 4: Checking .env file ==="
             if [ ! -f "$APP_HOME/.env" ]; then
               echo "Creating new .env file"
-              sudo tee $APP_HOME/.env >/dev/null <<ENV
-              NODE_ENV=production
-              APP_PORT=3000
-              APP_NAME=${{ secrets.APP_NAME }}
-              API_PREFIX=api
-              APP_FALLBACK_LANGUAGE=en
-              APP_HEADER_LANGUAGE=x-custom-lang
+              : | sudo tee $APP_HOME/.env >/dev/null
+              printf "%s\n" "NODE_ENV=production" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "APP_PORT=3000" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "APP_NAME=${{ secrets.APP_NAME }}" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "API_PREFIX=api" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "APP_FALLBACK_LANGUAGE=en" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "APP_HEADER_LANGUAGE=x-custom-lang" | sudo tee -a $APP_HOME/.env >/dev/null
 
               # Database
-              DATABASE_TYPE=postgres
-              DATABASE_HOST=pgbouncer
-              DATABASE_PORT=6432
-              DATABASE_USERNAME=${{ secrets.POSTGRES_USER }}
-              DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}
-              DATABASE_NAME=${{ secrets.DATABASE_NAME }}
-              DATABASE_SYNCHRONIZE=false
+              printf "%s\n" "DATABASE_TYPE=postgres" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "DATABASE_HOST=pgbouncer" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "DATABASE_PORT=6432" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "DATABASE_USERNAME=${{ secrets.POSTGRES_USER }}" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "DATABASE_NAME=${{ secrets.DATABASE_NAME }}" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "DATABASE_SYNCHRONIZE=false" | sudo tee -a $APP_HOME/.env >/dev/null
 
               # File storage
-              FILE_DRIVER=${{ secrets.FILE_DRIVER }}
+              printf "%s\n" "FILE_DRIVER=${{ secrets.FILE_DRIVER }}" | sudo tee -a $APP_HOME/.env >/dev/null
 
               # Azure (if using azure-blob-sas)
-              AZURE_STORAGE_ACCOUNT_NAME=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}
-              AZURE_STORAGE_ACCOUNT_KEY=${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}
-              AZURE_CONTAINER_NAME=${{ secrets.AZURE_CONTAINER_NAME }}
-              AZURE_BLOB_SAS_EXPIRY_SECONDS=3600
+              printf "%s\n" "AZURE_STORAGE_ACCOUNT_NAME=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "AZURE_STORAGE_ACCOUNT_KEY=${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "AZURE_CONTAINER_NAME=${{ secrets.AZURE_CONTAINER_NAME }}" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "AZURE_BLOB_SAS_EXPIRY_SECONDS=3600" | sudo tee -a $APP_HOME/.env >/dev/null
 
               # JWT (set via repo secrets or leave empty to use defaults)
-              AUTH_JWT_SECRET=${{ secrets.AUTH_JWT_SECRET }}
-              AUTH_REFRESH_SECRET=${{ secrets.AUTH_REFRESH_SECRET }}
-              AUTH_FORGOT_SECRET=${{ secrets.AUTH_FORGOT_SECRET }}
-              AUTH_CONFIRM_EMAIL_SECRET=${{ secrets.AUTH_CONFIRM_EMAIL_SECRET }}
+              printf "%s\n" "AUTH_JWT_SECRET=${{ secrets.AUTH_JWT_SECRET }}" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "AUTH_REFRESH_SECRET=${{ secrets.AUTH_REFRESH_SECRET }}" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "AUTH_FORGOT_SECRET=${{ secrets.AUTH_FORGOT_SECRET }}" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "AUTH_CONFIRM_EMAIL_SECRET=${{ secrets.AUTH_CONFIRM_EMAIL_SECRET }}" | sudo tee -a $APP_HOME/.env >/dev/null
 
               # Optional domains and Zoom OAuth
-              BACKEND_DOMAIN=${{ secrets.BACKEND_DOMAIN }}
-              FRONTEND_DOMAIN=${{ secrets.FRONTEND_DOMAIN }}
-              ZOOM_OAUTH_CLIENT_ID=${{ secrets.ZOOM_OAUTH_CLIENT_ID }}
-              ZOOM_OAUTH_CLIENT_SECRET=${{ secrets.ZOOM_OAUTH_CLIENT_SECRET }}
-              ZOOM_OAUTH_REDIRECT_URI=${{ secrets.ZOOM_OAUTH_REDIRECT_URI }}
+              printf "%s\n" "BACKEND_DOMAIN=${{ secrets.BACKEND_DOMAIN }}" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "FRONTEND_DOMAIN=${{ secrets.FRONTEND_DOMAIN }}" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "ZOOM_OAUTH_CLIENT_ID=${{ secrets.ZOOM_OAUTH_CLIENT_ID }}" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "ZOOM_OAUTH_CLIENT_SECRET=${{ secrets.ZOOM_OAUTH_CLIENT_SECRET }}" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "ZOOM_OAUTH_REDIRECT_URI=${{ secrets.ZOOM_OAUTH_REDIRECT_URI }}" | sudo tee -a $APP_HOME/.env >/dev/null
 
               # PgBouncer tuning (optional)
-              PGBOUNCER_DEFAULT_POOL_SIZE=20
-              PGBOUNCER_POOL_MODE=transaction
-              PGBOUNCER_MAX_CLIENT_CONN=200
-              ENV
+              printf "%s\n" "PGBOUNCER_DEFAULT_POOL_SIZE=20" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "PGBOUNCER_POOL_MODE=transaction" | sudo tee -a $APP_HOME/.env >/dev/null
+              printf "%s\n" "PGBOUNCER_MAX_CLIENT_CONN=200" | sudo tee -a $APP_HOME/.env >/dev/null
             else
               echo ".env file already exists, keeping existing configuration"
             fi
