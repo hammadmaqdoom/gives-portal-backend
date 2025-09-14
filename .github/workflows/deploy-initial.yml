@@ -60,6 +60,15 @@ jobs:
               echo "Docker already installed"
             fi
             
+            # Add user to docker group and refresh session
+            echo "=== Step 2.1: Setting up Docker permissions ==="
+            sudo usermod -aG docker $USER
+            # Use newgrp to refresh group membership for current session
+            newgrp docker << EOF
+            echo "Docker group permissions activated"
+            docker --version
+            EOF
+            
             # Install Docker Compose
             echo "=== Step 3: Installing Docker Compose ==="
             if ! command -v docker-compose &> /dev/null; then
@@ -195,28 +204,39 @@ jobs:
             # Build and start services
             echo "=== Step 12: Building and starting services ==="
             cd $APP_HOME
+            
+            # Use newgrp to ensure docker permissions
+            newgrp docker << EOF
+            echo "Building and starting services with docker permissions"
             docker-compose -f docker-compose.prod.yml up -d --build
+            EOF
 
             # Wait for services to be ready
             echo "=== Step 13: Waiting for services to be ready ==="
+            newgrp docker << EOF
             ./wait-for-it.sh postgres:5432 --timeout=60 --strict -- echo "PostgreSQL is ready"
             ./wait-for-it.sh redis:6379 --timeout=30 --strict -- echo "Redis is ready"
             ./wait-for-it.sh app:3000 --timeout=60 --strict -- echo "Application is ready"
+            EOF
 
             # Generate SSL certificates
             echo "=== Step 14: Generating SSL certificates ==="
             # Stop nginx temporarily
+            newgrp docker << EOF
             docker-compose -f docker-compose.prod.yml stop nginx
+            EOF
             
             # Generate certificates
             sudo certbot certonly --standalone -d $BACKEND_DOMAIN -d $STATIC_IP --non-interactive --agree-tos --email ${{ secrets.EMAIL }}
             
             # Start nginx
+            newgrp docker << EOF
             docker-compose -f docker-compose.prod.yml start nginx
+            EOF
 
             # Setup certificate renewal
             echo "=== Step 15: Setting up certificate renewal ==="
-            (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && cd $APP_HOME && docker-compose -f docker-compose.prod.yml restart nginx") | crontab -
+            (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && cd $APP_HOME && newgrp docker -c 'docker-compose -f docker-compose.prod.yml restart nginx'") | crontab -
 
             echo "=== INITIAL DEPLOYMENT COMPLETED SUCCESSFULLY ==="
             echo "Backend is running on: https://$BACKEND_DOMAIN"
