@@ -216,24 +216,38 @@ jobs:
             docker-compose -f docker-compose.prod.yml up -d --build
             EOF
 
+            # Wait a moment for app to start
+            echo "=== Step 14: Waiting for app to initialize ==="
+            sleep 30
+            
             # Check container status
-            echo "=== Step 14: Checking container status ==="
+            echo "=== Step 15: Checking container status ==="
             newgrp docker << EOF
             echo "=== Container Status ==="
             docker ps -a
-            echo "=== Container Logs (last 20 lines each) ==="
+            echo "=== Container Health Status ==="
+            docker inspect backend_app --format='{{.State.Health.Status}}' || echo "No health status"
+            echo "=== App Container Details ==="
+            docker inspect backend_app --format='{{json .State}}' | jq '.' || echo "No container details"
+            echo "=== Container Logs (last 50 lines each) ==="
             echo "--- PostgreSQL Logs ---"
-            docker logs backend_postgres --tail 20 || true
+            docker logs backend_postgres --tail 50 || true
             echo "--- Redis Logs ---"
-            docker logs backend_redis --tail 20 || true
-            echo "--- App Logs ---"
-            docker logs backend_app --tail 20 || true
+            docker logs backend_redis --tail 50 || true
+            echo "--- App Logs (Full) ---"
+            docker logs backend_app --tail 100 || true
             echo "--- Nginx Logs ---"
-            docker logs backend_nginx --tail 20 || true
+            docker logs backend_nginx --tail 50 || true
+            echo "=== Testing App Health Check ==="
+            docker exec backend_app curl -f http://localhost:3000/health || echo "Health check failed"
+            echo "=== Testing App Port ==="
+            docker exec backend_app netstat -tlnp || echo "Netstat failed"
+            echo "=== App Process List ==="
+            docker exec backend_app ps aux || echo "Process list failed"
             EOF
             
             # Wait for services to be ready
-            echo "=== Step 15: Waiting for services to be ready ==="
+            echo "=== Step 16: Waiting for services to be ready ==="
             newgrp docker << EOF
             # Wait for PostgreSQL
             echo "Waiting for PostgreSQL..."
@@ -250,7 +264,7 @@ jobs:
             EOF
 
             # Generate SSL certificates
-            echo "=== Step 16: Generating SSL certificates ==="
+            echo "=== Step 17: Generating SSL certificates ==="
             # Stop nginx temporarily
             newgrp docker << EOF
             docker-compose -f docker-compose.prod.yml stop nginx
@@ -265,7 +279,7 @@ jobs:
             EOF
 
             # Setup certificate renewal
-            echo "=== Step 17: Setting up certificate renewal ==="
+            echo "=== Step 18: Setting up certificate renewal ==="
             (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && cd $APP_HOME && newgrp docker -c 'docker-compose -f docker-compose.prod.yml restart nginx'") | crontab -
 
             echo "=== INITIAL DEPLOYMENT COMPLETED SUCCESSFULLY ==="
