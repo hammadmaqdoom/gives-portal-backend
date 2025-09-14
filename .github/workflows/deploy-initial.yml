@@ -1,0 +1,212 @@
+name: Initial AWS Lightsail Deployment
+
+on:
+  workflow_dispatch:
+
+jobs:
+  initial-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Copy source code to Lightsail
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          source: "."
+          target: "/opt/backend"
+          strip_components: 1
+
+      - name: Deploy to AWS Lightsail
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          script: |
+            set -e
+            
+            echo "=== INITIAL AWS LIGHTSAIL DEPLOYMENT ==="
+            echo "Backend Domain: ${{ secrets.BACKEND_DOMAIN }}"
+            echo "Frontend Domain: ${{ secrets.FRONTEND_DOMAIN }}"
+            echo "Current user: $(whoami)"
+            echo "Current directory: $(pwd)"
+            
+            # Set variables
+            APP_HOME="/opt/backend"
+            BACKEND_DOMAIN="${{ secrets.BACKEND_DOMAIN }}"
+            FRONTEND_DOMAIN="${{ secrets.FRONTEND_DOMAIN }}"
+            STATIC_IP=$(curl -s http://checkip.amazonaws.com/)
+            
+            echo "Static IP: $STATIC_IP"
+            
+            # Update system
+            echo "=== Step 1: Updating system ==="
+            sudo apt-get update -y
+            sudo apt-get upgrade -y
+            
+            # Install Docker
+            echo "=== Step 2: Installing Docker ==="
+            if ! command -v docker &> /dev/null; then
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sudo sh get-docker.sh
+              sudo usermod -aG docker $USER
+              rm get-docker.sh
+              echo "Docker installed successfully"
+            else
+              echo "Docker already installed"
+            fi
+            
+            # Install Docker Compose
+            echo "=== Step 3: Installing Docker Compose ==="
+            if ! command -v docker-compose &> /dev/null; then
+              sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+              sudo chmod +x /usr/local/bin/docker-compose
+              echo "Docker Compose installed successfully"
+            else
+              echo "Docker Compose already installed"
+            fi
+            
+            # Install Nginx
+            echo "=== Step 4: Installing Nginx ==="
+            sudo apt-get install -y nginx
+            
+            # Install Certbot for SSL
+            echo "=== Step 5: Installing Certbot ==="
+            sudo apt-get install -y certbot python3-certbot-nginx
+            
+            # Create application directory
+            echo "=== Step 6: Setting up application directory ==="
+            sudo mkdir -p $APP_HOME
+            sudo chown "$USER":"$USER" $APP_HOME
+            
+            # Create .env file
+            echo "=== Step 7: Creating environment configuration ==="
+            cat > $APP_HOME/.env << EOF
+            # Application Configuration
+            NODE_ENV=production
+            APP_PORT=3000
+            APP_NAME=${{ secrets.APP_NAME }}
+            API_PREFIX=api
+            APP_FALLBACK_LANGUAGE=en
+            APP_HEADER_LANGUAGE=x-custom-lang
+            FRONTEND_DOMAIN=${{ secrets.FRONTEND_DOMAIN }}
+            BACKEND_DOMAIN=${{ secrets.BACKEND_DOMAIN }}
+
+            # Database Configuration
+            DATABASE_TYPE=postgres
+            DATABASE_HOST=postgres
+            DATABASE_PORT=5432
+            DATABASE_USERNAME=${{ secrets.POSTGRES_USER }}
+            DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}
+            DATABASE_NAME=${{ secrets.DATABASE_NAME }}
+            DATABASE_SYNCHRONIZE=false
+            DATABASE_MAX_CONNECTIONS=100
+            DATABASE_SSL_ENABLED=false
+            DATABASE_REJECT_UNAUTHORIZED=false
+            DATABASE_CA=
+            DATABASE_KEY=
+            DATABASE_CERT=
+            DATABASE_URL=
+
+            # File Storage Configuration
+            FILE_DRIVER=${{ secrets.FILE_DRIVER }}
+            ACCESS_KEY_ID=${{ secrets.S3AWS_ACCESS_KEY_ID }}
+            SECRET_ACCESS_KEY=${{ secrets.S3AWS_SECRET_ACCESS_KEY }}
+            AWS_S3_REGION=${{ secrets.S3AWS_REGION }}
+            AWS_DEFAULT_S3_BUCKET=${{ secrets.S3AWS_DEFAULT_S3_BUCKET }}
+
+            # Azure Blob Storage (if using azure-blob-sas)
+            AZURE_STORAGE_ACCOUNT_NAME=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}
+            AZURE_STORAGE_ACCOUNT_KEY=${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}
+            AZURE_CONTAINER_NAME=${{ secrets.AZURE_CONTAINER_NAME }}
+            AZURE_BLOB_SAS_EXPIRY_SECONDS=${{ secrets.AZURE_BLOB_SAS_EXPIRY_SECONDS }}
+            AZURE_BLOB_PUBLIC_BASE_URL=${{ secrets.AZURE_BLOB_PUBLIC_BASE_URL }}
+
+            # Authentication
+            AUTH_JWT_SECRET=secret
+            AUTH_JWT_TOKEN_EXPIRES_IN=15m
+            AUTH_REFRESH_SECRET=secret_for_refresh
+            AUTH_REFRESH_TOKEN_EXPIRES_IN=3650d
+            AUTH_FORGOT_SECRET=secret_for_forgot
+            AUTH_FORGOT_TOKEN_EXPIRES_IN=30m
+            AUTH_CONFIRM_EMAIL_SECRET=secret_for_confirm_email
+            AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN=1d
+
+            # Social Auth
+            FACEBOOK_APP_ID=${{ secrets.FACEBOOK_APP_ID }}
+            FACEBOOK_APP_SECRET=${{ secrets.FACEBOOK_APP_SECRET }}
+            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+            APPLE_APP_AUDIENCE=[]
+
+            # Worker Configuration
+            WORKER_HOST=redis://redis:6379/1
+
+            # Redis Configuration
+            REDIS_ENABLED=false
+            REDIS_HOST=redis
+            REDIS_PORT=6379
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+            REDIS_DB=0
+            REDIS_TTL=3600
+
+            # Zoom OAuth
+            ZOOM_OAUTH_CLIENT_ID=${{ secrets.ZOOM_OAUTH_CLIENT_ID }}
+            ZOOM_OAUTH_CLIENT_SECRET=${{ secrets.ZOOM_OAUTH_CLIENT_SECRET }}
+            ZOOM_OAUTH_REDIRECT_URI=${{ secrets.ZOOM_OAUTH_REDIRECT_URI }}
+            EOF
+
+            # Use existing docker-compose.prod.yml from the copied code
+            echo "=== Step 8: Using existing Docker Compose configuration ==="
+            # The docker-compose.prod.yml is already copied from the repository
+
+            # Use existing Dockerfile.prod from the copied code
+            echo "=== Step 9: Using existing production Dockerfile ==="
+            # The Dockerfile.prod is already copied from the repository
+
+            # Create wait-for-it script
+            echo "=== Step 10: Creating wait-for-it script ==="
+            curl -o $APP_HOME/wait-for-it.sh https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh
+            chmod +x $APP_HOME/wait-for-it.sh
+
+            # Use existing Nginx configuration from the copied code
+            echo "=== Step 11: Using existing Nginx configuration ==="
+            # The nginx configuration is already copied from the repository
+            # Update the backend.conf with the actual domain and IP
+            sed -i "s/yourdomain.com/$BACKEND_DOMAIN/g" $APP_HOME/nginx/conf.d/backend.conf
+            sed -i "s/server_name _/server_name $BACKEND_DOMAIN $STATIC_IP/g" $APP_HOME/nginx/conf.d/backend.conf
+
+            # Build and start services
+            echo "=== Step 12: Building and starting services ==="
+            cd $APP_HOME
+            docker-compose -f docker-compose.prod.yml up -d --build
+
+            # Wait for services to be ready
+            echo "=== Step 13: Waiting for services to be ready ==="
+            ./wait-for-it.sh postgres:5432 --timeout=60 --strict -- echo "PostgreSQL is ready"
+            ./wait-for-it.sh redis:6379 --timeout=30 --strict -- echo "Redis is ready"
+            ./wait-for-it.sh app:3000 --timeout=60 --strict -- echo "Application is ready"
+
+            # Generate SSL certificates
+            echo "=== Step 14: Generating SSL certificates ==="
+            # Stop nginx temporarily
+            docker-compose -f docker-compose.prod.yml stop nginx
+            
+            # Generate certificates
+            sudo certbot certonly --standalone -d $BACKEND_DOMAIN -d $STATIC_IP --non-interactive --agree-tos --email ${{ secrets.EMAIL }}
+            
+            # Start nginx
+            docker-compose -f docker-compose.prod.yml start nginx
+
+            # Setup certificate renewal
+            echo "=== Step 15: Setting up certificate renewal ==="
+            (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && cd $APP_HOME && docker-compose -f docker-compose.prod.yml restart nginx") | crontab -
+
+            echo "=== INITIAL DEPLOYMENT COMPLETED SUCCESSFULLY ==="
+            echo "Backend is running on: https://$BACKEND_DOMAIN"
+            echo "Static IP: https://$STATIC_IP"
+            echo "Health check: https://$BACKEND_DOMAIN/health"

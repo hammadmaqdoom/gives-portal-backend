@@ -38,14 +38,14 @@ AZURE_BLOB_SAS_EXPIRY_SECONDS=
 # Optional: public base URL override if using CDN/custom domain
 AZURE_BLOB_PUBLIC_BASE_URL=
 
-MAIL_HOST=maildev
-MAIL_PORT=1025
+MAIL_HOST=email-smtp.ap-south-1.amazonaws.com
+MAIL_PORT=465
 MAIL_USER=
 MAIL_PASSWORD=
 MAIL_IGNORE_TLS=true
 MAIL_SECURE=false
 MAIL_REQUIRE_TLS=false
-MAIL_DEFAULT_EMAIL=noreply@example.com
+MAIL_DEFAULT_EMAIL=info@givesacademy.org
 MAIL_DEFAULT_NAME=Api
 MAIL_CLIENT_PORT=1080
 
