@@ -216,8 +216,24 @@ jobs:
             docker-compose -f docker-compose.prod.yml up -d --build
             EOF
 
+            # Check container status
+            echo "=== Step 14: Checking container status ==="
+            newgrp docker << EOF
+            echo "=== Container Status ==="
+            docker ps -a
+            echo "=== Container Logs (last 20 lines each) ==="
+            echo "--- PostgreSQL Logs ---"
+            docker logs backend_postgres --tail 20 || true
+            echo "--- Redis Logs ---"
+            docker logs backend_redis --tail 20 || true
+            echo "--- App Logs ---"
+            docker logs backend_app --tail 20 || true
+            echo "--- Nginx Logs ---"
+            docker logs backend_nginx --tail 20 || true
+            EOF
+            
             # Wait for services to be ready
-            echo "=== Step 14: Waiting for services to be ready ==="
+            echo "=== Step 15: Waiting for services to be ready ==="
             newgrp docker << EOF
             ./wait-for-it.sh postgres:5432 --timeout=60 --strict -- echo "PostgreSQL is ready"
             ./wait-for-it.sh redis:6379 --timeout=30 --strict -- echo "Redis is ready"
@@ -225,7 +241,7 @@ jobs:
             EOF
 
             # Generate SSL certificates
-            echo "=== Step 15: Generating SSL certificates ==="
+            echo "=== Step 16: Generating SSL certificates ==="
             # Stop nginx temporarily
             newgrp docker << EOF
             docker-compose -f docker-compose.prod.yml stop nginx
@@ -240,7 +256,7 @@ jobs:
             EOF
 
             # Setup certificate renewal
-            echo "=== Step 16: Setting up certificate renewal ==="
+            echo "=== Step 17: Setting up certificate renewal ==="
             (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && cd $APP_HOME && newgrp docker -c 'docker-compose -f docker-compose.prod.yml restart nginx'") | crontab -
 
             echo "=== INITIAL DEPLOYMENT COMPLETED SUCCESSFULLY ==="
