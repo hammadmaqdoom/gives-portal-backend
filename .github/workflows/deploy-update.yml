@@ -166,9 +166,18 @@ jobs:
               # Wait for services to be ready
               echo "=== Waiting for services to be ready ==="
               newgrp docker << EOF
-              ./wait-for-it.sh postgres:5432 --timeout=60 --strict -- echo "PostgreSQL is ready"
-              ./wait-for-it.sh redis:6379 --timeout=30 --strict -- echo "Redis is ready"
-              ./wait-for-it.sh app:3000 --timeout=60 --strict -- echo "Application is ready"
+              # Wait for PostgreSQL
+              echo "Waiting for PostgreSQL..."
+              docker exec backend_app ./wait-for-it.sh postgres:5432 --timeout=60 --strict -- echo "PostgreSQL is ready"
+              
+              # Wait for Redis
+              echo "Waiting for Redis..."
+              docker exec backend_app ./wait-for-it.sh redis:6379 --timeout=30 --strict -- echo "Redis is ready"
+              
+              # Wait for App to be healthy
+              echo "Waiting for App to be healthy..."
+              timeout 60 bash -c 'until docker exec backend_app curl -f http://localhost:3000/health; do sleep 2; done' || echo "App health check timeout"
+              echo "Application is ready"
               EOF
               
               echo "=== Code update completed successfully ==="
