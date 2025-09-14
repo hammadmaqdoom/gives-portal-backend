@@ -158,9 +158,12 @@ jobs:
               ZOOM_OAUTH_REDIRECT_URI=${{ secrets.ZOOM_OAUTH_REDIRECT_URI }}
               EOF
               
-              # Rebuild and start services
+              # Rebuild and start services (without health check dependencies)
               newgrp docker << EOF
-              docker-compose -f docker-compose.prod.yml up -d --build
+              # Start services without health check dependencies first
+              docker-compose -f docker-compose.prod.yml up -d --build postgres redis app
+              echo "Waiting for app to start..."
+              sleep 30
               EOF
               
               # Wait for services to be ready
@@ -178,6 +181,10 @@ jobs:
               echo "Waiting for App to be healthy..."
               timeout 60 bash -c 'until docker exec backend_app curl -f http://localhost:3000/health; do sleep 2; done' || echo "App health check timeout"
               echo "Application is ready"
+              
+              # Now start Nginx
+              echo "Starting Nginx..."
+              docker-compose -f docker-compose.prod.yml up -d nginx
               EOF
               
               echo "=== Code update completed successfully ==="
