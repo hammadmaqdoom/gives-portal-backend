@@ -206,14 +206,17 @@ jobs:
             sudo systemctl stop nginx || true
             sudo systemctl disable nginx || true
             
-            # Build and start services
+            # Build and start services (without health check dependencies)
             echo "=== Step 13: Building and starting services ==="
             cd $APP_HOME
             
             # Use newgrp to ensure docker permissions
             newgrp docker << EOF
             echo "Building and starting services with docker permissions"
-            docker-compose -f docker-compose.prod.yml up -d --build
+            # Start services without health check dependencies first
+            docker-compose -f docker-compose.prod.yml up -d --build postgres redis app
+            echo "Waiting for app to start..."
+            sleep 30
             EOF
 
             # Wait a moment for app to start
@@ -261,6 +264,10 @@ jobs:
             echo "Waiting for App to be healthy..."
             timeout 60 bash -c 'until docker exec backend_app curl -f http://localhost:3000/health; do sleep 2; done' || echo "App health check timeout"
             echo "Application is ready"
+            
+            # Now start Nginx
+            echo "Starting Nginx..."
+            docker-compose -f docker-compose.prod.yml up -d nginx
             EOF
 
             # Generate SSL certificates
