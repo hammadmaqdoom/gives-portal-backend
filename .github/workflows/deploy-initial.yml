@@ -201,8 +201,13 @@ jobs:
             sed -i "s/yourdomain.com/$BACKEND_DOMAIN/g" $APP_HOME/nginx/conf.d/backend.conf
             sed -i "s/server_name _/server_name $BACKEND_DOMAIN $STATIC_IP/g" $APP_HOME/nginx/conf.d/backend.conf
 
+            # Stop system Nginx to free up port 80
+            echo "=== Step 12: Stopping system Nginx ==="
+            sudo systemctl stop nginx || true
+            sudo systemctl disable nginx || true
+            
             # Build and start services
-            echo "=== Step 12: Building and starting services ==="
+            echo "=== Step 13: Building and starting services ==="
             cd $APP_HOME
             
             # Use newgrp to ensure docker permissions
@@ -212,7 +217,7 @@ jobs:
             EOF
 
             # Wait for services to be ready
-            echo "=== Step 13: Waiting for services to be ready ==="
+            echo "=== Step 14: Waiting for services to be ready ==="
             newgrp docker << EOF
             ./wait-for-it.sh postgres:5432 --timeout=60 --strict -- echo "PostgreSQL is ready"
             ./wait-for-it.sh redis:6379 --timeout=30 --strict -- echo "Redis is ready"
@@ -220,7 +225,7 @@ jobs:
             EOF
 
             # Generate SSL certificates
-            echo "=== Step 14: Generating SSL certificates ==="
+            echo "=== Step 15: Generating SSL certificates ==="
             # Stop nginx temporarily
             newgrp docker << EOF
             docker-compose -f docker-compose.prod.yml stop nginx
@@ -235,7 +240,7 @@ jobs:
             EOF
 
             # Setup certificate renewal
-            echo "=== Step 15: Setting up certificate renewal ==="
+            echo "=== Step 16: Setting up certificate renewal ==="
             (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && cd $APP_HOME && newgrp docker -c 'docker-compose -f docker-compose.prod.yml restart nginx'") | crontab -
 
             echo "=== INITIAL DEPLOYMENT COMPLETED SUCCESSFULLY ==="

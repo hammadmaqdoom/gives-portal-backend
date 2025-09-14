@@ -72,6 +72,10 @@ jobs:
             if [ "${{ github.event.inputs.update_type }}" = "code" ]; then
               echo "=== Updating application code ==="
               
+              # Stop system Nginx to free up port 80
+              echo "=== Stopping system Nginx ==="
+              sudo systemctl stop nginx || true
+              
               # Stop services
               newgrp docker << EOF
               docker-compose -f docker-compose.prod.yml down
