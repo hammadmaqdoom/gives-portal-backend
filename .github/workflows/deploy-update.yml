@@ -27,7 +27,7 @@ jobs:
           username: ${{ secrets.LIGHTSAIL_USER }}
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           source: "."
-          target: "/opt/backend"
+          target: "/tmp/backend"
           strip_components: 1
 
       - name: Deploy update to AWS Lightsail
@@ -53,6 +53,18 @@ jobs:
             echo "Backend Domain: $BACKEND_DOMAIN"
             echo "Frontend Domain: $FRONTEND_DOMAIN"
             echo "Static IP: $STATIC_IP"
+            
+            # Move files from /tmp/backend to /opt/backend
+            echo "=== Moving updated files to application directory ==="
+            if [ -d "/tmp/backend" ]; then
+              sudo rm -rf $APP_HOME/*
+              sudo cp -r /tmp/backend/* $APP_HOME/
+              sudo chown -R "$USER":"$USER" $APP_HOME
+              sudo rm -rf /tmp/backend
+              echo "Files moved successfully to $APP_HOME"
+            else
+              echo "Warning: /tmp/backend directory not found"
+            fi
             
             cd $APP_HOME
             
