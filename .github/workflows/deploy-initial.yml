@@ -277,19 +277,15 @@ jobs:
             echo "Waiting for App to be healthy..."
             timeout 60 bash -c 'until docker exec backend_app curl -f http://localhost:3000/health; do sleep 2; done' || echo "App health check timeout"
             echo "Application is ready"
-            
-            # Now start Nginx
-            echo "Starting Nginx..."
-            docker-compose -f docker-compose.prod.yml up -d nginx
             EOF
 
             # Generate SSL certificates
             echo "=== Step 17: Generating SSL certificates ==="
-            # Stop nginx temporarily
+            # Ensure nginx isn't started yet; we'll start it after certs
             newgrp docker << EOF
-            docker-compose -f docker-compose.prod.yml stop nginx
+            docker-compose -f docker-compose.prod.yml stop nginx || true
             EOF
-            
+
             # Generate certificates
             sudo certbot certonly --standalone -d $BACKEND_DOMAIN -d $STATIC_IP --non-interactive --agree-tos --email ${{ secrets.EMAIL }}
             
