@@ -124,7 +124,8 @@ jobs:
             DATABASE_USERNAME=${{ secrets.POSTGRES_USER }}
             DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}
             DATABASE_NAME=${{ secrets.DATABASE_NAME }}
-            DATABASE_SYNCHRONIZE=false
+            # Enable once for first boot to auto-create tables; turn off later
+            DATABASE_SYNCHRONIZE=true
             DATABASE_MAX_CONNECTIONS=100
             DATABASE_SSL_ENABLED=false
             DATABASE_REJECT_UNAUTHORIZED=false
