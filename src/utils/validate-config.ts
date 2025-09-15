@@ -6,7 +6,15 @@ function validateConfig<T extends object>(
   config: Record<string, unknown>,
   envVariablesClass: ClassConstructor<T>,
 ) {
-  const validatedConfig = plainToClass(envVariablesClass, config, {
+  // Treat empty strings as undefined so @IsOptional works as expected
+  const sanitizedConfig = Object.fromEntries(
+    Object.entries(config).map(([key, value]) => [
+      key,
+      value === '' ? undefined : value,
+    ]),
+  );
+
+  const validatedConfig = plainToClass(envVariablesClass, sanitizedConfig, {
     enableImplicitConversion: true,
   });
   const errors = validateSync(validatedConfig, {

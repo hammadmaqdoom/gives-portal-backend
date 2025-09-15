@@ -287,7 +287,8 @@ jobs:
             EOF
 
             # Generate certificates
-            sudo certbot certonly --standalone -d $BACKEND_DOMAIN -d $STATIC_IP --non-interactive --agree-tos --email ${{ secrets.EMAIL }}
+            # Issue cert only for domain; Let's Encrypt won't issue for bare IP
+            sudo certbot certonly --standalone -d $BACKEND_DOMAIN --non-interactive --agree-tos --email ${{ secrets.EMAIL }}
             
             # Start nginx
             newgrp docker << EOF
