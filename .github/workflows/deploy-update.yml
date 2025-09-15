@@ -160,8 +160,10 @@ jobs:
               
               # Rebuild and start services (without health check dependencies)
               newgrp docker << EOF
+              # Ensure fresh app image with updated base (Node 20)
+              docker-compose -f docker-compose.prod.yml build --no-cache app
               # Start services without health check dependencies first
-              docker-compose -f docker-compose.prod.yml up -d --build postgres redis app
+              docker-compose -f docker-compose.prod.yml up -d postgres redis app
               echo "Waiting for app to start..."
               sleep 30
               EOF
