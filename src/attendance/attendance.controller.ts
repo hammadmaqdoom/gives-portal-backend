@@ -129,6 +129,22 @@ export class AttendanceController {
     return this.attendanceService.findByClassAndDate(+classId, new Date(date));
   }
 
+  @Get('by-date')
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @ApiOkResponse({
+    type: [Attendance],
+  })
+  @SerializeOptions({
+    groups: ['admin'],
+  })
+  findByDate(
+    @Query('date') date: string,
+    @Query('classId') classId?: string,
+    @Query('studentId') studentId?: string,
+  ): Promise<Attendance[] | NullableType<Attendance>> {
+    return this.attendanceService.findByDate(new Date(date), classId ? +classId : undefined, studentId ? +studentId : undefined);
+  }
+
   @Get(':id')
   @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
   @ApiParam({
@@ -162,6 +178,16 @@ export class AttendanceController {
     @Body() updateAttendanceDto: UpdateAttendanceDto,
   ): Promise<Attendance | null> {
     return this.attendanceService.update(+id, updateAttendanceDto);
+  }
+
+  @Post('bulk-update')
+  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @HttpCode(HttpStatus.OK)
+  bulkUpdate(
+    @Body()
+    body: { items: Array<Partial<CreateAttendanceDto & UpdateAttendanceDto> & { id?: number }> },
+  ): Promise<{ updated: number; created: number }> {
+    return this.attendanceService.bulkUpdate(body?.items ?? []);
   }
 
   @Delete(':id')

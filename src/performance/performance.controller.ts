@@ -36,7 +36,7 @@ import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
 
 @ApiBearerAuth()
-@Roles(RoleEnum.admin)
+@Roles(RoleEnum.admin, RoleEnum.teacher)
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @ApiTags('Performance')
 @Controller({
@@ -109,6 +109,14 @@ export class PerformanceController {
     @Param('assignmentId') assignmentId: string,
   ): Promise<Performance[]> {
     return this.performanceService.findByAssignment(+assignmentId);
+  }
+
+  // Grades helpers expected by frontend
+  @Get('grades/student/:studentId')
+  @ApiParam({ name: 'studentId', type: String })
+  @ApiOkResponse({ type: [Performance] })
+  getStudentGrades(@Param('studentId') studentId: string) {
+    return this.performanceService.findByStudent(+studentId);
   }
 
   @Get('student/:studentId/assignment/:assignmentId')

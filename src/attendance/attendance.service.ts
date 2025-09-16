@@ -78,6 +78,25 @@ export class AttendanceService {
     return this.attendanceRepository.findByClassAndDate(classId, date);
   }
 
+  async findByDate(
+    date: Date,
+    classId?: number,
+    studentId?: number,
+  ): Promise<Attendance[] | NullableType<Attendance>> {
+    if (studentId) {
+      return this.attendanceRepository.findByStudentAndDate(studentId, date);
+    }
+    if (classId) {
+      return this.attendanceRepository.findByClassAndDate(classId, date);
+    }
+    // fallback: list page for that date
+    return this.attendanceRepository.findManyWithPagination({
+      filterOptions: { date } as any,
+      sortOptions: null,
+      paginationOptions: { page: 1, limit: 100 },
+    });
+  }
+
   async update(
     id: Attendance['id'],
     updateAttendanceDto: UpdateAttendanceDto,
@@ -98,5 +117,26 @@ export class AttendanceService {
 
   async remove(id: Attendance['id']): Promise<void> {
     await this.attendanceRepository.remove(id);
+  }
+
+  async bulkUpdate(items: Array<Partial<Attendance> & { id?: number }>): Promise<{ updated: number; created: number }> {
+    let updated = 0;
+    let created = 0;
+    for (const item of items) {
+      if (item.id) {
+        await this.attendanceRepository.update(item.id, item);
+        updated += 1;
+      } else if (item.student && item.class && item.date) {
+        const existing = await this.attendanceRepository.findByStudentAndDate((item.student as any).id ?? (item as any).student, item.date as any);
+        if (existing) {
+          await this.attendanceRepository.update(existing.id, item);
+          updated += 1;
+        } else {
+          await this.attendanceRepository.create(item);
+          created += 1;
+        }
+      }
+    }
+    return { updated, created };
   }
 }
