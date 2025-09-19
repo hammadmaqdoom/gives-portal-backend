@@ -76,10 +76,8 @@ jobs:
               echo "=== Stopping system Nginx ==="
               sudo systemctl stop nginx || true
               
-              # Stop services
-              newgrp docker << EOF
-              docker-compose -f docker-compose.prod.yml down
-              EOF
+              # Stop services (no heredoc)
+              sg docker -c "docker-compose -f docker-compose.prod.yml down"
               
               # Update environment variables if needed
               echo "=== Updating environment configuration ==="
@@ -159,35 +157,22 @@ jobs:
               | tee .env >/dev/null
               
               # Rebuild and start services (without health check dependencies)
-              newgrp docker << EOF
-              # Ensure fresh app image with updated base (Node 20)
-              docker-compose -f docker-compose.prod.yml build --no-cache app
-              # Start services without health check dependencies first
-              docker-compose -f docker-compose.prod.yml up -d postgres redis app
+              sg docker -c "docker-compose -f docker-compose.prod.yml build --no-cache app"
+              sg docker -c "docker-compose -f docker-compose.prod.yml up -d postgres redis app"
               echo "Waiting for app to start..."
               sleep 30
-              EOF
               
               # Wait for services to be ready
               echo "=== Waiting for services to be ready ==="
-              newgrp docker << EOF
-              # Wait for PostgreSQL
               echo "Waiting for PostgreSQL..."
-              docker exec backend_app ./wait-for-it.sh postgres:5432 --timeout=60 --strict -- echo "PostgreSQL is ready"
-
-              # Wait for Redis
+              sg docker -c "docker exec backend_app ./wait-for-it.sh postgres:5432 --timeout=60 --strict -- echo 'PostgreSQL is ready'"
               echo "Waiting for Redis..."
-              docker exec backend_app ./wait-for-it.sh redis:6379 --timeout=30 --strict -- echo "Redis is ready"
-
-              # Wait for App to be healthy
+              sg docker -c "docker exec backend_app ./wait-for-it.sh redis:6379 --timeout=30 --strict -- echo 'Redis is ready'"
               echo "Waiting for App to be healthy..."
               timeout 60 bash -c 'until docker exec backend_app curl -f http://localhost:3000/health; do sleep 2; done' || echo "App health check timeout"
               echo "Application is ready"
-
-              # Now start Nginx
               echo "Starting Nginx..."
-              docker-compose -f docker-compose.prod.yml up -d nginx
-              EOF
+              sg docker -c "docker-compose -f docker-compose.prod.yml up -d nginx"
               
               echo "=== Code update completed successfully ==="
             fi
@@ -274,9 +259,7 @@ jobs:
               | tee .env >/dev/null
               
               # Restart services with new configuration
-              newgrp docker << EOF
-              docker-compose -f docker-compose.prod.yml restart app
-              EOF
+              sg docker -c "docker-compose -f docker-compose.prod.yml restart app"
                             
               echo "=== Configuration update completed successfully ==="
               fi
@@ -286,17 +269,13 @@ jobs:
                 echo "=== Updating SSL certificates ==="
                 
               # Stop nginx temporarily
-              newgrp docker << EOF
-                docker-compose -f docker-compose.prod.yml stop nginx
-              EOF
+              sg docker -c "docker-compose -f docker-compose.prod.yml stop nginx"
                             
               # Renew certificates
               sudo certbot renew --standalone --non-interactive
               
               # Start nginx
-              newgrp docker << EOF
-              docker-compose -f docker-compose.prod.yml start nginx
-              EOF
+              sg docker -c "docker-compose -f docker-compose.prod.yml start nginx"
                             
               echo "=== SSL certificate update completed successfully ==="
             fi
