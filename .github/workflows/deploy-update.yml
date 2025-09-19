@@ -79,23 +79,23 @@ jobs:
               # Stop services (no heredoc)
               sg docker -c "docker-compose -f docker-compose.prod.yml down"
               
-              # Update environment variables (printf approach to avoid heredoc parsing issues)
+              # Update environment variables (write final values; no sed)
               echo "=== Updating environment configuration ==="
               printf "%s\n" \
               "NODE_ENV=production" \
               "APP_PORT=3000" \
-              "APP_NAME=__APP_NAME__" \
+              "APP_NAME=${{ secrets.APP_NAME }}" \
               "API_PREFIX=api" \
               "APP_FALLBACK_LANGUAGE=en" \
               "APP_HEADER_LANGUAGE=x-custom-lang" \
-              "FRONTEND_DOMAIN=__FRONTEND_DOMAIN__" \
-              "BACKEND_DOMAIN=__BACKEND_DOMAIN__" \
+              "FRONTEND_DOMAIN=$FRONTEND_DOMAIN" \
+              "BACKEND_DOMAIN=$BACKEND_DOMAIN" \
               "DATABASE_TYPE=postgres" \
               "DATABASE_HOST=postgres" \
               "DATABASE_PORT=5432" \
-              "DATABASE_USERNAME=__DB_USER__" \
-              "DATABASE_PASSWORD=__DB_PASS__" \
-              "DATABASE_NAME=__DB_NAME__" \
+              "DATABASE_USERNAME=${{ secrets.DATABASE_USERNAME || secrets.POSTGRES_USER }}" \
+              "DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}" \
+              "DATABASE_NAME=${{ secrets.DATABASE_NAME }}" \
               "DATABASE_SYNCHRONIZE=false" \
               "DATABASE_MAX_CONNECTIONS=100" \
               "DATABASE_SSL_ENABLED=false" \
@@ -104,16 +104,16 @@ jobs:
               "DATABASE_KEY=" \
               "DATABASE_CERT=" \
               "DATABASE_URL=" \
-              "FILE_DRIVER=__FILE_DRIVER__" \
-              "ACCESS_KEY_ID=__S3_KEY__" \
-              "SECRET_ACCESS_KEY=__S3_SECRET__" \
-              "AWS_S3_REGION=__S3_REGION__" \
-              "AWS_DEFAULT_S3_BUCKET=__S3_BUCKET__" \
-              "AZURE_STORAGE_ACCOUNT_NAME=__AZURE_ACC__" \
-              "AZURE_STORAGE_ACCOUNT_KEY=__AZURE_KEY__" \
-              "AZURE_CONTAINER_NAME=__AZURE_CONTAINER__" \
-              "AZURE_BLOB_SAS_EXPIRY_SECONDS=" \
-              "AZURE_BLOB_PUBLIC_BASE_URL=" \
+              "FILE_DRIVER=${{ secrets.FILE_DRIVER }}" \
+              "ACCESS_KEY_ID=${{ secrets.S3AWS_ACCESS_KEY_ID }}" \
+              "SECRET_ACCESS_KEY=${{ secrets.S3AWS_SECRET_ACCESS_KEY }}" \
+              "AWS_S3_REGION=${{ secrets.S3AWS_REGION }}" \
+              "AWS_DEFAULT_S3_BUCKET=${{ secrets.S3AWS_DEFAULT_S3_BUCKET }}" \
+              "AZURE_STORAGE_ACCOUNT_NAME=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}" \
+              "AZURE_STORAGE_ACCOUNT_KEY=${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}" \
+              "AZURE_CONTAINER_NAME=${{ secrets.AZURE_CONTAINER_NAME }}" \
+              "AZURE_BLOB_SAS_EXPIRY_SECONDS=${{ secrets.AZURE_BLOB_SAS_EXPIRY_SECONDS }}" \
+              "AZURE_BLOB_PUBLIC_BASE_URL=${{ secrets.AZURE_BLOB_PUBLIC_BASE_URL }}" \
               "AUTH_JWT_SECRET=secret" \
               "AUTH_JWT_TOKEN_EXPIRES_IN=15m" \
               "AUTH_REFRESH_SECRET=secret_for_refresh" \
@@ -122,42 +122,22 @@ jobs:
               "AUTH_FORGOT_TOKEN_EXPIRES_IN=30m" \
               "AUTH_CONFIRM_EMAIL_SECRET=secret_for_confirm_email" \
               "AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN=1d" \
-              "FACEBOOK_APP_ID=" \
-              "FACEBOOK_APP_SECRET=" \
-              "GOOGLE_CLIENT_ID=" \
-              "GOOGLE_CLIENT_SECRET=" \
+              "FACEBOOK_APP_ID=${{ secrets.FACEBOOK_APP_ID }}" \
+              "FACEBOOK_APP_SECRET=${{ secrets.FACEBOOK_APP_SECRET }}" \
+              "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" \
+              "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" \
               "APPLE_APP_AUDIENCE=[]" \
               "WORKER_HOST=redis://redis:6379/1" \
               "REDIS_ENABLED=false" \
               "REDIS_HOST=redis" \
               "REDIS_PORT=6379" \
-              "REDIS_PASSWORD=__REDIS_PASS__" \
+              "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}" \
               "REDIS_DB=0" \
               "REDIS_TTL=3600" \
-              "ZOOM_OAUTH_CLIENT_ID=__ZOOM_ID__" \
-              "ZOOM_OAUTH_CLIENT_SECRET=__ZOOM_SECRET__" \
-              "ZOOM_OAUTH_REDIRECT_URI=__ZOOM_REDIRECT__" \
+              "ZOOM_OAUTH_CLIENT_ID=${{ secrets.ZOOM_OAUTH_CLIENT_ID }}" \
+              "ZOOM_OAUTH_CLIENT_SECRET=${{ secrets.ZOOM_OAUTH_CLIENT_SECRET }}" \
+              "ZOOM_OAUTH_REDIRECT_URI=${{ secrets.ZOOM_OAUTH_REDIRECT_URI }}" \
               | sudo tee .env >/dev/null
-
-              sudo sed -i \
-                -e "s|__APP_NAME__|${{ secrets.APP_NAME }}|g" \
-                -e "s|__FRONTEND_DOMAIN__|$FRONTEND_DOMAIN|g" \
-                -e "s|__BACKEND_DOMAIN__|$BACKEND_DOMAIN|g" \
-                -e "s|__DB_USER__|${{ secrets.POSTGRES_USER }}|g" \
-                -e "s|__DB_PASS__|${{ secrets.DATABASE_PASSWORD }}|g" \
-                -e "s|__DB_NAME__|${{ secrets.DATABASE_NAME }}|g" \
-                -e "s|__FILE_DRIVER__|${{ secrets.FILE_DRIVER }}|g" \
-                -e "s|__S3_KEY__|${{ secrets.S3AWS_ACCESS_KEY_ID }}|g" \
-                -e "s|__S3_SECRET__|${{ secrets.S3AWS_SECRET_ACCESS_KEY }}|g" \
-                -e "s|__S3_REGION__|${{ secrets.S3AWS_REGION }}|g" \
-                -e "s|__S3_BUCKET__|${{ secrets.S3AWS_DEFAULT_S3_BUCKET }}|g" \
-                -e "s|__AZURE_ACC__|${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}|g" \
-                -e "s|__AZURE_KEY__|${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}|g" \
-                -e "s|__AZURE_CONTAINER__|${{ secrets.AZURE_CONTAINER_NAME }}|g" \
-                -e "s|__REDIS_PASS__|${{ secrets.REDIS_PASSWORD }}|g" \
-                -e "s|__ZOOM_ID__|${{ secrets.ZOOM_OAUTH_CLIENT_ID }}|g" \
-                -e "s|__ZOOM_SECRET__|${{ secrets.ZOOM_OAUTH_CLIENT_SECRET }}|g" \
-                -e "s|__ZOOM_REDIRECT__|${{ secrets.ZOOM_OAUTH_REDIRECT_URI }}|g" .env
               
               # Rebuild and start services (without health check dependencies)
               sg docker -c "docker-compose -f docker-compose.prod.yml build --no-cache app"
