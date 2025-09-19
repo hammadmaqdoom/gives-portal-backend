@@ -278,23 +278,23 @@ jobs:
               docker-compose -f docker-compose.prod.yml restart app
               EOF
                             
-                            echo "=== Configuration update completed successfully ==="
-                          fi
-                          
-                          # Update type: ssl
-                          if [ "${{ github.event.inputs.update_type }}" = "ssl" ]; then
-                            echo "=== Updating SSL certificates ==="
-                            
-                            # Stop nginx temporarily
-                            newgrp docker << EOF
-              docker-compose -f docker-compose.prod.yml stop nginx
+              echo "=== Configuration update completed successfully ==="
+              fi
+              
+              # Update type: ssl
+              if [ "${{ github.event.inputs.update_type }}" = "ssl" ]; then
+                echo "=== Updating SSL certificates ==="
+                
+              # Stop nginx temporarily
+              newgrp docker << EOF
+                docker-compose -f docker-compose.prod.yml stop nginx
               EOF
                             
-                            # Renew certificates
-                            sudo certbot renew --standalone --non-interactive
-                            
-                            # Start nginx
-                            newgrp docker << EOF
+              # Renew certificates
+              sudo certbot renew --standalone --non-interactive
+              
+              # Start nginx
+              newgrp docker << EOF
               docker-compose -f docker-compose.prod.yml start nginx
               EOF
                             
