@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MailerService } from '../mailer/mailer.service';
 import { AllConfigType } from '../config/config.type';
+import { createUrl } from '../utils/url-helper';
 import * as path from 'path';
 
 export interface NotificationData {
@@ -32,13 +33,15 @@ export class NotificationService {
   }
 
   private getFrontendUrl(): string {
-    return this.configService.getOrThrow('app.frontendDomain', { infer: true });
+    const domain = this.configService.getOrThrow('app.frontendDomain', { infer: true });
+    return createUrl(domain).toString();
   }
 
   async sendWelcomeEmail(data: NotificationData & {
     userName: string;
   }): Promise<void> {
-    const loginUrl = `${this.getFrontendUrl()}/auth/login`;
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', { infer: true });
+    const loginUrl = createUrl(frontendDomain, '/auth/login').toString();
     
     await this.mailerService.sendMail({
       to: data.to,
@@ -61,7 +64,8 @@ export class NotificationService {
     schedule: string;
     fee: string;
   }): Promise<void> {
-    const dashboardUrl = `${this.getFrontendUrl()}/dashboard`;
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', { infer: true });
+    const dashboardUrl = createUrl(frontendDomain, '/dashboard').toString();
     
     await this.mailerService.sendMail({
       to: data.to,
@@ -89,7 +93,8 @@ export class NotificationService {
     teacherName: string;
     reason: string;
   }): Promise<void> {
-    const dashboardUrl = `${this.getFrontendUrl()}/dashboard`;
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', { infer: true });
+    const dashboardUrl = createUrl(frontendDomain, '/dashboard').toString();
     
     await this.mailerService.sendMail({
       to: data.to,
@@ -117,7 +122,8 @@ export class NotificationService {
     description: string;
     invoiceId: number;
   }): Promise<void> {
-    const invoiceUrl = `${this.getFrontendUrl()}/dashboard/invoices/${data.invoiceId}`;
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', { infer: true });
+    const invoiceUrl = createUrl(frontendDomain, `/dashboard/invoices/${data.invoiceId}`).toString();
     
     await this.mailerService.sendMail({
       to: data.to,
@@ -143,7 +149,8 @@ export class NotificationService {
     authorName: string;
     postDate: string;
   }): Promise<void> {
-    const dashboardUrl = `${this.getFrontendUrl()}/dashboard`;
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', { infer: true });
+    const dashboardUrl = createUrl(frontendDomain, '/dashboard').toString();
     
     await this.mailerService.sendMail({
       to: data.to,

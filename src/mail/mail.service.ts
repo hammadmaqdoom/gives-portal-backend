@@ -5,6 +5,7 @@ import { MailData } from './interfaces/mail-data.interface';
 
 import { MaybeType } from '../utils/types/maybe.type';
 import { MailerService } from '../mailer/mailer.service';
+import { createUrl } from '../utils/url-helper';
 import path from 'path';
 import { AllConfigType } from '../config/config.type';
 
@@ -31,11 +32,11 @@ export class MailService {
       ]);
     }
 
-    const url = new URL(
-      this.configService.getOrThrow('app.frontendDomain', {
-        infer: true,
-      }) + '/confirm-email',
-    );
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', {
+      infer: true,
+    });
+    
+    const url = createUrl(frontendDomain, '/confirm-email');
     url.searchParams.set('hash', mailData.data.hash);
 
     await this.mailerService.sendMail({
@@ -83,11 +84,11 @@ export class MailService {
       ]);
     }
 
-    const url = new URL(
-      this.configService.getOrThrow('app.frontendDomain', {
-        infer: true,
-      }) + '/password-change',
-    );
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', {
+      infer: true,
+    });
+    
+    const url = createUrl(frontendDomain, '/password-change');
     url.searchParams.set('hash', mailData.data.hash);
     url.searchParams.set('expires', mailData.data.tokenExpires.toString());
 
@@ -135,11 +136,11 @@ export class MailService {
       ]);
     }
 
-    const url = new URL(
-      this.configService.getOrThrow('app.frontendDomain', {
-        infer: true,
-      }) + '/confirm-new-email',
-    );
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', {
+      infer: true,
+    });
+    
+    const url = createUrl(frontendDomain, '/confirm-new-email');
     url.searchParams.set('hash', mailData.data.hash);
 
     await this.mailerService.sendMail({
