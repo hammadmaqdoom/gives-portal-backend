@@ -44,13 +44,15 @@ export class AuthService {
   async validateLogin(loginDto: AuthEmailLoginDto): Promise<LoginResponseDto> {
     const user = await this.usersService.findByEmail(loginDto.email);
 
-    if (!user) {
-      throw new UnprocessableEntityException({
+    // For security, never reveal whether the email or password is incorrect
+    const invalidCredentials = () =>
+      new UnprocessableEntityException({
         status: HttpStatus.UNPROCESSABLE_ENTITY,
-        errors: {
-          email: 'notFound',
-        },
+        error: 'invalidCredentials',
       });
+
+    if (!user) {
+      throw invalidCredentials();
     }
 
     if (user.provider !== AuthProvidersEnum.email) {
@@ -63,12 +65,7 @@ export class AuthService {
     }
 
     if (!user.password) {
-      throw new UnprocessableEntityException({
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-        errors: {
-          password: 'incorrectPassword',
-        },
-      });
+      throw invalidCredentials();
     }
 
     const isValidPassword = await bcrypt.compare(
@@ -77,12 +74,7 @@ export class AuthService {
     );
 
     if (!isValidPassword) {
-      throw new UnprocessableEntityException({
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-        errors: {
-          password: 'incorrectPassword',
-        },
-      });
+      throw invalidCredentials();
     }
 
     const hash = crypto
