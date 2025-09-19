@@ -41,9 +41,10 @@ RUN echo 'const crypto = require("crypto"); global.crypto = crypto; require("./d
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
 
-# Copy wait-for-it script
-COPY wait-for-it.sh ./
-RUN chmod +x wait-for-it.sh
+# Install wait-for-it script (used by startup checks)
+RUN curl -fsSL https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh -o /usr/local/bin/wait-for-it \
+  && chmod +x /usr/local/bin/wait-for-it \
+  && ln -s /usr/local/bin/wait-for-it ./wait-for-it.sh
 
 # Create uploads directory
 RUN mkdir -p uploads && chown -R nestjs:nodejs uploads
