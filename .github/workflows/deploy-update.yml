@@ -174,16 +174,16 @@ jobs:
               # Wait for PostgreSQL
               echo "Waiting for PostgreSQL..."
               docker exec backend_app ./wait-for-it.sh postgres:5432 --timeout=60 --strict -- echo "PostgreSQL is ready"
-              
+
               # Wait for Redis
               echo "Waiting for Redis..."
               docker exec backend_app ./wait-for-it.sh redis:6379 --timeout=30 --strict -- echo "Redis is ready"
-              
+
               # Wait for App to be healthy
               echo "Waiting for App to be healthy..."
               timeout 60 bash -c 'until docker exec backend_app curl -f http://localhost:3000/health; do sleep 2; done' || echo "App health check timeout"
               echo "Application is ready"
-              
+
               # Now start Nginx
               echo "Starting Nginx..."
               docker-compose -f docker-compose.prod.yml up -d nginx
@@ -277,27 +277,27 @@ jobs:
               newgrp docker << EOF
               docker-compose -f docker-compose.prod.yml restart app
               EOF
-              
-              echo "=== Configuration update completed successfully ==="
-            fi
-            
-            # Update type: ssl
-            if [ "${{ github.event.inputs.update_type }}" = "ssl" ]; then
-              echo "=== Updating SSL certificates ==="
-              
-              # Stop nginx temporarily
-              newgrp docker << EOF
+                            
+                            echo "=== Configuration update completed successfully ==="
+                          fi
+                          
+                          # Update type: ssl
+                          if [ "${{ github.event.inputs.update_type }}" = "ssl" ]; then
+                            echo "=== Updating SSL certificates ==="
+                            
+                            # Stop nginx temporarily
+                            newgrp docker << EOF
               docker-compose -f docker-compose.prod.yml stop nginx
               EOF
-              
-              # Renew certificates
-              sudo certbot renew --standalone --non-interactive
-              
-              # Start nginx
-              newgrp docker << EOF
+                            
+                            # Renew certificates
+                            sudo certbot renew --standalone --non-interactive
+                            
+                            # Start nginx
+                            newgrp docker << EOF
               docker-compose -f docker-compose.prod.yml start nginx
               EOF
-              
+                            
               echo "=== SSL certificate update completed successfully ==="
             fi
             
