@@ -79,65 +79,65 @@ jobs:
               # Stop services (no heredoc)
               sg docker -c "docker-compose -f docker-compose.prod.yml down"
               
-              # Update environment variables if needed (safe heredoc + substitutions)
+              # Update environment variables (printf approach to avoid heredoc parsing issues)
               echo "=== Updating environment configuration ==="
-              sudo tee .env >/dev/null <<'ENVEOF'
-              NODE_ENV=production
-              APP_PORT=3000
-              APP_NAME=__APP_NAME__
-              API_PREFIX=api
-              APP_FALLBACK_LANGUAGE=en
-              APP_HEADER_LANGUAGE=x-custom-lang
-              FRONTEND_DOMAIN=__FRONTEND_DOMAIN__
-              BACKEND_DOMAIN=__BACKEND_DOMAIN__
-              DATABASE_TYPE=postgres
-              DATABASE_HOST=postgres
-              DATABASE_PORT=5432
-              DATABASE_USERNAME=__DB_USER__
-              DATABASE_PASSWORD=__DB_PASS__
-              DATABASE_NAME=__DB_NAME__
-              DATABASE_SYNCHRONIZE=false
-              DATABASE_MAX_CONNECTIONS=100
-              DATABASE_SSL_ENABLED=false
-              DATABASE_REJECT_UNAUTHORIZED=false
-              DATABASE_CA=
-              DATABASE_KEY=
-              DATABASE_CERT=
-              DATABASE_URL=
-              FILE_DRIVER=__FILE_DRIVER__
-              ACCESS_KEY_ID=__S3_KEY__
-              SECRET_ACCESS_KEY=__S3_SECRET__
-              AWS_S3_REGION=__S3_REGION__
-              AWS_DEFAULT_S3_BUCKET=__S3_BUCKET__
-              AZURE_STORAGE_ACCOUNT_NAME=__AZURE_ACC__
-              AZURE_STORAGE_ACCOUNT_KEY=__AZURE_KEY__
-              AZURE_CONTAINER_NAME=__AZURE_CONTAINER__
-              AZURE_BLOB_SAS_EXPIRY_SECONDS=
-              AZURE_BLOB_PUBLIC_BASE_URL=
-              AUTH_JWT_SECRET=secret
-              AUTH_JWT_TOKEN_EXPIRES_IN=15m
-              AUTH_REFRESH_SECRET=secret_for_refresh
-              AUTH_REFRESH_TOKEN_EXPIRES_IN=3650d
-              AUTH_FORGOT_SECRET=secret_for_forgot
-              AUTH_FORGOT_TOKEN_EXPIRES_IN=30m
-              AUTH_CONFIRM_EMAIL_SECRET=secret_for_confirm_email
-              AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN=1d
-              FACEBOOK_APP_ID=
-              FACEBOOK_APP_SECRET=
-              GOOGLE_CLIENT_ID=
-              GOOGLE_CLIENT_SECRET=
-              APPLE_APP_AUDIENCE=[]
-              WORKER_HOST=redis://redis:6379/1
-              REDIS_ENABLED=false
-              REDIS_HOST=redis
-              REDIS_PORT=6379
-              REDIS_PASSWORD=__REDIS_PASS__
-              REDIS_DB=0
-              REDIS_TTL=3600
-              ZOOM_OAUTH_CLIENT_ID=__ZOOM_ID__
-              ZOOM_OAUTH_CLIENT_SECRET=__ZOOM_SECRET__
-              ZOOM_OAUTH_REDIRECT_URI=__ZOOM_REDIRECT__
-              ENVEOF
+              printf "%s\n" \
+              "NODE_ENV=production" \
+              "APP_PORT=3000" \
+              "APP_NAME=__APP_NAME__" \
+              "API_PREFIX=api" \
+              "APP_FALLBACK_LANGUAGE=en" \
+              "APP_HEADER_LANGUAGE=x-custom-lang" \
+              "FRONTEND_DOMAIN=__FRONTEND_DOMAIN__" \
+              "BACKEND_DOMAIN=__BACKEND_DOMAIN__" \
+              "DATABASE_TYPE=postgres" \
+              "DATABASE_HOST=postgres" \
+              "DATABASE_PORT=5432" \
+              "DATABASE_USERNAME=__DB_USER__" \
+              "DATABASE_PASSWORD=__DB_PASS__" \
+              "DATABASE_NAME=__DB_NAME__" \
+              "DATABASE_SYNCHRONIZE=false" \
+              "DATABASE_MAX_CONNECTIONS=100" \
+              "DATABASE_SSL_ENABLED=false" \
+              "DATABASE_REJECT_UNAUTHORIZED=false" \
+              "DATABASE_CA=" \
+              "DATABASE_KEY=" \
+              "DATABASE_CERT=" \
+              "DATABASE_URL=" \
+              "FILE_DRIVER=__FILE_DRIVER__" \
+              "ACCESS_KEY_ID=__S3_KEY__" \
+              "SECRET_ACCESS_KEY=__S3_SECRET__" \
+              "AWS_S3_REGION=__S3_REGION__" \
+              "AWS_DEFAULT_S3_BUCKET=__S3_BUCKET__" \
+              "AZURE_STORAGE_ACCOUNT_NAME=__AZURE_ACC__" \
+              "AZURE_STORAGE_ACCOUNT_KEY=__AZURE_KEY__" \
+              "AZURE_CONTAINER_NAME=__AZURE_CONTAINER__" \
+              "AZURE_BLOB_SAS_EXPIRY_SECONDS=" \
+              "AZURE_BLOB_PUBLIC_BASE_URL=" \
+              "AUTH_JWT_SECRET=secret" \
+              "AUTH_JWT_TOKEN_EXPIRES_IN=15m" \
+              "AUTH_REFRESH_SECRET=secret_for_refresh" \
+              "AUTH_REFRESH_TOKEN_EXPIRES_IN=3650d" \
+              "AUTH_FORGOT_SECRET=secret_for_forgot" \
+              "AUTH_FORGOT_TOKEN_EXPIRES_IN=30m" \
+              "AUTH_CONFIRM_EMAIL_SECRET=secret_for_confirm_email" \
+              "AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN=1d" \
+              "FACEBOOK_APP_ID=" \
+              "FACEBOOK_APP_SECRET=" \
+              "GOOGLE_CLIENT_ID=" \
+              "GOOGLE_CLIENT_SECRET=" \
+              "APPLE_APP_AUDIENCE=[]" \
+              "WORKER_HOST=redis://redis:6379/1" \
+              "REDIS_ENABLED=false" \
+              "REDIS_HOST=redis" \
+              "REDIS_PORT=6379" \
+              "REDIS_PASSWORD=__REDIS_PASS__" \
+              "REDIS_DB=0" \
+              "REDIS_TTL=3600" \
+              "ZOOM_OAUTH_CLIENT_ID=__ZOOM_ID__" \
+              "ZOOM_OAUTH_CLIENT_SECRET=__ZOOM_SECRET__" \
+              "ZOOM_OAUTH_REDIRECT_URI=__ZOOM_REDIRECT__" \
+              | sudo tee .env >/dev/null
 
               sudo sed -i \
                 -e "s|__APP_NAME__|${{ secrets.APP_NAME }}|g" \
