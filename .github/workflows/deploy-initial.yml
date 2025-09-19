@@ -278,6 +278,13 @@ jobs:
             echo "Waiting for App to be healthy..."
             timeout 60 bash -c 'until docker exec backend_app curl -f http://localhost:3000/health; do sleep 2; done' || echo "App health check timeout"
             echo "Application is ready"
+            
+            # Run database seed
+            echo "Running database seed..."
+            # Run the compiled seed file directly with environment variables
+            docker exec -e NODE_ENV=production backend_app node ./dist/database/seeds/relational/run-seed.js || \
+            echo "Seed command failed or not available"
+            echo "Database seed completed"
             EOF
 
             # Generate SSL certificates
