@@ -134,7 +134,7 @@ export class CreateSettingsDto {
 
   @ApiPropertyOptional({ example: 'noreply@lmsportal.com' })
   @IsOptional()
-  @IsEmail()
+  @IsString()
   @MaxLength(255)
   smtpUser?: string;
 

@@ -458,6 +458,125 @@ export class FilesController {
     }
   }
 
+  @Get()
+  @ApiOperation({ summary: 'Get all files with pagination and filters' })
+  async getAllFiles(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 20,
+    @Query('search') search?: string,
+    @Query('contextType') contextType?: string,
+    @Query('contextId') contextId?: string,
+    @Query('uploadedBy') uploadedBy?: string,
+    @Query('mimeType') mimeType?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const files = await this.filesService.getAllFiles();
+    
+    // Apply filters
+    let filteredFiles = files;
+    
+    if (search) {
+      filteredFiles = filteredFiles.filter(file => 
+        file.originalName.toLowerCase().includes(search.toLowerCase()) ||
+        file.filename.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+    
+    if (contextType) {
+      filteredFiles = filteredFiles.filter(file => file.contextType === contextType);
+    }
+    
+    if (contextId) {
+      filteredFiles = filteredFiles.filter(file => file.contextId === contextId);
+    }
+    
+    if (uploadedBy) {
+      filteredFiles = filteredFiles.filter(file => file.uploadedBy === uploadedBy);
+    }
+    
+    if (mimeType) {
+      filteredFiles = filteredFiles.filter(file => file.mimeType.includes(mimeType));
+    }
+    
+    if (startDate) {
+      const start = new Date(startDate);
+      filteredFiles = filteredFiles.filter(file => new Date(file.uploadedAt) >= start);
+    }
+    
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999); // End of day
+      filteredFiles = filteredFiles.filter(file => new Date(file.uploadedAt) <= end);
+    }
+    
+    // Pagination
+    const total = filteredFiles.length;
+    const totalPages = Math.ceil(total / limit);
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedFiles = filteredFiles.slice(startIndex, endIndex);
+    
+    return {
+      data: paginatedFiles.map(file => ({
+        id: file.id,
+        filename: file.filename,
+        originalName: file.originalName,
+        path: file.path,
+        url: `${this.getBaseUrl()}/api/v1/files/serve/${file.id}`,
+        size: file.size,
+        mimeType: file.mimeType,
+        uploadedBy: file.uploadedBy,
+        uploadedAt: file.uploadedAt,
+        contextType: file.contextType,
+        contextId: file.contextId,
+        createdAt: file.createdAt,
+        updatedAt: file.updatedAt,
+        deletedAt: file.deletedAt,
+      })),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+      },
+    };
+  }
+
+  @Get('stats')
+  @ApiOperation({ summary: 'Get file statistics' })
+  async getFileStats() {
+    const files = await this.filesService.getAllFiles();
+    
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+    
+    const filesByType = files.reduce((acc, file) => {
+      const type = file.mimeType.split('/')[0];
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const recentUploads = files
+      .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
+      .slice(0, 5)
+      .map(file => ({
+        id: file.id,
+        filename: file.filename,
+        originalName: file.originalName,
+        size: file.size,
+        mimeType: file.mimeType,
+        uploadedAt: file.uploadedAt,
+        url: `${this.getBaseUrl()}/api/v1/files/serve/${file.id}`,
+      }));
+    
+    return {
+      totalFiles: files.length,
+      totalSize,
+      filesByType,
+      recentUploads,
+    };
+  }
+
   @Get('debug/count')
   @ApiOperation({ summary: 'Get total file count for debugging' })
   async getFileCount() {
@@ -486,6 +605,30 @@ export class FilesController {
         filename: file.filename,
       })),
     };
+  }
+
+  @Get(':id/download')
+  @ApiOperation({ summary: 'Download file by ID' })
+  @ApiParam({ name: 'id', description: 'File ID' })
+  async downloadFile(@Param('id') id: string, @Res() res: any) {
+    const file = await this.filesService.getFileById(id);
+    if (!file) {
+      throw new BadRequestException('File not found');
+    }
+
+    const fullPath = this.filesService.getFullFilePath(file.path);
+    const fs = require('fs');
+    
+    if (!fs.existsSync(fullPath)) {
+      throw new BadRequestException('File not found on disk');
+    }
+
+    res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${file.originalName}"`);
+    res.setHeader('Content-Length', file.size);
+    
+    const fileStream = fs.createReadStream(fullPath);
+    fileStream.pipe(res);
   }
 
   @Get(':id')
