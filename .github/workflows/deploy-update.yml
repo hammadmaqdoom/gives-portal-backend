@@ -72,6 +72,11 @@ jobs:
             if [ "${{ github.event.inputs.update_type }}" = "code" ]; then
               echo "=== Updating application code ==="
               
+              # Update nginx configuration with actual domain
+              echo "=== Updating nginx configuration ==="
+              sudo sed -i "s/yourdomain.com/$BACKEND_DOMAIN/g" nginx/conf.d/backend.conf
+              sudo sed -i "s/server_name _/server_name $BACKEND_DOMAIN $STATIC_IP/g" nginx/conf.d/backend.conf
+              
               # Stop system Nginx to free up port 80
               echo "=== Stopping system Nginx ==="
               sudo systemctl stop nginx || true
@@ -164,6 +169,11 @@ jobs:
             if [ "${{ github.event.inputs.update_type }}" = "config" ]; then
               echo "=== Updating configuration ==="
               
+              # Update nginx configuration with actual domain
+              echo "=== Updating nginx configuration ==="
+              sudo sed -i "s/yourdomain.com/$BACKEND_DOMAIN/g" nginx/conf.d/backend.conf
+              sudo sed -i "s/server_name _/server_name $BACKEND_DOMAIN $STATIC_IP/g" nginx/conf.d/backend.conf
+              
               # Update environment variables (write final values; no sed)
               echo "=== Updating environment configuration ==="
               printf "%s\n" \
@@ -233,7 +243,7 @@ jobs:
               # Update type: ssl
               if [ "${{ github.event.inputs.update_type }}" = "ssl" ]; then
                 echo "=== Updating SSL certificates ==="
-                
+              
               # Stop nginx temporarily
               sg docker -c "docker-compose -f docker-compose.prod.yml stop nginx"
                             
