@@ -16,7 +16,6 @@ import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import {
   ApiBearerAuth,
-  ApiCreatedResponse,
   ApiOkResponse,
   ApiParam,
   ApiTags,
@@ -24,10 +23,7 @@ import {
 import { Roles } from '../roles/roles.decorator';
 import { RoleEnum } from '../roles/roles.enum';
 import { AuthGuard } from '@nestjs/passport';
-import {
-  InfinityPaginationResponse,
-  InfinityPaginationResponseDto,
-} from '../utils/dto/infinity-pagination-response.dto';
+import { InfinityPaginationResponseDto } from '../utils/dto/infinity-pagination-response.dto';
 import { NullableType } from '../utils/types/nullable.type';
 import { QueryAttendanceDto } from './dto/query-attendance.dto';
 import { Attendance } from './domain/attendance';
@@ -142,7 +138,11 @@ export class AttendanceController {
     @Query('classId') classId?: string,
     @Query('studentId') studentId?: string,
   ): Promise<Attendance[] | NullableType<Attendance>> {
-    return this.attendanceService.findByDate(new Date(date), classId ? +classId : undefined, studentId ? +studentId : undefined);
+    return this.attendanceService.findByDate(
+      new Date(date),
+      classId ? +classId : undefined,
+      studentId ? +studentId : undefined,
+    );
   }
 
   @Get(':id')
@@ -185,7 +185,9 @@ export class AttendanceController {
   @HttpCode(HttpStatus.OK)
   bulkUpdate(
     @Body()
-    body: { items: Array<Partial<CreateAttendanceDto & UpdateAttendanceDto> & { id?: number }> },
+    body: {
+      items: Array<Partial<Attendance> & { id?: number }>;
+    },
   ): Promise<{ updated: number; created: number }> {
     return this.attendanceService.bulkUpdate(body?.items ?? []);
   }
