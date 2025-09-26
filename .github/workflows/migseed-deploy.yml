@@ -1,0 +1,72 @@
+name: Manage Migrations & Seeds after deployment
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+    inputs:
+      runSeeds:
+        description: 'Run seed after migrations (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Build & deploy steps are assumed handled by your current pipeline.
+      # This workflow focuses on running migrations & seeds on the remote host after containers are up.
+
+      - name: Run migrations on remote host
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            echo "== Wait for containers =="
+            docker ps
+            # Wait until backend_app is healthy
+            for i in $(seq 1 30); do
+              status=$(docker inspect --format='{{json .State.Health.Status}}' backend_app 2>/dev/null | tr -d '"' || echo 'starting')
+              if [ "$status" = "healthy" ]; then echo "backend_app healthy"; break; fi
+              echo "backend_app status: $status (retry $i)"; sleep 2;
+            done
+
+            echo "== Run TypeORM migrations =="
+            docker exec backend_app sh -lc 'npx typeorm --dataSource=dist/database/data-source.js migration:run | cat'
+
+      - name: Optionally run seeds on remote host (first deploy only)
+        if: ${{ github.event.inputs.runSeeds == 'true' || secrets.RUN_SEEDS == 'true' }}
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            echo "== Run seeds =="
+            docker exec backend_app sh -lc 'node dist/database/seeds/relational/run-seed.js | cat'
+
+      - name: Show applied migrations
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            docker exec backend_postgres sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT id, timestamp, name FROM migrations ORDER BY id;"'
+
+
