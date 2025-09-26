@@ -1,4 +1,13 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiOkResponse, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ClassesService } from '../classes/classes.service';
 import { InvoicesService } from '../invoices/invoices.service';
@@ -38,10 +47,16 @@ export class PublicController {
   }
 
   @Post('invoices/upload-proof')
-  @ApiResponse({ status: HttpStatus.OK, description: 'Upload payment proof for latest unpaid invoice' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Upload payment proof for latest unpaid invoice',
+  })
   @HttpCode(HttpStatus.OK)
   async uploadPaymentProof(@Body() body: UploadProofDto) {
-    const updated = await this.invoicesService.attachProofToLatestUnpaidInvoice(body.studentId, body.paymentProofUrl);
+    const updated = await this.invoicesService.attachProofToLatestUnpaidInvoice(
+      body.studentId,
+      body.paymentProofUrl,
+    );
     return { data: updated };
   }
 
@@ -77,5 +92,3 @@ export class PublicController {
     };
   }
 }
-
-

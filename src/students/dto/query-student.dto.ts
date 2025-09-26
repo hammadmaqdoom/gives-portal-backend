@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, IsNumber } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export class FilterStudentDto {
@@ -22,6 +22,12 @@ export class FilterStudentDto {
   @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)
   includeRelations?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  userId?: number;
 }
 
 export class SortStudentDto {

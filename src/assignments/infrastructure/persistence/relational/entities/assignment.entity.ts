@@ -59,6 +59,7 @@ export class AssignmentEntity extends EntityRelationalHelper {
   @ManyToOne(() => ClassEntity, {
     eager: true,
   })
+  @JoinColumn({ name: 'classId' })
   class?: ClassEntity | null;
 
   @ManyToOne(() => TeacherEntity, {

@@ -11,22 +11,23 @@ import {
   HttpCode,
   HttpStatus,
   Request,
+  Res,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiResponse,
   ApiBearerAuth,
   ApiOperation,
 } from '@nestjs/swagger';
+import { Response } from 'express';
 import { InvoicesService } from './invoices.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
-import {
-  FilterInvoiceDto,
-  SortInvoiceDto,
-  QueryInvoiceDto,
-} from './dto/query-invoice.dto';
-import { PaginationOptionsDto } from '../utils/dto/pagination-options.dto';
+import { QueryInvoiceDto } from './dto/query-invoice.dto';
 import { RolesGuard } from '../roles/roles.guard';
 import { AuthGuard } from '@nestjs/passport';
 import { Roles } from '../roles/roles.decorator';
@@ -142,14 +143,25 @@ export class InvoicesController {
     const userRole = req.user.role?.name?.toLowerCase();
     const userId = req.user.id;
 
+    console.log('🔍 getMyInvoices - User ID:', userId);
+    console.log('🔍 getMyInvoices - User Role:', userRole);
+    console.log('🔍 getMyInvoices - Full user object:', JSON.stringify(req.user, null, 2));
+
     if (userRole === 'parent') {
       // Find parent by user ID first, then get their invoices
-      return this.invoicesService.findByParentUserId(userId);
-    } else if (userRole === 'student') {
+      console.log('🔍 Getting invoices for parent with user ID:', userId);
+      const result = await this.invoicesService.findByParentUserId(userId);
+      console.log('🔍 Parent invoices result:', result);
+      return result;
+    } else if (userRole === 'student' || userRole === 'user') {
       // Find student by user ID first, then get their invoices
-      return this.invoicesService.findByStudentUserId(userId);
+      console.log('🔍 Getting invoices for student with user ID:', userId);
+      const result = await this.invoicesService.findByStudentUserId(userId);
+      console.log('🔍 Student invoices result:', result);
+      return result;
     }
 
+    console.log('🔍 User role not recognized, returning empty array');
     return [];
   }
 
@@ -220,6 +232,116 @@ export class InvoicesController {
     @Body() body: { paymentProofUrl: string },
   ) {
     return this.invoicesService.uploadPaymentProof(+id, body.paymentProofUrl);
+  }
+
+  @Post(':id/upload-proof-file')
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Upload payment proof file for invoice' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Payment proof file uploaded successfully',
+    type: Invoice,
+  })
+  async uploadPaymentProofFile(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req: any,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    // Validate file type (only allow PDF, images)
+    const allowedMimeTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+    ];
+
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Invalid file type. Only PDF and image files are allowed.',
+      );
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      throw new BadRequestException(
+        'File size too large. Maximum size is 10MB.',
+      );
+    }
+
+    return this.invoicesService.uploadPaymentProofFile(+id, file, req.user?.id);
+  }
+
+  @Get(':id/pdf')
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @ApiOperation({ summary: 'Download invoice as PDF' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Invoice PDF generated successfully',
+    content: {
+      'application/pdf': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  async downloadPDF(@Param('id') id: string, @Res() res: Response) {
+    const pdfBuffer = await this.invoicesService.generatePDF(+id);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="invoice-${id}.pdf"`,
+      'Content-Length': pdfBuffer.length.toString(),
+    });
+
+    res.send(pdfBuffer);
+  }
+
+  @Get(':id/view')
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @ApiOperation({ summary: 'View invoice as PDF' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Invoice PDF generated successfully',
+    content: {
+      'application/pdf': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  async viewPDF(@Param('id') id: string, @Res() res: Response) {
+    const pdfBuffer = await this.invoicesService.generatePDF(+id);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="invoice-${id}.pdf"`,
+      'Content-Length': pdfBuffer.length.toString(),
+    });
+
+    res.send(pdfBuffer);
+  }
+
+  @Post(':id/send-email')
+  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send invoice via email' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Invoice sent via email successfully',
+  })
+  async sendInvoiceEmail(@Param('id') id: string) {
+    return this.invoicesService.sendInvoiceEmail(+id);
   }
 
   @Delete(':id')

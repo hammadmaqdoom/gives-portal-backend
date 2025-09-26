@@ -33,6 +33,7 @@ import { RolesGuard } from '../roles/roles.guard';
 import { Roles } from '../roles/roles.decorator';
 import { RoleEnum } from '../roles/roles.enum';
 import { FilesService } from './files.service';
+import { ConfigService } from '@nestjs/config';
 import { FileStorageService, FileUploadContext } from './file-storage.service';
 import { User } from '../users/domain/user';
 import * as path from 'path';
@@ -48,6 +49,7 @@ export class FilesController {
   constructor(
     private readonly filesService: FilesService,
     private readonly fileStorageService: FileStorageService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -366,6 +368,26 @@ export class FilesController {
 
       console.log(`Serving file: ${file.filename} from path: ${file.path}`);
 
+      // If using non-local storage (e.g., s3), stream via server to avoid CORS
+      const driver = this.configService.get<string>('file.driver');
+      if (driver && driver !== 'local') {
+        try {
+          const { stream, contentType, contentLength } =
+            await this.fileStorageService.getObjectStream(file.path);
+          res.setHeader('Content-Type', contentType || file.mimeType || 'application/octet-stream');
+          if (contentLength) res.setHeader('Content-Length', contentLength);
+          res.setHeader(
+            'Content-Disposition',
+            `inline; filename="${file.originalName}"`,
+          );
+          stream.pipe(res);
+          return;
+        } catch (e) {
+          console.error('Error streaming object from storage:', e);
+          throw new BadRequestException('Unable to stream file from storage');
+        }
+      }
+
       // Get the full file path
       const fullPath = this.filesService.getFullFilePath(file.path);
       console.log(`Full file path: ${fullPath}`);
@@ -431,7 +453,23 @@ export class FilesController {
         return;
       }
 
-      // Get the full file path
+      // If using non-local storage, return headers from storage
+      const driver = this.configService.get<string>('file.driver');
+      if (driver && driver !== 'local') {
+        try {
+          const { contentType, contentLength } =
+            await this.fileStorageService.headObject(file.path);
+          if (contentType) res.setHeader('Content-Type', contentType);
+          if (contentLength) res.setHeader('Content-Length', contentLength);
+          res.status(200).send();
+          return;
+        } catch (e) {
+          res.status(404).send();
+          return;
+        }
+      }
+
+      // Get the full file path (local)
       const fullPath = this.filesService.getFullFilePath(file.path);
 
       // Check if file exists
@@ -458,6 +496,74 @@ export class FilesController {
     }
   }
 
+  @Get('serve/payment-proofs/:filename')
+  @ApiOperation({ summary: 'Serve payment proof file by filename' })
+  @ApiParam({ name: 'filename', description: 'Payment proof filename' })
+  async servePaymentProofFile(
+    @Param('filename') filename: string,
+    @Res() res: any,
+  ) {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+
+      // Construct the file path
+      const filePath = path.join(
+        process.cwd(),
+        'uploads',
+        'payment-proofs',
+        filename,
+      );
+
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        res.status(404).json({ error: 'Payment proof file not found' });
+        return;
+      }
+
+      // Get file stats
+      const stats = fs.statSync(filePath);
+
+      // Determine content type based on file extension
+      const ext = path.extname(filename).toLowerCase();
+      let contentType = 'application/octet-stream';
+
+      switch (ext) {
+        case '.pdf':
+          contentType = 'application/pdf';
+          break;
+        case '.jpg':
+        case '.jpeg':
+          contentType = 'image/jpeg';
+          break;
+        case '.png':
+          contentType = 'image/png';
+          break;
+        case '.gif':
+          contentType = 'image/gif';
+          break;
+      }
+
+      // Set headers
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Length', stats.size);
+      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Authorization',
+      );
+
+      // Stream the file
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error('Error serving payment proof file:', error);
+      res.status(500).json({ error: 'Failed to serve payment proof file' });
+    }
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get all files with pagination and filters' })
   async getAllFiles(
@@ -472,53 +578,66 @@ export class FilesController {
     @Query('endDate') endDate?: string,
   ) {
     const files = await this.filesService.getAllFiles();
-    
+
     // Apply filters
     let filteredFiles = files;
-    
+
     if (search) {
-      filteredFiles = filteredFiles.filter(file => 
-        file.originalName.toLowerCase().includes(search.toLowerCase()) ||
-        file.filename.toLowerCase().includes(search.toLowerCase())
+      filteredFiles = filteredFiles.filter(
+        (file) =>
+          file.originalName.toLowerCase().includes(search.toLowerCase()) ||
+          file.filename.toLowerCase().includes(search.toLowerCase()),
       );
     }
-    
+
     if (contextType) {
-      filteredFiles = filteredFiles.filter(file => file.contextType === contextType);
+      filteredFiles = filteredFiles.filter(
+        (file) => file.contextType === contextType,
+      );
     }
-    
+
     if (contextId) {
-      filteredFiles = filteredFiles.filter(file => file.contextId === contextId);
+      filteredFiles = filteredFiles.filter(
+        (file) => file.contextId === contextId,
+      );
     }
-    
+
     if (uploadedBy) {
-      filteredFiles = filteredFiles.filter(file => file.uploadedBy === uploadedBy);
+      filteredFiles = filteredFiles.filter(
+        (file) => file.uploadedBy === uploadedBy,
+      );
     }
-    
+
     if (mimeType) {
-      filteredFiles = filteredFiles.filter(file => file.mimeType.includes(mimeType));
+      filteredFiles = filteredFiles.filter((file) =>
+        file.mimeType.includes(mimeType),
+      );
     }
-    
+
     if (startDate) {
       const start = new Date(startDate);
-      filteredFiles = filteredFiles.filter(file => new Date(file.uploadedAt) >= start);
+      filteredFiles = filteredFiles.filter(
+        (file) => new Date(file.uploadedAt) >= start,
+      );
     }
-    
+
     if (endDate) {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999); // End of day
-      filteredFiles = filteredFiles.filter(file => new Date(file.uploadedAt) <= end);
+      filteredFiles = filteredFiles.filter(
+        (file) => new Date(file.uploadedAt) <= end,
+      );
     }
-    
+
     // Pagination
     const total = filteredFiles.length;
     const totalPages = Math.ceil(total / limit);
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
     const paginatedFiles = filteredFiles.slice(startIndex, endIndex);
-    
+
     return {
-      data: paginatedFiles.map(file => ({
+      data: paginatedFiles.map((file) => ({
         id: file.id,
         filename: file.filename,
         originalName: file.originalName,
@@ -547,19 +666,25 @@ export class FilesController {
   @ApiOperation({ summary: 'Get file statistics' })
   async getFileStats() {
     const files = await this.filesService.getAllFiles();
-    
+
     const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-    
-    const filesByType = files.reduce((acc, file) => {
-      const type = file.mimeType.split('/')[0];
-      acc[type] = (acc[type] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    
+
+    const filesByType = files.reduce(
+      (acc, file) => {
+        const type = file.mimeType.split('/')[0];
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
     const recentUploads = files
-      .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
+      .sort(
+        (a, b) =>
+          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
+      )
       .slice(0, 5)
-      .map(file => ({
+      .map((file) => ({
         id: file.id,
         filename: file.filename,
         originalName: file.originalName,
@@ -568,7 +693,7 @@ export class FilesController {
         uploadedAt: file.uploadedAt,
         url: `${this.getBaseUrl()}/api/v1/files/serve/${file.id}`,
       }));
-    
+
     return {
       totalFiles: files.length,
       totalSize,
@@ -616,17 +741,39 @@ export class FilesController {
       throw new BadRequestException('File not found');
     }
 
+    // If using non-local storage, stream download via server
+    const driver = this.configService.get<string>('file.driver');
+    if (driver && driver !== 'local') {
+      try {
+        const { stream, contentType, contentLength } =
+          await this.fileStorageService.getObjectStream(file.path);
+        res.setHeader('Content-Type', contentType || file.mimeType || 'application/octet-stream');
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="${file.originalName}"`,
+        );
+        if (contentLength) res.setHeader('Content-Length', contentLength);
+        stream.pipe(res);
+        return;
+      } catch (e) {
+        throw new BadRequestException('Unable to download file from storage');
+      }
+    }
+
     const fullPath = this.filesService.getFullFilePath(file.path);
     const fs = require('fs');
-    
+
     if (!fs.existsSync(fullPath)) {
       throw new BadRequestException('File not found on disk');
     }
 
     res.setHeader('Content-Type', file.mimeType);
-    res.setHeader('Content-Disposition', `attachment; filename="${file.originalName}"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.originalName}"`,
+    );
     res.setHeader('Content-Length', file.size);
-    
+
     const fileStream = fs.createReadStream(fullPath);
     fileStream.pipe(res);
   }

@@ -35,7 +35,7 @@ export class MailService {
     const frontendDomain = this.configService.getOrThrow('app.frontendDomain', {
       infer: true,
     });
-    
+
     const url = createUrl(frontendDomain, '/confirm-email');
     url.searchParams.set('hash', mailData.data.hash);
 
@@ -87,7 +87,7 @@ export class MailService {
     const frontendDomain = this.configService.getOrThrow('app.frontendDomain', {
       infer: true,
     });
-    
+
     const url = createUrl(frontendDomain, '/password-change');
     url.searchParams.set('hash', mailData.data.hash);
     url.searchParams.set('expires', mailData.data.tokenExpires.toString());
@@ -139,7 +139,7 @@ export class MailService {
     const frontendDomain = this.configService.getOrThrow('app.frontendDomain', {
       infer: true,
     });
-    
+
     const url = createUrl(frontendDomain, '/confirm-new-email');
     url.searchParams.set('hash', mailData.data.hash);
 
@@ -164,6 +164,130 @@ export class MailService {
         text1,
         text2,
         text3,
+      },
+    });
+  }
+
+  async sendInvoiceEmail(data: {
+    to: string;
+    parentName: string;
+    studentName: string;
+    invoiceNumber: string;
+    amount: string;
+    dueDate: string;
+    description: string;
+    pdfBuffer: Buffer;
+  }): Promise<void> {
+    const i18n = I18nContext.current();
+    let emailTitle: MaybeType<string>;
+    let text1: MaybeType<string>;
+    let text2: MaybeType<string>;
+    let text3: MaybeType<string>;
+
+    if (i18n) {
+      [emailTitle, text1, text2, text3] = await Promise.all([
+        i18n.t('common.invoiceEmail'),
+        i18n.t('invoice-email.text1'),
+        i18n.t('invoice-email.text2'),
+        i18n.t('invoice-email.text3'),
+      ]);
+    }
+
+    await this.mailerService.sendMail({
+      to: data.to,
+      subject:
+        emailTitle || `Invoice ${data.invoiceNumber} - ${data.studentName}`,
+      text: `Invoice ${data.invoiceNumber} for ${data.studentName}. Amount: ${data.amount}. Due: ${data.dueDate}`,
+      templatePath: path.join(
+        this.configService.getOrThrow('app.workingDirectory', {
+          infer: true,
+        }),
+        'src',
+        'mail',
+        'mail-templates',
+        'invoice-email.hbs',
+      ),
+      context: {
+        title: emailTitle || `Invoice ${data.invoiceNumber}`,
+        parentName: data.parentName,
+        studentName: data.studentName,
+        invoiceNumber: data.invoiceNumber,
+        amount: data.amount,
+        dueDate: data.dueDate,
+        description: data.description,
+        app_name: this.configService.get('app.name', { infer: true }),
+        text1: text1 || `Dear ${data.parentName || 'Student'},`,
+        text2:
+          text2 || `Please find attached the invoice for ${data.studentName}.`,
+        text3: text3 || `Amount: ${data.amount} | Due Date: ${data.dueDate}`,
+      },
+      attachments: [
+        {
+          filename: `invoice-${data.invoiceNumber}.pdf`,
+          content: data.pdfBuffer,
+          contentType: 'application/pdf',
+        },
+      ],
+    });
+  }
+
+  async sendPaymentConfirmationEmail(data: {
+    to: string;
+    parentName: string;
+    studentName: string;
+    invoiceNumber: string;
+    amount: string;
+    paymentMethod: string;
+    transactionId: string;
+    paymentDate: string;
+    description: string;
+  }): Promise<void> {
+    const i18n = I18nContext.current();
+    let emailTitle: MaybeType<string>;
+    let text1: MaybeType<string>;
+    let text2: MaybeType<string>;
+    let text3: MaybeType<string>;
+
+    if (i18n) {
+      [emailTitle, text1, text2, text3] = await Promise.all([
+        i18n.t('common.paymentConfirmationEmail'),
+        i18n.t('payment-confirmation-email.text1'),
+        i18n.t('payment-confirmation-email.text2'),
+        i18n.t('payment-confirmation-email.text3'),
+      ]);
+    }
+
+    await this.mailerService.sendMail({
+      to: data.to,
+      subject:
+        emailTitle || `Payment Confirmation - Invoice ${data.invoiceNumber}`,
+      text: `Payment confirmed for Invoice ${data.invoiceNumber}. Amount: ${data.amount}. Transaction ID: ${data.transactionId}`,
+      templatePath: path.join(
+        this.configService.getOrThrow('app.workingDirectory', {
+          infer: true,
+        }),
+        'src',
+        'mail',
+        'mail-templates',
+        'payment-confirmation.hbs',
+      ),
+      context: {
+        title:
+          emailTitle || `Payment Confirmation - Invoice ${data.invoiceNumber}`,
+        parentName: data.parentName,
+        studentName: data.studentName,
+        invoiceNumber: data.invoiceNumber,
+        amount: data.amount,
+        paymentMethod: data.paymentMethod,
+        transactionId: data.transactionId,
+        paymentDate: data.paymentDate,
+        description: data.description,
+        app_name: this.configService.get('app.name', { infer: true }),
+        text1: text1 || `Dear ${data.parentName || 'Student'},`,
+        text2:
+          text2 ||
+          `We are pleased to confirm that your payment has been processed successfully.`,
+        text3: text3 || `Thank you for your prompt payment!`,
       },
     });
   }

@@ -124,6 +124,15 @@ export class ClassesController {
     return this.classesService.remove(+id);
   }
 
+  // Duplicate class
+  @Post(':id/duplicate')
+  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiParam({ name: 'id', type: String })
+  async duplicate(@Param('id') id: string): Promise<Class> {
+    return this.classesService.duplicate(+id);
+  }
+
   // New enrollment endpoint
   @Get(':id/enrollments')
   @HttpCode(HttpStatus.OK)

@@ -11,5 +11,3 @@ export class UploadProofDto {
   @IsNotEmpty()
   paymentProofUrl: string; // Allow generic string; can switch to IsUrl if needed
 }
-
-

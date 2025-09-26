@@ -1,5 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, IsPhoneNumber, IsPositive, IsString } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsPhoneNumber,
+  IsPositive,
+  IsString,
+} from 'class-validator';
 
 export class PublicPurchaseDto {
   @ApiProperty()
@@ -25,5 +32,3 @@ export class PublicPurchaseDto {
   @IsString()
   phone?: string;
 }
-
-

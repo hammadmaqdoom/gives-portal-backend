@@ -29,6 +29,7 @@ export class UserMapper {
     domainEntity.createdAt = raw.createdAt;
     domainEntity.updatedAt = raw.updatedAt;
     domainEntity.deletedAt = raw.deletedAt;
+    (domainEntity as any).mustChangePassword = (raw as any).mustChangePassword ?? false;
     return domainEntity;
   }
 
@@ -79,6 +80,7 @@ export class UserMapper {
     persistenceEntity.createdAt = domainEntity.createdAt;
     persistenceEntity.updatedAt = domainEntity.updatedAt;
     persistenceEntity.deletedAt = domainEntity.deletedAt;
+    (persistenceEntity as any).mustChangePassword = (domainEntity as any).mustChangePassword ?? false;
     return persistenceEntity;
   }
 }

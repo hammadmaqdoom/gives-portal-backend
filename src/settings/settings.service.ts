@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { SettingsRepository } from './infrastructure/persistence/settings.repository';
 import { Settings } from './domain/settings';
 import { CreateSettingsDto } from './dto/create-settings.dto';
@@ -6,9 +11,7 @@ import { UpdateSettingsDto } from './dto/update-settings.dto';
 
 @Injectable()
 export class SettingsService {
-  constructor(
-    private readonly settingsRepository: SettingsRepository,
-  ) {}
+  constructor(private readonly settingsRepository: SettingsRepository) {}
 
   async getSettings(): Promise<Settings | null> {
     return this.settingsRepository.find();
@@ -16,26 +19,29 @@ export class SettingsService {
 
   async getSettingsOrCreate(): Promise<Settings> {
     let settings = await this.settingsRepository.find();
-    
+
     if (!settings) {
       // Create default settings if none exist
       const defaultSettings: CreateSettingsDto = {
         appName: 'LMS Portal',
         appTitle: 'LMS Portal - Education Management System',
-        metaDescription: 'Comprehensive education management system for schools and institutions',
+        metaDescription:
+          'Comprehensive education management system for schools and institutions',
         defaultTimezone: 'Asia/Karachi',
         smtpSecure: false,
         smtpIgnoreTls: false,
         smtpRequireTls: true,
       };
-      
+
       settings = await this.settingsRepository.create(defaultSettings);
     }
-    
+
     return settings;
   }
 
-  async createSettings(createSettingsDto: CreateSettingsDto): Promise<Settings> {
+  async createSettings(
+    createSettingsDto: CreateSettingsDto,
+  ): Promise<Settings> {
     // Check if settings already exist
     const existingSettings = await this.settingsRepository.find();
     if (existingSettings) {
@@ -45,19 +51,24 @@ export class SettingsService {
     return this.settingsRepository.create(createSettingsDto);
   }
 
-  async updateSettings(updateSettingsDto: UpdateSettingsDto): Promise<Settings> {
+  async updateSettings(
+    updateSettingsDto: UpdateSettingsDto,
+  ): Promise<Settings> {
     const existingSettings = await this.settingsRepository.find();
-    
+
     if (!existingSettings) {
       throw new NotFoundException('Settings not found');
     }
 
-    const updatedSettings = await this.settingsRepository.update(existingSettings.id, updateSettingsDto);
-    
+    const updatedSettings = await this.settingsRepository.update(
+      existingSettings.id,
+      updateSettingsDto,
+    );
+
     // If SMTP settings were updated, we could emit an event here
     // to notify the mailer service to refresh its configuration
     // For now, the mailer service will use the latest config on each send
-    
+
     return updatedSettings;
   }
 
@@ -68,9 +79,10 @@ export class SettingsService {
     logoNavbar?: string | null;
     logoFavicon?: string | null;
     defaultTimezone: string;
+    defaultCurrency?: string | null;
   }> {
     const settings = await this.getSettingsOrCreate();
-    
+
     return {
       appName: settings.appName,
       appTitle: settings.appTitle,
@@ -78,6 +90,7 @@ export class SettingsService {
       logoNavbar: settings.logoNavbar,
       logoFavicon: settings.logoFavicon,
       defaultTimezone: settings.defaultTimezone,
+      defaultCurrency: (settings as any).defaultCurrency || 'PKR',
     };
   }
 
@@ -92,7 +105,7 @@ export class SettingsService {
     contactWebsite?: string | null;
   }> {
     const settings = await this.getSettingsOrCreate();
-    
+
     return {
       businessAddress: settings.businessAddress,
       taxRegistrationLabel: settings.taxRegistrationLabel,
@@ -116,7 +129,7 @@ export class SettingsService {
     bankSwiftCode?: string | null;
   }> {
     const settings = await this.getSettingsOrCreate();
-    
+
     return {
       bankName: settings.bankName,
       bankAccountNumber: settings.bankAccountNumber,
@@ -141,7 +154,7 @@ export class SettingsService {
     smtpRequireTls: boolean;
   }> {
     const settings = await this.getSettingsOrCreate();
-    
+
     return {
       smtpHost: settings.smtpHost,
       smtpPort: settings.smtpPort,
@@ -162,7 +175,7 @@ export class SettingsService {
     socialInstagram?: string | null;
   }> {
     const settings = await this.getSettingsOrCreate();
-    
+
     return {
       socialFacebook: settings.socialFacebook,
       socialTwitter: settings.socialTwitter,

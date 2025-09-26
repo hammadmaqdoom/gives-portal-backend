@@ -32,15 +32,21 @@ class EnvironmentVariablesValidator {
   @IsString()
   AWS_S3_REGION: string;
 
-  @ValidateIf((envValues) => envValues.FILE_DRIVER === FileDriver.AZURE_BLOB_SAS)
+  @ValidateIf(
+    (envValues) => envValues.FILE_DRIVER === FileDriver.AZURE_BLOB_SAS,
+  )
   @IsString()
   AZURE_STORAGE_ACCOUNT_NAME: string;
 
-  @ValidateIf((envValues) => envValues.FILE_DRIVER === FileDriver.AZURE_BLOB_SAS)
+  @ValidateIf(
+    (envValues) => envValues.FILE_DRIVER === FileDriver.AZURE_BLOB_SAS,
+  )
   @IsString()
   AZURE_STORAGE_ACCOUNT_KEY: string;
 
-  @ValidateIf((envValues) => envValues.FILE_DRIVER === FileDriver.AZURE_BLOB_SAS)
+  @ValidateIf(
+    (envValues) => envValues.FILE_DRIVER === FileDriver.AZURE_BLOB_SAS,
+  )
   @IsString()
   AZURE_CONTAINER_NAME: string;
 }

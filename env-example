@@ -58,6 +58,12 @@ AUTH_FORGOT_TOKEN_EXPIRES_IN=30m
 AUTH_CONFIRM_EMAIL_SECRET=secret_for_confirm_email
 AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN=1d
 
+# Get from openexchangerates.org
+OPENEXCHANGERATES_APP_ID=add-api-key-here
+
+# Payment Gateway Encryption Key (32+ characters for AES-256-GCM)
+ENCRYPTION_KEY=your-super-secret-encryption-key-32-chars-minimum
+
 FACEBOOK_APP_ID=
 FACEBOOK_APP_SECRET=
 

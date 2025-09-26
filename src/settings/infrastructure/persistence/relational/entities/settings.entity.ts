@@ -51,6 +51,9 @@ export class SettingsEntity extends EntityRelationalHelper {
   companyLegalName: string | null;
 
   // Bank Account Details
+  @Column({ type: 'varchar', length: 3, nullable: true, default: 'PKR' })
+  defaultCurrency: string | null;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   bankName: string | null;
 

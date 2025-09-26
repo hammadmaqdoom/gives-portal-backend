@@ -1,10 +1,18 @@
-import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Post, Body, UseGuards, Request, Get, Query } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../roles/roles.guard';
 import { Roles } from '../roles/roles.decorator';
 import { RoleEnum } from '../roles/roles.enum';
-import { AnnouncementsService, CreateAnnouncementDto } from './announcements.service';
+import {
+  AnnouncementsService,
+  CreateAnnouncementDto,
+} from './announcements.service';
 
 @ApiTags('Announcements')
 @Controller({
@@ -26,12 +34,14 @@ export class AnnouncementsController {
   ) {
     // Set author ID from the authenticated user
     createAnnouncementDto.authorId = req.user.id;
-    
-    await this.announcementsService.createAnnouncement(createAnnouncementDto);
-    
-    return {
-      message: 'Announcement sent successfully',
-      targetAudience: createAnnouncementDto.targetAudience,
-    };
+
+    const saved = await this.announcementsService.createAnnouncement(createAnnouncementDto);
+    return saved;
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List announcements (optional classId filter)' })
+  async list(@Query('classId') classId?: string) {
+    return this.announcementsService.listAnnouncements(classId ? Number(classId) : undefined);
   }
 }

@@ -125,6 +125,7 @@ export class UsersService {
       status: status,
       provider: createUserDto.provider ?? AuthProvidersEnum.email,
       socialId: createUserDto.socialId,
+      mustChangePassword: false,
     });
   }
 
@@ -194,7 +195,7 @@ export class UsersService {
         updateUserDto.email,
       );
 
-      if (userObject && userObject.id !== id) {
+      if (userObject && userObject.id !== Number(id)) {
         throw new UnprocessableEntityException({
           status: HttpStatus.UNPROCESSABLE_ENTITY,
           errors: {
@@ -279,6 +280,7 @@ export class UsersService {
       status,
       provider: updateUserDto.provider,
       socialId: updateUserDto.socialId,
+      mustChangePassword: (updateUserDto as any).mustChangePassword,
     });
   }
 

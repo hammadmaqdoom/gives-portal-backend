@@ -30,7 +30,7 @@ export class AddInvoiceItemsOnly1757159231198 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "invoice_item" DROP CONSTRAINT "FK_553d5aac210d22fdca5c8d48ead"`,
     );
-    
+
     // Drop the invoice_item table
     await queryRunner.query(`DROP TABLE "invoice_item"`);
   }

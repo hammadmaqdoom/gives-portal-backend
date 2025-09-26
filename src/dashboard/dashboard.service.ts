@@ -25,6 +25,8 @@ import {
   StudentAnalyticsDto,
 } from './dto/student-dashboard.dto';
 import { ParentStatsDto, ParentAnalyticsDto } from './dto/parent-dashboard.dto';
+import { CurrencyService } from '../currency/currency.service';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class DashboardService {
@@ -49,6 +51,8 @@ export class DashboardService {
     private parentRepository: Repository<ParentEntity>,
     @InjectRepository(StudentClassEnrollmentEntity)
     private enrollmentRepository: Repository<StudentClassEnrollmentEntity>,
+    private readonly currencyService: CurrencyService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   async getAdminStats(): Promise<AdminStatsDto> {
@@ -243,7 +247,10 @@ export class DashboardService {
       .select('SUM(fee.amount)', 'total')
       .where('fee.status = :status', { status: PaymentStatus.PAID })
       .getRawOne();
-    return parseFloat(result?.total || '0');
+    const total = parseFloat(result?.total || '0');
+    const defaultCurrency = (await this.settingsService.getSettingsOrCreate() as any).defaultCurrency || 'PKR';
+    // Convert aggregated total to PKR
+    return await this.currencyService.convert(total, defaultCurrency, 'PKR');
   }
 
   private async getPendingFees(): Promise<number> {
@@ -252,7 +259,9 @@ export class DashboardService {
       .select('SUM(fee.amount)', 'total')
       .where('fee.status = :status', { status: PaymentStatus.UNPAID })
       .getRawOne();
-    return parseFloat(result?.total || '0');
+    const total = parseFloat(result?.total || '0');
+    const defaultCurrency = (await this.settingsService.getSettingsOrCreate() as any).defaultCurrency || 'PKR';
+    return await this.currencyService.convert(total, defaultCurrency, 'PKR');
   }
 
   private async getRecentEnrollments(): Promise<number> {
@@ -325,12 +334,17 @@ export class DashboardService {
       .orderBy('month', 'ASC')
       .getRawMany();
 
-    return result.map((item) => ({
-      month: new Date(item.month).toLocaleDateString('en-US', {
-        month: 'short',
-      }),
-      revenue: parseFloat(item.total),
+    const defaultCurrency = (await this.settingsService.getSettingsOrCreate() as any).defaultCurrency || 'PKR';
+    const mapped = await Promise.all(result.map(async (item) => {
+      const date = new Date(item.month);
+      const amount = parseFloat(item.total);
+      const revenuePKR = await this.currencyService.convert(amount, defaultCurrency, 'PKR', date);
+      return {
+        month: date.toLocaleDateString('en-US', { month: 'short' }),
+        revenue: revenuePKR,
+      };
     }));
+    return mapped;
   }
 
   private async getAttendanceByClass() {

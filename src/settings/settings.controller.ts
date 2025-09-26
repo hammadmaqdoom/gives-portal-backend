@@ -8,12 +8,18 @@ import {
   Request,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../roles/roles.guard';
 import { Roles } from '../roles/roles.decorator';
 import { RoleEnum } from '../roles/roles.enum';
 import { SettingsService } from './settings.service';
+import { CurrencyService } from '../currency/currency.service';
 import { CreateSettingsDto } from './dto/create-settings.dto';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { Settings } from './domain/settings';
@@ -26,7 +32,10 @@ import { Settings } from './domain/settings';
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @ApiBearerAuth()
 export class SettingsController {
-  constructor(private readonly settingsService: SettingsService) {}
+  constructor(
+    private readonly settingsService: SettingsService,
+    private readonly currencyService: CurrencyService,
+  ) {}
 
   @Get()
   @Roles(RoleEnum.admin)
@@ -63,7 +72,7 @@ export class SettingsController {
   }
 
   @Get('bank-details')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Get bank account details' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -93,6 +102,15 @@ export class SettingsController {
   })
   async getSocialMedia() {
     return this.settingsService.getSocialMedia();
+  }
+
+  @Post('currency/sync')
+  @Roles(RoleEnum.admin)
+  @ApiOperation({ summary: 'Manually sync currency rates (fetch latest)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Currency rates synced' })
+  async syncCurrencyRates() {
+    const record = await this.currencyService.getRateForDate(new Date());
+    return { success: true, base: record.base, date: record.date };
   }
 
   @Post()

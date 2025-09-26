@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
@@ -25,6 +26,8 @@ import { LearningModulesModule } from './learning-modules/learning-modules.modul
 import { AnnouncementsModule } from './announcements/announcements.module';
 import { SettingsModule } from './settings/settings.module';
 import { ZoomModule } from './zoom/zoom.module';
+import { PaymentsModule } from './payments/payments.module';
+import { AnnotationsModule } from './annotations/annotations.module';
 import { PublicController } from './public/public.controller';
 import { AppDataSource } from './database/data-source';
 import authConfig from './auth/config/auth.config';
@@ -48,6 +51,7 @@ import fileConfig from './files/config/file.config';
         return new DataSource(options).initialize();
       },
     }),
+    ScheduleModule.forRoot(),
     AuthModule,
     UsersModule,
     FilesModule,
@@ -72,6 +76,8 @@ import fileConfig from './files/config/file.config';
     AnnouncementsModule,
     SettingsModule,
     ZoomModule,
+    PaymentsModule,
+    AnnotationsModule,
   ],
   controllers: [PublicController],
 })

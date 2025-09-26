@@ -1,43 +1,56 @@
 import {
-  Entity,
-  PrimaryGeneratedColumn,
   Column,
-  ManyToOne,
-  JoinColumn,
   CreateDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { StudentEntity } from '../../../../../students/infrastructure/persistence/relational/entities/student.entity';
+import { EntityRelationalHelper } from '../../../../../utils/relational-entity-helper';
 import { LearningModuleEntity } from './learning-module.entity';
+import { StudentEntity } from '../../../../../students/infrastructure/persistence/relational/entities/student.entity';
 
-@Entity('module_completion')
-export class ModuleCompletionEntity {
+@Entity({ name: 'module_completion' })
+export class ModuleCompletionEntity extends EntityRelationalHelper {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'student_id' })
-  studentId: number;
-
-  @Column({ name: 'module_id' })
+  @Index()
+  @Column({ type: 'int', name: 'module_id' })
   moduleId: number;
 
-  @Column({ name: 'is_completed', default: false })
+  @Index()
+  @Column({ type: 'int', name: 'student_id' })
+  studentId: number;
+
+  @Column({ type: 'boolean', default: false, name: 'is_completed' })
   isCompleted: boolean;
 
-  @Column({ name: 'completed_at', type: 'timestamp', nullable: true })
-  completedAt: Date | null;
+  @Column({ type: 'timestamp', nullable: true, name: 'completed_at' })
+  completedAt?: Date | null;
 
-  @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
+  @Column({ type: 'int', default: 0, name: 'progress_percentage' })
+  progressPercentage: number; // 0-100
+
+  @Column({ type: 'int', default: 0, name: 'time_spent' })
+  timeSpent: number; // Time spent in seconds
+
+  @Column({ type: 'jsonb', nullable: true, name: 'completion_data' })
+  completionData?: any; // Additional completion tracking data
+
+  @ManyToOne(() => LearningModuleEntity, { eager: true })
+  @JoinColumn({ name: 'module_id' })
+  module?: LearningModuleEntity | null;
+
+  @ManyToOne(() => StudentEntity, { eager: true })
+  @JoinColumn({ name: 'student_id' })
+  student?: StudentEntity | null;
+
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
-
-  @ManyToOne(() => StudentEntity)
-  @JoinColumn({ name: 'student_id' })
-  student: StudentEntity;
-
-  @ManyToOne(() => LearningModuleEntity)
-  @JoinColumn({ name: 'module_id' })
-  module: LearningModuleEntity;
 }

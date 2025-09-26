@@ -57,16 +57,21 @@ export class SettingsMapper {
     persistenceEntity.logoFavicon = domainEntity.logoFavicon || null;
     persistenceEntity.defaultTimezone = domainEntity.defaultTimezone;
     persistenceEntity.businessAddress = domainEntity.businessAddress || null;
-    persistenceEntity.taxRegistrationLabel = domainEntity.taxRegistrationLabel || null;
-    persistenceEntity.taxRegistrationNumber = domainEntity.taxRegistrationNumber || null;
+    persistenceEntity.taxRegistrationLabel =
+      domainEntity.taxRegistrationLabel || null;
+    persistenceEntity.taxRegistrationNumber =
+      domainEntity.taxRegistrationNumber || null;
     persistenceEntity.companyNumber = domainEntity.companyNumber || null;
     persistenceEntity.companyLegalName = domainEntity.companyLegalName || null;
     persistenceEntity.bankName = domainEntity.bankName || null;
-    persistenceEntity.bankAccountNumber = domainEntity.bankAccountNumber || null;
+    persistenceEntity.bankAccountNumber =
+      domainEntity.bankAccountNumber || null;
     persistenceEntity.bankAccountTitle = domainEntity.bankAccountTitle || null;
     persistenceEntity.bankAccountType = domainEntity.bankAccountType || null;
-    persistenceEntity.bankAccountCurrency = domainEntity.bankAccountCurrency || null;
-    persistenceEntity.bankRoutingNumber = domainEntity.bankRoutingNumber || null;
+    persistenceEntity.bankAccountCurrency =
+      domainEntity.bankAccountCurrency || null;
+    persistenceEntity.bankRoutingNumber =
+      domainEntity.bankRoutingNumber || null;
     persistenceEntity.bankIban = domainEntity.bankIban || null;
     persistenceEntity.bankSwiftCode = domainEntity.bankSwiftCode || null;
     persistenceEntity.smtpHost = domainEntity.smtpHost || null;

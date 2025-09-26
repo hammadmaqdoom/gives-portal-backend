@@ -15,6 +15,8 @@ import { StudentsService } from '../students/students.service';
 import { ParentsService } from '../parents/parents.service';
 import { NotificationService } from '../notifications/notification.service';
 import { InvoiceStatus } from './domain/invoice';
+import { jsPDF } from 'jspdf';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class InvoicesService {
@@ -25,6 +27,7 @@ export class InvoicesService {
     @Inject(forwardRef(() => ParentsService))
     private readonly parentsService: ParentsService,
     private readonly notificationService: NotificationService,
+    private readonly mailService: MailService,
   ) {}
 
   async create(createInvoiceDto: CreateInvoiceDto): Promise<Invoice> {
@@ -73,20 +76,21 @@ export class InvoicesService {
       generatedDate: new Date(),
       description: createInvoiceDto.description,
       notes: createInvoiceDto.notes,
-      items: createInvoiceDto.items?.map(item => ({
-        id: 0, // Will be set by database
-        invoiceId: 0, // Will be set by database
-        description: item.description,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        total: item.total,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })) || [],
+      items:
+        createInvoiceDto.items?.map((item) => ({
+          id: 0, // Will be set by database
+          invoiceId: 0, // Will be set by database
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.total,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })) || [],
     };
 
     const invoice = await this.invoiceRepository.create(invoiceData);
-    
+
     // Send invoice notification email
     try {
       await this.sendInvoiceNotification(invoice);
@@ -94,7 +98,7 @@ export class InvoicesService {
       console.error('Error sending invoice notification:', error);
       // Don't fail the invoice creation if notification fails
     }
-    
+
     return invoice;
   }
 
@@ -126,13 +130,23 @@ export class InvoicesService {
   }
 
   async findByStudentUserId(userId: number): Promise<Invoice[]> {
+    console.log('🔍 findByStudentUserId - Looking for student with user ID:', userId);
+    
     // First find the student by user ID
     const student = await this.studentsService.findByUserId(userId);
+    console.log('🔍 findByStudentUserId - Found student:', student);
+    
     if (!student) {
+      console.log('🔍 findByStudentUserId - No student found, returning empty array');
       return [];
     }
+    
     // Then get invoices for that student
-    return this.invoiceRepository.findByStudent(student.id);
+    console.log('🔍 findByStudentUserId - Getting invoices for student ID:', student.id);
+    const invoices = await this.invoiceRepository.findByStudent(student.id);
+    console.log('🔍 findByStudentUserId - Found invoices:', invoices);
+    
+    return invoices;
   }
 
   async findByParent(parentId: number): Promise<Invoice[]> {
@@ -158,9 +172,14 @@ export class InvoicesService {
     const invoices = await this.invoiceRepository.findByStudent(studentId);
     const latestUnpaid = (invoices || [])
       .filter((i) => i.status !== 'paid')
-      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+      .sort(
+        (a: any, b: any) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )[0];
     if (!latestUnpaid) return null;
-    return this.invoiceRepository.update(latestUnpaid.id, { paymentProofUrl: proofUrl } as any);
+    return this.invoiceRepository.update(latestUnpaid.id, {
+      paymentProofUrl: proofUrl,
+    } as any);
   }
 
   async findOverdue(): Promise<Invoice[]> {
@@ -254,6 +273,38 @@ export class InvoicesService {
     return this.invoiceRepository.update(id, { paymentProofUrl });
   }
 
+  async uploadPaymentProofFile(
+    id: number,
+    file: Express.Multer.File,
+    uploadedBy: string,
+  ): Promise<Invoice | null> {
+    const invoice = await this.invoiceRepository.findById(id);
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const fileExtension = file.originalname.split('.').pop();
+    const filename = `payment-proof-${id}-${timestamp}.${fileExtension}`;
+
+    // Create uploads directory if it doesn't exist
+    const uploadsDir = 'uploads/payment-proofs';
+    const fs = require('fs');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    // Save file to uploads directory
+    const filePath = `${uploadsDir}/${filename}`;
+    fs.writeFileSync(filePath, file.buffer);
+
+    // Generate URL for the uploaded file
+    const paymentProofUrl = `/api/v1/files/serve/payment-proofs/${filename}`;
+
+    return this.invoiceRepository.update(id, { paymentProofUrl });
+  }
+
   async remove(id: number): Promise<void> {
     const invoice = await this.invoiceRepository.findById(id);
     if (!invoice) {
@@ -317,6 +368,184 @@ export class InvoicesService {
     return stats;
   }
 
+  async generatePDF(invoiceId: number): Promise<Buffer> {
+    const invoice = await this.findById(invoiceId);
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+
+    // Get student details
+    const student = await this.studentsService.findById(invoice.studentId);
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    // Get parent details
+    let parent: any = null;
+    if (invoice.parentId) {
+      parent = await this.parentsService.findById(invoice.parentId);
+    }
+
+    // If no parent found, try to get parents from student
+    if (!parent) {
+      const parents = await this.parentsService.findByStudentId(
+        invoice.studentId,
+      );
+      parent = parents && parents.length > 0 ? parents[0] : null;
+    }
+
+    const doc = new jsPDF();
+
+    // Set up the PDF content
+    let yPosition = 20;
+
+    // Header
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INVOICE', 20, yPosition);
+    yPosition += 10;
+
+    // Invoice number and date
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Invoice #: ${invoice.invoiceNumber}`, 20, yPosition);
+    yPosition += 5;
+    doc.text(
+      `Date: ${new Date(invoice.generatedDate).toLocaleDateString()}`,
+      20,
+      yPosition,
+    );
+    yPosition += 5;
+    doc.text(
+      `Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}`,
+      20,
+      yPosition,
+    );
+    yPosition += 20;
+
+    // Bill to section
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Bill To:', 20, yPosition);
+    yPosition += 10;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    if (parent) {
+      doc.text(parent.fullName || 'Parent', 20, yPosition);
+      yPosition += 5;
+      if (parent.email) {
+        doc.text(parent.email, 20, yPosition);
+        yPosition += 5;
+      }
+    }
+    doc.text(`Student: ${student.name}`, 20, yPosition);
+    yPosition += 10;
+
+    // Description
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Description:', 20, yPosition);
+    yPosition += 5;
+    doc.text(invoice.description, 20, yPosition);
+    yPosition += 15;
+
+    // Amount
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(
+      `Amount: ${invoice.currency} ${invoice.amount.toFixed(2)}`,
+      20,
+      yPosition,
+    );
+    yPosition += 10;
+
+    // Status
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Status: ${invoice.status.toUpperCase()}`, 20, yPosition);
+
+    // Notes
+    if (invoice.notes) {
+      yPosition += 15;
+      doc.text('Notes:', 20, yPosition);
+      yPosition += 5;
+      doc.text(invoice.notes, 20, yPosition);
+    }
+
+    return Buffer.from(doc.output('arraybuffer'));
+  }
+
+  async sendInvoiceEmail(invoiceId: number): Promise<{ message: string }> {
+    const invoice = await this.findById(invoiceId);
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+
+    // Get student details
+    const student = await this.studentsService.findById(invoice.studentId);
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    // Get parent details
+    let parent: any = null;
+    if (invoice.parentId) {
+      parent = await this.parentsService.findById(invoice.parentId);
+    }
+
+    // If no parent found, try to get parents from student
+    if (!parent) {
+      const parents = await this.parentsService.findByStudentId(
+        invoice.studentId,
+      );
+      parent = parents && parents.length > 0 ? parents[0] : null;
+    }
+
+    // Collect email recipients
+    const recipients: string[] = [];
+
+    // Add student email if available
+    if (student.email) {
+      recipients.push(student.email);
+    }
+
+    // Add parent email if available
+    if (parent && parent.email) {
+      recipients.push(parent.email);
+    }
+
+    if (recipients.length === 0) {
+      throw new UnprocessableEntityException(
+        'No email addresses found for student or parent',
+      );
+    }
+
+    // Generate PDF
+    const pdfBuffer = await this.generatePDF(invoiceId);
+
+    // Send email to all recipients
+    const emailPromises = recipients.map((recipient) =>
+      this.mailService.sendInvoiceEmail({
+        to: recipient,
+        parentName: parent?.fullName || 'Parent',
+        studentName: student.name,
+        invoiceNumber: invoice.invoiceNumber,
+        amount: `${invoice.currency} ${invoice.amount.toFixed(2)}`,
+        dueDate: new Date(invoice.dueDate).toLocaleDateString(),
+        description: invoice.description,
+        pdfBuffer,
+      }),
+    );
+
+    await Promise.all(emailPromises);
+
+    const recipientList = recipients.join(', ');
+    return {
+      message: `Invoice sent successfully via email to: ${recipientList}`,
+    };
+  }
+
   private async sendInvoiceNotification(invoice: Invoice): Promise<void> {
     try {
       // Get student details
@@ -331,7 +560,9 @@ export class InvoicesService {
 
       // If no parent found, try to get parents from student
       if (!parent) {
-        const parents = await this.parentsService.findByStudentId(invoice.studentId);
+        const parents = await this.parentsService.findByStudentId(
+          invoice.studentId,
+        );
         parent = parents && parents.length > 0 ? parents[0] : null;
       }
 
@@ -339,7 +570,7 @@ export class InvoicesService {
 
       // Format amount
       const formattedAmount = `${invoice.amount} ${invoice.currency}`;
-      
+
       // Format due date
       const dueDate = new Date(invoice.dueDate).toLocaleDateString();
 

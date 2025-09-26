@@ -11,12 +11,23 @@ import { Class } from './domain/class';
 import { IPaginationOptions } from '../utils/types/pagination-options';
 import { UpdateClassDto } from './dto/update-class.dto';
 import { StudentClassEnrollmentRepository } from '../students/infrastructure/persistence/relational/repositories/student-class-enrollment.repository';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { LearningModuleEntity } from '../learning-modules/infrastructure/persistence/relational/entities/learning-module.entity';
+import { LearningModuleSectionEntity } from '../learning-modules/infrastructure/persistence/relational/entities/learning-module-section.entity';
+import { AssignmentEntity } from '../assignments/infrastructure/persistence/relational/entities/assignment.entity';
 
 @Injectable()
 export class ClassesService {
   constructor(
     private readonly classesRepository: ClassRepository,
     private readonly enrollmentRepository: StudentClassEnrollmentRepository,
+    @InjectRepository(LearningModuleEntity)
+    private readonly moduleRepo: Repository<LearningModuleEntity>,
+    @InjectRepository(LearningModuleSectionEntity)
+    private readonly sectionRepo: Repository<LearningModuleSectionEntity>,
+    @InjectRepository(AssignmentEntity)
+    private readonly assignmentRepo: Repository<AssignmentEntity>,
   ) {}
 
   async create(createClassDto: CreateClassDto): Promise<Class> {
@@ -106,6 +117,97 @@ export class ClassesService {
 
   async remove(id: Class['id']): Promise<void> {
     await this.classesRepository.remove(id);
+  }
+
+  // Duplicate class with sections and modules (no schedules, no enrollments)
+  async duplicate(id: number): Promise<Class> {
+    const original = await this.classesRepository.findById(id);
+    if (!original) {
+      throw new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: { class: 'classNotExists' },
+      });
+    }
+
+    const newName = `${original.name}-copy`;
+    const duplicateClass = await this.classesRepository.create({
+      name: newName,
+      batchTerm: original.batchTerm,
+      weekdays: original.weekdays,
+      timing: undefined,
+      timezone: original.timezone,
+      courseOutline: original.courseOutline,
+      feeUSD: (original as any).feeUSD,
+      feePKR: (original as any).feePKR,
+      classMode: (original as any).classMode,
+      subject: original.subject as any,
+      teacher: original.teacher as any,
+      schedules: [],
+    });
+
+    // Map sections by old->new
+    const sections = await this.sectionRepo.find({ where: { classId: id }, order: { orderIndex: 'ASC', id: 'ASC' } as any });
+    const sectionIdMap = new Map<number, number>();
+    for (const s of sections) {
+      const created = await this.sectionRepo.save(
+        this.sectionRepo.create({
+          classId: duplicateClass.id,
+          title: s.title,
+          orderIndex: s.orderIndex ?? 0,
+        }),
+      );
+      sectionIdMap.set(s.id, created.id);
+    }
+
+    // Copy modules (preserve drip configuration)
+    const modules = await this.moduleRepo.find({ where: { classId: id } as any, order: { orderIndex: 'ASC', id: 'ASC' } });
+    for (const m of modules) {
+      const newSectionId = m.sectionId ? sectionIdMap.get(m.sectionId) || null : null;
+      await this.moduleRepo.save(
+        this.moduleRepo.create({
+          title: m.title,
+          contentHtml: (m as any).contentHtml,
+          orderIndex: m.orderIndex,
+          groupId: (m as any).groupId,
+          videoUrl: m.videoUrl,
+          attachments: (m as any).attachments,
+          classId: duplicateClass.id,
+          sectionId: newSectionId as any,
+          isPinned: (m as any).isPinned ?? false,
+          zoomMeetingId: null,
+          zoomMeetingUrl: null,
+          zoomMeetingPassword: null,
+          zoomMeetingStartTime: null,
+          zoomMeetingDuration: null,
+          // preserve drip configuration exactly
+          dripEnabled: (m as any).dripEnabled ?? false,
+          dripReleaseDate: (m as any).dripReleaseDate ?? null,
+          dripPrerequisites: (m as any).dripPrerequisites ?? null,
+          dripDelayDays: (m as any).dripDelayDays ?? null,
+        } as any),
+      );
+    }
+
+    // Copy assignments created by admin/teacher (owned by class)
+    const assignments = await this.assignmentRepo.find({ where: { class: { id } } as any, order: { id: 'ASC' } });
+    for (const a of assignments) {
+      await this.assignmentRepo.save(
+        this.assignmentRepo.create({
+          title: a.title,
+          description: a.description,
+          dueDate: a.dueDate,
+          type: a.type as any,
+          status: a.status as any,
+          maxScore: a.maxScore,
+          markingCriteria: a.markingCriteria,
+          attachments: a.attachments as any,
+          class: { id: duplicateClass.id } as any,
+          teacher: a.teacher ? ({ id: (a.teacher as any).id } as any) : undefined,
+        } as any),
+      );
+    }
+
+    return duplicateClass;
   }
 
   // New method for getting class enrollments

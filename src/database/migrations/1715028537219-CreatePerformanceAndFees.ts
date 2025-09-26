@@ -165,8 +165,12 @@ export class CreatePerformanceAndFees1715028537219
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_fee_class"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_fee_student"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "fee"`);
-    await queryRunner.query(`DROP TYPE IF EXISTS "public"."payment_method_enum"`);
-    await queryRunner.query(`DROP TYPE IF EXISTS "public"."payment_status_enum"`);
+    await queryRunner.query(
+      `DROP TYPE IF EXISTS "public"."payment_method_enum"`,
+    );
+    await queryRunner.query(
+      `DROP TYPE IF EXISTS "public"."payment_status_enum"`,
+    );
 
     // Drop performance table
     await queryRunner.query(`
@@ -183,9 +187,13 @@ export class CreatePerformanceAndFees1715028537219
         END IF;
       END $$;
     `);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_performance_assignment"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_performance_assignment"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_performance_student"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "performance"`);
-    await queryRunner.query(`DROP TYPE IF EXISTS "public"."performance_status_enum"`);
+    await queryRunner.query(
+      `DROP TYPE IF EXISTS "public"."performance_status_enum"`,
+    );
   }
 }

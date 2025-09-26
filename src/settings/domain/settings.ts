@@ -10,7 +10,10 @@ export class Settings {
   @ApiProperty({ example: 'LMS Portal - Education Management System' })
   appTitle: string;
 
-  @ApiProperty({ example: 'Comprehensive education management system for schools and institutions' })
+  @ApiProperty({
+    example:
+      'Comprehensive education management system for schools and institutions',
+  })
   metaDescription: string;
 
   @ApiProperty({ example: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...' })

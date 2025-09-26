@@ -4,11 +4,18 @@ import { ClassesController } from './classes.controller';
 import { ClassesService } from './classes.service';
 import { RelationalClassPersistenceModule } from './infrastructure/persistence/relational/relational-persistence.module';
 import { StudentsModule } from '../students/students.module';
+import { LearningModuleEntity } from '../learning-modules/infrastructure/persistence/relational/entities/learning-module.entity';
+import { LearningModuleSectionEntity } from '../learning-modules/infrastructure/persistence/relational/entities/learning-module-section.entity';
+import { AssignmentEntity } from '../assignments/infrastructure/persistence/relational/entities/assignment.entity';
 
 const infrastructurePersistenceModule = RelationalClassPersistenceModule;
 
 @Module({
-  imports: [infrastructurePersistenceModule, forwardRef(() => StudentsModule)],
+  imports: [
+    infrastructurePersistenceModule,
+    forwardRef(() => StudentsModule),
+    TypeOrmModule.forFeature([LearningModuleEntity, LearningModuleSectionEntity, AssignmentEntity]),
+  ],
   controllers: [ClassesController],
   providers: [ClassesService],
   exports: [ClassesService, infrastructurePersistenceModule],

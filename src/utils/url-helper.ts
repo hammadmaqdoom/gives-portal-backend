@@ -11,12 +11,12 @@ export function ensureProtocol(domain: string): string {
   if (!domain) {
     throw new Error('Domain is required');
   }
-  
+
   // If domain already has a protocol, return as is
   if (domain.startsWith('http://') || domain.startsWith('https://')) {
     return domain;
   }
-  
+
   // Default to HTTPS for production domains
   return `https://${domain}`;
 }
@@ -30,7 +30,7 @@ export function ensureProtocol(domain: string): string {
 export function createUrl(domain: string, path: string = ''): URL {
   const fullDomain = ensureProtocol(domain);
   const fullPath = path.startsWith('/') ? path : `/${path}`;
-  
+
   return new URL(fullDomain + fullPath);
 }
 

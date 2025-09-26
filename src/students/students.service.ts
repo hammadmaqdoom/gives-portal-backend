@@ -122,6 +122,7 @@ export class StudentsService {
       contact: createStudentDto.contact,
       photo,
       user,
+      userId: user?.id ? Number(user.id) : null, // Explicitly set the userId foreign key
     });
 
     // Handle class enrollments
@@ -176,11 +177,12 @@ export class StudentsService {
   }
 
   async findByUserId(userId: number): Promise<NullableType<Student>> {
-    console.log(`StudentsService.findByUserId called with userId: ${userId}`);
+    console.log(`🔍 StudentsService.findByUserId called with userId: ${userId}`);
 
     const student = await this.studentsRepository.findByUserId(userId);
 
-    console.log(`StudentsService.findByUserId result:`, student);
+    console.log(`🔍 StudentsService.findByUserId result:`, student);
+    console.log(`🔍 StudentsService.findByUserId result userId:`, student?.userId);
 
     return student;
   }
@@ -260,6 +262,7 @@ export class StudentsService {
       contact: updateStudentDto.contact,
       photo,
       user,
+      userId: user?.id ? Number(user.id) : null, // Explicitly set the userId foreign key
     });
 
     if (!updatedStudent) {
@@ -382,7 +385,10 @@ export class StudentsService {
 
     // Send enrollment notification email
     try {
-      await this.sendEnrollmentNotification(studentId, createEnrollmentDto.classId);
+      await this.sendEnrollmentNotification(
+        studentId,
+        createEnrollmentDto.classId,
+      );
     } catch (error) {
       console.error('Error sending enrollment notification:', error);
       // Don't fail the enrollment if notification fails
@@ -440,7 +446,11 @@ export class StudentsService {
 
     // Send unenrollment notification email
     try {
-      await this.sendUnenrollmentNotification(studentId, classId, 'Student unenrolled from class');
+      await this.sendUnenrollmentNotification(
+        studentId,
+        classId,
+        'Student unenrolled from class',
+      );
     } catch (error) {
       console.error('Error sending unenrollment notification:', error);
       // Don't fail the unenrollment if notification fails
@@ -579,7 +589,10 @@ export class StudentsService {
     }
   }
 
-  private async sendEnrollmentNotification(studentId: number, classId: number): Promise<void> {
+  private async sendEnrollmentNotification(
+    studentId: number,
+    classId: number,
+  ): Promise<void> {
     try {
       const student = await this.studentsRepository.findById(studentId);
       if (!student) return;
@@ -593,15 +606,19 @@ export class StudentsService {
 
       // Get class teacher
       const teacher = classDetails.teacher;
-      
+
       // Format schedule
-      const schedule = classDetails.schedules?.map(s => 
-        `${s.weekday} ${s.startTime}-${s.endTime} (${s.timezone})`
-      ).join(', ') || 'Schedule TBD';
+      const schedule =
+        classDetails.schedules
+          ?.map(
+            (s) => `${s.weekday} ${s.startTime}-${s.endTime} (${s.timezone})`,
+          )
+          .join(', ') || 'Schedule TBD';
 
       // Format fee
       const currency = student.country === 'Pakistan' ? 'PKR' : 'USD';
-      const fee = currency === 'PKR' ? classDetails.feePKR : classDetails.feeUSD;
+      const fee =
+        currency === 'PKR' ? classDetails.feePKR : classDetails.feeUSD;
       const formattedFee = `${fee} ${currency}`;
 
       // Send notification to all parents
@@ -624,7 +641,11 @@ export class StudentsService {
     }
   }
 
-  private async sendUnenrollmentNotification(studentId: number, classId: number, reason: string): Promise<void> {
+  private async sendUnenrollmentNotification(
+    studentId: number,
+    classId: number,
+    reason: string,
+  ): Promise<void> {
     try {
       const student = await this.studentsRepository.findById(studentId);
       if (!student) return;
@@ -656,5 +677,71 @@ export class StudentsService {
     } catch (error) {
       console.error('Error sending unenrollment notification:', error);
     }
+  }
+
+  // Student-User Linking Methods
+  async linkStudentToUser(studentId: number, userId: number): Promise<Student | null> {
+    const student = await this.studentsRepository.findById(studentId);
+    if (!student) {
+      throw new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: {
+          studentId: 'studentNotExists',
+        },
+      });
+    }
+
+    // Verify user exists
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: {
+          userId: 'userNotExists',
+        },
+      });
+    }
+
+    // Update student with userId
+    const updatedStudent = await this.studentsRepository.update(studentId, { userId });
+    return updatedStudent;
+  }
+
+  async autoLinkStudentsToUsers(): Promise<{ linked: number; notFound: number; errors: number }> {
+    const students = await this.studentsRepository.findManyWithPagination({
+      filterOptions: { userId: null as any },
+      sortOptions: null,
+      paginationOptions: { page: 1, limit: 1000 },
+      includeRelations: false,
+    });
+
+    let linked = 0;
+    let notFound = 0;
+    let errors = 0;
+
+    for (const student of students) {
+      try {
+        if (student.email) {
+          // Find user by email
+          const user = await this.usersService.findByEmail(student.email);
+          if (user) {
+            await this.studentsRepository.update(student.id, { userId: Number(user.id) });
+            linked++;
+            console.log(`✅ Linked student "${student.name}" to user ID ${user.id}`);
+          } else {
+            notFound++;
+            console.log(`❌ No user found for student "${student.name}" with email ${student.email}`);
+          }
+        } else {
+          notFound++;
+          console.log(`❌ Student "${student.name}" has no email address`);
+        }
+      } catch (error) {
+        errors++;
+        console.error(`❌ Error linking student "${student.name}":`, error);
+      }
+    }
+
+    return { linked, notFound, errors };
   }
 }

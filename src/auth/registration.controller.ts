@@ -78,7 +78,9 @@ export class RegistrationController {
 
     // Enrollment inside create() generates invoice(s) via StudentsService.generateMonthlyInvoice
     // Find invoices for this student
-    const invoices = await this.invoicesService.findByStudent(studentResult.student.id);
+    const invoices = await this.invoicesService.findByStudent(
+      studentResult.student.id,
+    );
 
     return {
       studentId: studentResult.student.id,

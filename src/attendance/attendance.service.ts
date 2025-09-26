@@ -119,7 +119,9 @@ export class AttendanceService {
     await this.attendanceRepository.remove(id);
   }
 
-  async bulkUpdate(items: Array<Partial<Attendance> & { id?: number }>): Promise<{ updated: number; created: number }> {
+  async bulkUpdate(
+    items: Array<Partial<Attendance> & { id?: number }>,
+  ): Promise<{ updated: number; created: number }> {
     let updated = 0;
     let created = 0;
     for (const item of items) {
@@ -127,7 +129,10 @@ export class AttendanceService {
         await this.attendanceRepository.update(item.id, item);
         updated += 1;
       } else if (item.student && item.class && item.date) {
-        const existing = await this.attendanceRepository.findByStudentAndDate((item.student as any).id ?? (item as any).student, item.date as any);
+        const existing = await this.attendanceRepository.findByStudentAndDate(
+          (item.student as any).id ?? (item as any).student,
+          item.date as any,
+        );
         if (existing) {
           await this.attendanceRepository.update(existing.id, item);
           updated += 1;

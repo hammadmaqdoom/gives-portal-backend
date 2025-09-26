@@ -55,10 +55,13 @@ export class ParentEntity extends EntityRelationalHelper {
   @Column({ type: String, nullable: true })
   passcode?: string | null;
 
+  @Column({ type: 'int', nullable: true })
+  userId?: number | null;
+
   @OneToOne(() => UserEntity, {
     // eager: true, // Removed to fix query builder issues
   })
-  @JoinColumn()
+  @JoinColumn({ name: 'userId' })
   user?: UserEntity | null;
 
   @OneToMany(

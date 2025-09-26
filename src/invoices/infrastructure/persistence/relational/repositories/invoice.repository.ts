@@ -81,13 +81,21 @@ export class InvoiceRepositoryImpl implements InvoiceRepository {
   }
 
   async findByStudent(studentId: number): Promise<Invoice[]> {
+    console.log(`🔍 InvoiceRepository.findByStudent called with studentId: ${studentId}`);
+    
     const entities = await this.invoiceRepository.find({
       where: { student: { id: studentId } },
       relations: ['student', 'parent'],
       order: { createdAt: 'DESC' },
     });
 
-    return entities.map((entity) => InvoiceMapper.toDomain(entity));
+    console.log(`🔍 InvoiceRepository.findByStudent raw entities:`, entities);
+    console.log(`🔍 InvoiceRepository.findByStudent found ${entities.length} invoices`);
+
+    const result = entities.map((entity) => InvoiceMapper.toDomain(entity));
+    console.log(`🔍 InvoiceRepository.findByStudent mapped result:`, result);
+
+    return result;
   }
 
   async findByParent(parentId: number): Promise<Invoice[]> {

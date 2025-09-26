@@ -18,6 +18,7 @@ export class StudentMapper {
     student.dateOfBirth = raw.dateOfBirth;
     student.email = raw.email;
     student.contact = raw.contact;
+    student.userId = raw.userId;
     student.createdAt = raw.createdAt;
     student.updatedAt = raw.updatedAt;
     student.deletedAt = raw.deletedAt;
@@ -111,6 +112,9 @@ export class StudentMapper {
     }
     if (student.contact !== undefined) {
       studentEntity.contact = student.contact;
+    }
+    if (student.userId !== undefined) {
+      studentEntity.userId = student.userId;
     }
 
     return studentEntity;

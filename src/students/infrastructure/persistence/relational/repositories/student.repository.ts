@@ -121,10 +121,10 @@ export class StudentsRelationalRepository {
   }
 
   async findByUserId(userId: number): Promise<NullableType<Student>> {
-    console.log(`StudentRepository.findByUserId called with userId: ${userId}`);
+    console.log(`🔍 StudentRepository.findByUserId called with userId: ${userId}`);
 
     const student = await this.studentsRepository.findOne({
-      where: { user: { id: userId } },
+      where: { userId: userId },
       relations: [
         'photo',
         'user',
@@ -135,10 +135,12 @@ export class StudentsRelationalRepository {
       ],
     });
 
-    console.log(`StudentRepository.findByUserId raw result:`, student);
+    console.log(`🔍 StudentRepository.findByUserId raw result:`, student);
+    console.log(`🔍 StudentRepository.findByUserId raw result userId:`, student?.userId);
 
     const result = student ? this.studentMapper.toDomain(student) : null;
-    console.log(`StudentRepository.findByUserId mapped result:`, result);
+    console.log(`🔍 StudentRepository.findByUserId mapped result:`, result);
+    console.log(`🔍 StudentRepository.findByUserId mapped result userId:`, result?.userId);
 
     return result;
   }

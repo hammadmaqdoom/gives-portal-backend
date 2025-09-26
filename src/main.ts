@@ -30,16 +30,16 @@ async function bootstrap() {
   // );
 
   // Replace the debug section with this:
-  try {
-    const dbHost = configService.get('database.host', { infer: true });
-    const dbPort = configService.get('database.port', { infer: true });
-    const dbName = configService.get('database.name', { infer: true });
-    console.log('ConfigService database.host:', dbHost);
-    console.log('ConfigService database.port:', dbPort);
-    console.log('ConfigService database.name:', dbName);
-  } catch (error) {
-    console.log('ConfigService error:', error.message);
-  }
+  // try {
+  //   const dbHost = configService.get('database.host', { infer: true });
+  //   const dbPort = configService.get('database.port', { infer: true });
+  //   const dbName = configService.get('database.name', { infer: true });
+  //   console.log('ConfigService database.host:', dbHost);
+  //   console.log('ConfigService database.port:', dbPort);
+  //   console.log('ConfigService database.name:', dbName);
+  // } catch (error) {
+  //   console.log('ConfigService error:', error.message);
+  // }
 
   app.enableShutdownHooks();
   app.setGlobalPrefix(
@@ -76,7 +76,7 @@ async function bootstrap() {
       })
       .build();
 
-    const document = SwaggerModule.createDocument(app, options);
+    const document = SwaggerModule.createDocument(app, options, { deepScanRoutes: true });
     SwaggerModule.setup('docs', app, document);
   }
 

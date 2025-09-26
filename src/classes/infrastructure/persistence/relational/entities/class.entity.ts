@@ -51,6 +51,9 @@ export class ClassEntity extends EntityRelationalHelper {
   @Column({ type: 'enum', enum: ['virtual', 'in-person'], default: 'virtual' })
   classMode: 'virtual' | 'in-person';
 
+  @Column({ type: 'boolean', default: false, name: 'drip_content_enabled' })
+  dripContentEnabled: boolean;
+
   @ManyToOne(() => SubjectEntity, {
     eager: true,
   })

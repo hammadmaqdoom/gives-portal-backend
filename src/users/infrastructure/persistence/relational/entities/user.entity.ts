@@ -89,4 +89,7 @@ export class UserEntity extends EntityRelationalHelper {
 
   @DeleteDateColumn()
   deletedAt: Date;
+
+  @Column({ type: Boolean, default: false })
+  mustChangePassword: boolean;
 }

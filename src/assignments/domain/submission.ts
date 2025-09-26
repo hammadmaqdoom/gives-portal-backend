@@ -48,4 +48,5 @@ export class Submission {
 
   student?: Student | null;
   assignment?: Assignment | null;
+  class?: { id: number } | null;
 }

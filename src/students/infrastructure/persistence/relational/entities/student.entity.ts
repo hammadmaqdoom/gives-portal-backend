@@ -53,6 +53,9 @@ export class StudentEntity extends EntityRelationalHelper {
   @Column({ type: String, nullable: true })
   contact?: string | null;
 
+  @Column({ type: 'int', nullable: true })
+  userId?: number | null;
+
   @OneToOne(() => FileEntity, {
     // eager: true, // Removed to fix query builder issues
   })
@@ -62,7 +65,7 @@ export class StudentEntity extends EntityRelationalHelper {
   @OneToOne(() => UserEntity, {
     // eager: true, // Removed to fix query builder issues
   })
-  @JoinColumn()
+  @JoinColumn({ name: 'userId' })
   user?: UserEntity | null;
 
   @OneToMany(

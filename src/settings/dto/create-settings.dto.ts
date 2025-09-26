@@ -23,17 +23,24 @@ export class CreateSettingsDto {
   @MaxLength(255)
   appTitle: string;
 
-  @ApiProperty({ example: 'Comprehensive education management system for schools and institutions' })
+  @ApiProperty({
+    example:
+      'Comprehensive education management system for schools and institutions',
+  })
   @IsNotEmpty()
   @IsString()
   metaDescription: string;
 
-  @ApiPropertyOptional({ example: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...' })
+  @ApiPropertyOptional({
+    example: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...',
+  })
   @IsOptional()
   @IsString()
   logoNavbar?: string;
 
-  @ApiPropertyOptional({ example: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...' })
+  @ApiPropertyOptional({
+    example: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...',
+  })
   @IsOptional()
   @IsString()
   logoFavicon?: string;
@@ -72,6 +79,12 @@ export class CreateSettingsDto {
   @IsString()
   @MaxLength(255)
   companyLegalName?: string;
+
+  @ApiPropertyOptional({ example: 'PKR', description: 'ISO 4217 currency code used as default across the company' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(3)
+  defaultCurrency?: string;
 
   @ApiPropertyOptional({ example: 'Habib Bank Limited' })
   @IsOptional()

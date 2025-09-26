@@ -8,11 +8,13 @@ import {
   PutObjectCommand,
   CreateBucketCommand,
   HeadBucketCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface FileUploadContext {
-  type: 'assignment' | 'submission' | 'module';
+  type: 'assignment' | 'submission' | 'module' | 'payment-proof';
   id: string | number;
   userId: string | number;
 }
@@ -390,5 +392,69 @@ export class FileStorageService {
     }
 
     return filePath;
+  }
+
+  /**
+   * Returns whether storage is local
+   */
+  isLocal(): boolean {
+    return this.fileDriver === FileDriver.LOCAL;
+  }
+
+  /**
+   * Get a readable stream and metadata for a stored object
+   */
+  async getObjectStream(filePath: string): Promise<{
+    stream: NodeJS.ReadableStream;
+    contentType?: string;
+    contentLength?: number;
+  }> {
+    if (this.fileDriver === FileDriver.LOCAL) {
+      const fullPath = path.resolve(filePath);
+      const stream = fs.createReadStream(fullPath);
+      const stats = fs.existsSync(fullPath) ? fs.statSync(fullPath) : null;
+      return {
+        stream,
+        contentType: undefined,
+        contentLength: stats ? stats.size : undefined,
+      };
+    }
+
+    // S3 and s3-presigned
+    const key = filePath.replace(/\\/g, '/');
+    const obj = await this.s3Client.send(
+      new GetObjectCommand({ Bucket: this.s3Bucket, Key: key })
+    );
+    return {
+      stream: obj.Body as NodeJS.ReadableStream,
+      contentType: obj.ContentType,
+      contentLength: obj.ContentLength,
+    };
+  }
+
+  /**
+   * Get object headers without body
+   */
+  async headObject(filePath: string): Promise<{
+    contentType?: string;
+    contentLength?: number;
+  }> {
+    if (this.fileDriver === FileDriver.LOCAL) {
+      const fullPath = path.resolve(filePath);
+      if (!fs.existsSync(fullPath)) {
+        return {};
+      }
+      const stats = fs.statSync(fullPath);
+      return { contentLength: stats.size };
+    }
+
+    const key = filePath.replace(/\\/g, '/');
+    const head = await this.s3Client.send(
+      new HeadObjectCommand({ Bucket: this.s3Bucket, Key: key })
+    );
+    return {
+      contentType: head.ContentType,
+      contentLength: head.ContentLength,
+    };
   }
 }

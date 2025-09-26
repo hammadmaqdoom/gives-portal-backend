@@ -13,7 +13,7 @@ import {
   Request,
   NotFoundException,
 } from '@nestjs/common';
-import { ApiTags, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiResponse, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
@@ -286,5 +286,35 @@ export class StudentsController {
   })
   getEnrollments(@Param('id') id: string) {
     return this.studentsService.getEnrollments(+id);
+  }
+
+  // Student-User Linking Endpoints
+  @Post('link-to-user/:studentId/:userId')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.admin)
+  @ApiOperation({ summary: 'Link a student to a user account' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Student linked to user successfully',
+  })
+  async linkStudentToUser(
+    @Param('studentId') studentId: string,
+    @Param('userId') userId: string,
+  ) {
+    return this.studentsService.linkStudentToUser(+studentId, +userId);
+  }
+
+  @Post('auto-link-students')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.admin)
+  @ApiOperation({ summary: 'Automatically link all students to their user accounts by email' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Students linked to users successfully',
+  })
+  async autoLinkStudents() {
+    return this.studentsService.autoLinkStudentsToUsers();
   }
 }

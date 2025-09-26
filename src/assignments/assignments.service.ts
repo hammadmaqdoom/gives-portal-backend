@@ -35,7 +35,7 @@ export class AssignmentsService {
               (att) => att && att.trim() !== '',
             )
           : undefined,
-      class: { id: createAssignmentDto.class } as any, // Convert number to object with id
+      class: { id: createAssignmentDto.class } as any, // ensure class_id persists
     };
 
     return this.assignmentsRepository.create(assignmentData);

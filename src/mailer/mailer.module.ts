@@ -1,4 +1,3 @@
-
 import { Module, forwardRef } from '@nestjs/common';
 import { MailerService } from './mailer.service';
 import { SettingsModule } from '../settings/settings.module';

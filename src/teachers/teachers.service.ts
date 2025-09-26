@@ -72,6 +72,10 @@ export class TeachersService {
         lastName: createTeacherDto.name.split(' ').slice(1).join(' ') || '',
         role: { id: RoleEnum.teacher },
         status: { id: StatusEnum.active },
+        // Force password change on first login for temporary credentials
+        // UsersService.create supports extra fields in payload via repository; mapper passes through
+        // If repository type constrains, this is still safe because unknown fields are ignored by TypeORM
+        ...( { mustChangePassword: true } as any ),
       });
 
       console.log(
@@ -265,6 +269,8 @@ export class TeachersService {
     if (user) {
       await this.usersService.update(user.id, {
         password: tempPassword,
+        // Ensure forced reset after admin-generated temporary password
+        ...( { mustChangePassword: true } as any ),
       });
       console.log(
         `Teacher password reset: ${teacher.email} - user account updated`,
@@ -278,6 +284,7 @@ export class TeachersService {
         lastName: teacher.name.split(' ').slice(1).join(' ') || '',
         role: { id: RoleEnum.teacher },
         status: { id: StatusEnum.active },
+        ...( { mustChangePassword: true } as any ),
       });
       console.log(
         `Teacher password reset: ${teacher.email} - new user account created`,

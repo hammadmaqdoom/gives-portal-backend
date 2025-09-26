@@ -60,8 +60,8 @@ export class InvoiceMapper {
     persistenceEntity.updatedAt = domainEntity.updatedAt;
     persistenceEntity.deletedAt = domainEntity.deletedAt;
     persistenceEntity.items =
-      domainEntity.items?.map((item) =>
-        InvoiceItemMapper.toPersistence(item) as any,
+      domainEntity.items?.map(
+        (item) => InvoiceItemMapper.toPersistence(item) as any,
       ) || [];
     return persistenceEntity;
   }

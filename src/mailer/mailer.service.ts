@@ -9,7 +9,7 @@ import { SettingsService } from '../settings/settings.service';
 @Injectable()
 export class MailerService implements OnModuleInit {
   private transporter: nodemailer.Transporter;
-  
+
   constructor(
     private readonly configService: ConfigService<AllConfigType>,
     private readonly settingsService: SettingsService,
@@ -48,7 +48,7 @@ export class MailerService implements OnModuleInit {
   async updateTransporterConfig() {
     try {
       const smtpConfig = await this.settingsService.getSmtpConfig();
-      
+
       // Only update if SMTP config is available
       if (smtpConfig.smtpHost && smtpConfig.smtpUser) {
         this.transporter = this.createTransporter({
@@ -92,15 +92,24 @@ export class MailerService implements OnModuleInit {
     // Get dynamic from email and name from settings
     let fromEmail: string;
     let fromName: string;
-    
+
     try {
       const smtpConfig = await this.settingsService.getSmtpConfig();
-      fromEmail = smtpConfig.smtpFromEmail || this.configService.get('mail.defaultEmail', { infer: true }) || 'noreply@example.com';
-      fromName = smtpConfig.smtpFromName || this.configService.get('mail.defaultName', { infer: true }) || 'System';
+      fromEmail =
+        smtpConfig.smtpFromEmail ||
+        this.configService.get('mail.defaultEmail', { infer: true }) ||
+        'noreply@example.com';
+      fromName =
+        smtpConfig.smtpFromName ||
+        this.configService.get('mail.defaultName', { infer: true }) ||
+        'System';
     } catch (error) {
       // Fallback to config service values
-      fromEmail = this.configService.get('mail.defaultEmail', { infer: true }) || 'noreply@example.com';
-      fromName = this.configService.get('mail.defaultName', { infer: true }) || 'System';
+      fromEmail =
+        this.configService.get('mail.defaultEmail', { infer: true }) ||
+        'noreply@example.com';
+      fromName =
+        this.configService.get('mail.defaultName', { infer: true }) || 'System';
     }
 
     await this.transporter.sendMail({

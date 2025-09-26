@@ -124,7 +124,7 @@ export class ParentsRelationalRepository {
     if (!userId) return null;
 
     const parent = await this.parentsRepository.findOne({
-      where: { user: { id: userId } },
+      where: { userId: userId },
       relations: ['user', 'parentStudents', 'parentStudents.student'],
     });
 

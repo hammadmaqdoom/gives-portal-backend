@@ -47,8 +47,8 @@ export class SubmissionEntity extends EntityRelationalHelper {
   @Column({ type: String, nullable: true })
   fileUrl?: string | null;
 
-  @Column({ type: 'simple-array', nullable: true })
-  attachments?: string[] | null;
+  @Column({ type: 'text', nullable: true })
+  attachments?: string | null;
 
   @Column({ type: Date, nullable: true })
   submittedAt?: Date | null;
@@ -67,6 +67,7 @@ export class SubmissionEntity extends EntityRelationalHelper {
   })
   @JoinColumn({ name: 'assignmentId' })
   assignment?: AssignmentEntity | null;
+
 
   @CreateDateColumn()
   createdAt: Date;

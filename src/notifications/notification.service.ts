@@ -29,20 +29,28 @@ export class NotificationService {
   }
 
   private getAppName(): string {
-    return this.configService.get('app.name', { infer: true }) || 'Gives Portal';
+    return (
+      this.configService.get('app.name', { infer: true }) || 'Gives Portal'
+    );
   }
 
   private getFrontendUrl(): string {
-    const domain = this.configService.getOrThrow('app.frontendDomain', { infer: true });
+    const domain = this.configService.getOrThrow('app.frontendDomain', {
+      infer: true,
+    });
     return createUrl(domain).toString();
   }
 
-  async sendWelcomeEmail(data: NotificationData & {
-    userName: string;
-  }): Promise<void> {
-    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', { infer: true });
+  async sendWelcomeEmail(
+    data: NotificationData & {
+      userName: string;
+    },
+  ): Promise<void> {
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', {
+      infer: true,
+    });
     const loginUrl = createUrl(frontendDomain, '/auth/login').toString();
-    
+
     await this.mailerService.sendMail({
       to: data.to,
       subject: `Welcome to ${this.getAppName()}`,
@@ -55,18 +63,22 @@ export class NotificationService {
     });
   }
 
-  async sendClassEnrollmentNotification(data: NotificationData & {
-    parentName: string;
-    studentName: string;
-    className: string;
-    subjectName: string;
-    teacherName: string;
-    schedule: string;
-    fee: string;
-  }): Promise<void> {
-    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', { infer: true });
+  async sendClassEnrollmentNotification(
+    data: NotificationData & {
+      parentName: string;
+      studentName: string;
+      className: string;
+      subjectName: string;
+      teacherName: string;
+      schedule: string;
+      fee: string;
+    },
+  ): Promise<void> {
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', {
+      infer: true,
+    });
     const dashboardUrl = createUrl(frontendDomain, '/dashboard').toString();
-    
+
     await this.mailerService.sendMail({
       to: data.to,
       subject: `Class Enrollment Confirmation - ${data.className}`,
@@ -85,17 +97,21 @@ export class NotificationService {
     });
   }
 
-  async sendClassUnenrollmentNotification(data: NotificationData & {
-    parentName: string;
-    studentName: string;
-    className: string;
-    subjectName: string;
-    teacherName: string;
-    reason: string;
-  }): Promise<void> {
-    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', { infer: true });
+  async sendClassUnenrollmentNotification(
+    data: NotificationData & {
+      parentName: string;
+      studentName: string;
+      className: string;
+      subjectName: string;
+      teacherName: string;
+      reason: string;
+    },
+  ): Promise<void> {
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', {
+      infer: true,
+    });
     const dashboardUrl = createUrl(frontendDomain, '/dashboard').toString();
-    
+
     await this.mailerService.sendMail({
       to: data.to,
       subject: `Class Unenrollment Notification - ${data.className}`,
@@ -113,18 +129,25 @@ export class NotificationService {
     });
   }
 
-  async sendInvoiceGeneratedNotification(data: NotificationData & {
-    parentName: string;
-    studentName: string;
-    invoiceNumber: string;
-    amount: string;
-    dueDate: string;
-    description: string;
-    invoiceId: number;
-  }): Promise<void> {
-    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', { infer: true });
-    const invoiceUrl = createUrl(frontendDomain, `/dashboard/invoices/${data.invoiceId}`).toString();
-    
+  async sendInvoiceGeneratedNotification(
+    data: NotificationData & {
+      parentName: string;
+      studentName: string;
+      invoiceNumber: string;
+      amount: string;
+      dueDate: string;
+      description: string;
+      invoiceId: number;
+    },
+  ): Promise<void> {
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', {
+      infer: true,
+    });
+    const invoiceUrl = createUrl(
+      frontendDomain,
+      `/dashboard/invoices/${data.invoiceId}`,
+    ).toString();
+
     await this.mailerService.sendMail({
       to: data.to,
       subject: `New Invoice Generated - ${data.invoiceNumber}`,
@@ -142,16 +165,20 @@ export class NotificationService {
     });
   }
 
-  async sendAnnouncementNotification(data: NotificationData & {
-    recipientName: string;
-    title: string;
-    message: string;
-    authorName: string;
-    postDate: string;
-  }): Promise<void> {
-    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', { infer: true });
+  async sendAnnouncementNotification(
+    data: NotificationData & {
+      recipientName: string;
+      title: string;
+      message: string;
+      authorName: string;
+      postDate: string;
+    },
+  ): Promise<void> {
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', {
+      infer: true,
+    });
     const dashboardUrl = createUrl(frontendDomain, '/dashboard').toString();
-    
+
     await this.mailerService.sendMail({
       to: data.to,
       subject: `New Announcement: ${data.title}`,
@@ -168,10 +195,12 @@ export class NotificationService {
     });
   }
 
-  async sendPasswordResetNotification(data: NotificationData & {
-    userName: string;
-    resetUrl: string;
-  }): Promise<void> {
+  async sendPasswordResetNotification(
+    data: NotificationData & {
+      userName: string;
+      resetUrl: string;
+    },
+  ): Promise<void> {
     await this.mailerService.sendMail({
       to: data.to,
       subject: `Password Reset - ${this.getAppName()}`,

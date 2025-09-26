@@ -12,6 +12,8 @@ import { AssignmentEntity } from '../assignments/infrastructure/persistence/rela
 import { SubmissionEntity } from '../assignments/infrastructure/persistence/relational/entities/submission.entity';
 import { ParentEntity } from '../parents/infrastructure/persistence/relational/entities/parent.entity';
 import { StudentClassEnrollmentEntity } from '../students/infrastructure/persistence/relational/entities/student-class-enrollment.entity';
+import { CurrencyModule } from '../currency/currency.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { StudentClassEnrollmentEntity } from '../students/infrastructure/persist
       ParentEntity,
       StudentClassEnrollmentEntity,
     ]),
+    CurrencyModule,
+    SettingsModule,
   ],
   controllers: [DashboardController],
   providers: [DashboardService],

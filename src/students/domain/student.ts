@@ -21,6 +21,8 @@ export class Student {
 
   contact?: string | null;
 
+  userId?: number | null;
+
   photo?: FileType | null;
 
   user?: User | null;

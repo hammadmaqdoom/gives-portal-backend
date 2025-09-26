@@ -288,16 +288,19 @@ export class ParentsService {
   }
 
   async findByStudentId(studentId: number): Promise<Parent[]> {
-    const parentStudents = await this.parentStudentRepository.findByStudentId(studentId);
+    const parentStudents =
+      await this.parentStudentRepository.findByStudentId(studentId);
     const parents: Parent[] = [];
-    
+
     for (const parentStudent of parentStudents) {
-      const parent = await this.parentsRepository.findById(parentStudent.parentId);
+      const parent = await this.parentsRepository.findById(
+        parentStudent.parentId,
+      );
       if (parent) {
         parents.push(parent);
       }
     }
-    
+
     return parents;
   }
 }

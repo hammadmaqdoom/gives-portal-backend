@@ -113,4 +113,8 @@ export class User {
 
   @ApiProperty()
   deletedAt: Date;
+
+  @ApiProperty({ type: Boolean, example: false })
+  @Expose({ groups: ['me', 'admin'] })
+  mustChangePassword: boolean;
 }
