@@ -1,10 +1,6 @@
 name: Manage Migrations & Seeds after deployment
 
 on:
-  push:
-    branches: [ main, master ]
-    paths:
-      - 'backend/**'
   workflow_dispatch:
     inputs:
       runSeeds:
