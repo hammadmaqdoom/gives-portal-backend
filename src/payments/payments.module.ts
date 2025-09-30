@@ -11,6 +11,8 @@ import { EncryptionService } from './infrastructure/encryption/encryption.servic
 import { WebhookService } from './infrastructure/webhooks/webhook.service';
 import { PaymentLoggerService } from './infrastructure/logging/payment-logger.service';
 import { InvoicesModule } from '../invoices/invoices.module';
+import { StudentsModule } from '../students/students.module';
+import { ParentsModule } from '../parents/parents.module';
 import { FilesModule } from '../files/files.module';
 import { SettingsModule } from '../settings/settings.module';
 
@@ -36,6 +38,8 @@ import { PaymentTransactionRepositoryImpl } from './infrastructure/persistence/r
       PaymentTransactionEntity,
     ]),
     forwardRef(() => InvoicesModule),
+    forwardRef(() => StudentsModule),
+    forwardRef(() => ParentsModule),
     FilesModule,
     SettingsModule,
   ],
