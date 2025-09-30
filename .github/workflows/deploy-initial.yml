@@ -194,6 +194,9 @@ jobs:
             ZOOM_OAUTH_CLIENT_ID=${{ secrets.ZOOM_OAUTH_CLIENT_ID }}
             ZOOM_OAUTH_CLIENT_SECRET=${{ secrets.ZOOM_OAUTH_CLIENT_SECRET }}
             ZOOM_OAUTH_REDIRECT_URI=${{ secrets.ZOOM_OAUTH_REDIRECT_URI }}
+
+            # OpenExchangeRates API
+            OPENEXCHANGERATES_APP_ID=${{ secrets.OPENEXCHANGERATES_APP_ID }}
             EOF
 
             # Use existing docker-compose.prod.yml from the copied code

@@ -12,7 +12,6 @@ import { PaymentGatewayRepository } from './infrastructure/persistence/payment-g
 import { PaymentGatewayCredentialsRepository } from './infrastructure/persistence/payment-gateway-credentials.repository';
 import { PaymentTransactionRepository } from './infrastructure/persistence/payment-transaction.repository';
 import { PaymentLoggerService } from './infrastructure/logging/payment-logger.service';
-import { StudentsService } from '../students/students.service';
 import { SettingsService } from '../settings/settings.service';
 import {
   PaymentGatewayNotFoundError,
@@ -33,7 +32,6 @@ export class PaymentsService {
     private paymentGatewayCredentialsRepository: PaymentGatewayCredentialsRepository,
     private paymentTransactionRepository: PaymentTransactionRepository,
     private paymentLogger: PaymentLoggerService,
-    private studentsService: StudentsService,
     private settingsService: SettingsService,
   ) {}
 
@@ -491,24 +489,8 @@ export class PaymentsService {
     return this.paymentGatewayFactory.getGateway(gateway);
   }
 
-  async getStudentByUserId(userId: string): Promise<any> {
-    try {
-      // Try to find student by user ID first
-      const student = await this.studentsService.findByUserId(parseInt(userId, 10));
-      
-      // If not found by user ID, try by email (if available)
-      if (!student) {
-        // We would need to get user email from user service, but for now just return null
-        this.logger.warn(`Student not found for user ID: ${userId}`);
-        return null;
-      }
-      
-      return student;
-    } catch (error) {
-      this.logger.error(`Error finding student for user ID ${userId}:`, error);
-      return null;
-    }
-  }
+  // Note: getStudentByUserId method removed to avoid circular dependency
+  // This functionality should be handled by the calling service (e.g., InvoicesService)
 
   async createBankTransferPayment(
     studentId: number,

@@ -9,12 +9,14 @@ import { ParentsModule } from '../parents/parents.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { MailModule } from '../mail/mail.module';
 import { PaymentsModule } from '../payments/payments.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
     RelationalInvoicePersistenceModule,
     NotificationModule,
     MailModule,
+    SettingsModule,
     forwardRef(() => PaymentsModule),
     forwardRef(() => StudentsModule),
     forwardRef(() => ParentsModule),

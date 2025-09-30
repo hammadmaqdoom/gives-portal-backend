@@ -341,7 +341,7 @@ export class PaymentTransactionsController {
     };
   }> {
     // Get student ID from user ID
-    const student = await this.paymentsService.getStudentByUserId(req.user?.id);
+    const student = await this.studentsService.findByUserId(parseInt(req.user?.id, 10));
     if (!student) {
       throw new Error('Student profile not found for current user');
     }
@@ -576,7 +576,7 @@ export class PaymentTransactionsController {
 
       // Resolve studentId: prefer current user's student; fallback to invoice.studentId for admin/parent flows
       let resolvedStudentId: number | null = null;
-      const student = await this.paymentsService.getStudentByUserId(req.user?.id);
+      const student = await this.studentsService.findByUserId(parseInt(req.user?.id, 10));
       if (student) {
         resolvedStudentId = student.id;
       } else if (body.invoiceId) {
