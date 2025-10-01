@@ -11,6 +11,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      RUN_SEEDS: ${{ secrets.RUN_SEEDS }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,7 +43,7 @@ jobs:
             docker exec backend_app sh -lc 'npx typeorm --dataSource=dist/database/data-source.js migration:run | cat'
 
       - name: Optionally run seeds on remote host (first deploy only)
-        if: ${{ github.event.inputs.runSeeds == 'true' || secrets.RUN_SEEDS == 'true' }}
+        if: ${{ github.event.inputs.runSeeds == 'true' || env.RUN_SEEDS == 'true' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
