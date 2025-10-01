@@ -225,4 +225,57 @@ export class CreateSettingsDto {
   @IsUrl()
   @MaxLength(255)
   socialInstagram?: string;
+
+  // File Storage
+  @ApiPropertyOptional({ example: 'local', description: 'local | s3 | s3-presigned | azure-blob-sas' })
+  @IsOptional()
+  @IsString()
+  fileDriver?: string;
+
+  // AWS S3
+  @ApiPropertyOptional({ example: 'AKIA...' })
+  @IsOptional()
+  @IsString()
+  accessKeyId?: string;
+
+  @ApiPropertyOptional({ example: '********' })
+  @IsOptional()
+  @IsString()
+  secretAccessKey?: string;
+
+  @ApiPropertyOptional({ example: 'my-bucket-name' })
+  @IsOptional()
+  @IsString()
+  awsDefaultS3Bucket?: string;
+
+  @ApiPropertyOptional({ example: 'ap-south-1' })
+  @IsOptional()
+  @IsString()
+  awsS3Region?: string;
+
+  // Azure Blob (SAS)
+  @ApiPropertyOptional({ example: 'mystorage' })
+  @IsOptional()
+  @IsString()
+  azureStorageAccountName?: string;
+
+  @ApiPropertyOptional({ example: '********' })
+  @IsOptional()
+  @IsString()
+  azureStorageAccountKey?: string;
+
+  @ApiPropertyOptional({ example: 'container-name' })
+  @IsOptional()
+  @IsString()
+  azureContainerName?: string;
+
+  @ApiPropertyOptional({ example: 3600 })
+  @IsOptional()
+  @IsNumber()
+  azureBlobSasExpirySeconds?: number;
+
+  @ApiPropertyOptional({ example: 'https://cdn.example.com' })
+  @IsOptional()
+  @IsString()
+  azureBlobPublicBaseUrl?: string;
 }

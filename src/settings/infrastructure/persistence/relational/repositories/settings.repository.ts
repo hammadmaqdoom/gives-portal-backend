@@ -31,11 +31,21 @@ export class SettingsRepositoryImpl implements SettingsRepository {
   }
 
   async update(id: number, data: Partial<Settings>): Promise<Settings> {
-    const persistenceEntity = SettingsMapper.toPersistence(data as Settings);
-    await this.settingsRepository.update(id, persistenceEntity);
-    const updatedEntity = await this.settingsRepository.findOne({
-      where: { id },
+    // Load current entity and perform a safe partial merge of only defined keys
+    const current = await this.settingsRepository.findOne({ where: { id } });
+    if (!current) {
+      throw new Error('Settings not found');
+    }
+
+    // Copy only defined values from incoming partial to avoid nulling other fields
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined) {
+        // @ts-ignore dynamic assign
+        (current as any)[key] = value as any;
+      }
     });
-    return SettingsMapper.toDomain(updatedEntity!);
+
+    const saved = await this.settingsRepository.save(current);
+    return SettingsMapper.toDomain(saved);
   }
 }

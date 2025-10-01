@@ -15,6 +15,7 @@ import { ResolvePromisesInterceptor } from './utils/serializer.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: true });
+  (global as any).nestjsApp = app;
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
   const configService = app.get(ConfigService<AllConfigType>);
 

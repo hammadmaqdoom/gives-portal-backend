@@ -12,6 +12,7 @@ import {
   HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
+import { SettingsService } from '../settings/settings.service';
 
 export interface FileUploadContext {
   type: 'assignment' | 'submission' | 'module' | 'payment-proof';
@@ -34,39 +35,64 @@ export interface UploadedFileInfo {
 
 @Injectable()
 export class FileStorageService {
-  private readonly s3Client: S3Client;
-  private readonly fileDriver: FileDriver;
-  private readonly uploadBasePath: string;
-  private readonly s3Bucket: string;
-  private readonly s3Region: string;
+  private s3Client: S3Client;
+  private fileDriver: FileDriver;
+  private uploadBasePath: string;
+  private s3Bucket: string;
+  private s3Region: string;
+  private configLoaded = false;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly settingsService: SettingsService,
+  ) {}
+
+  private async ensureConfigLoaded(): Promise<void> {
+    if (this.configLoaded) return;
+
+    // Defaults from env
     this.fileDriver =
       this.configService.get<FileDriver>('file.driver') || FileDriver.LOCAL;
     this.uploadBasePath =
-      this.configService.get('file.uploadBasePath') || 'uploads';
+      (this.configService.get('file.uploadBasePath') as string) || 'uploads';
 
-    if (
-      this.fileDriver === FileDriver.S3 ||
-      this.fileDriver === FileDriver.S3_PRESIGNED
-    ) {
-      const region = this.configService.get('file.awsS3Region');
-      const accessKeyId = this.configService.get('file.accessKeyId');
-      const secretAccessKey = this.configService.get('file.secretAccessKey');
-      const bucket = this.configService.get('file.awsDefaultS3Bucket');
-
-      if (region && accessKeyId && secretAccessKey && bucket) {
-        this.s3Client = new S3Client({
-          region,
-          credentials: {
-            accessKeyId,
-            secretAccessKey,
-          },
-        });
-        this.s3Bucket = bucket;
-        this.s3Region = region;
+    try {
+      const storage = await this.settingsService.getFileStorage();
+      if (storage?.fileDriver) {
+        this.fileDriver = storage.fileDriver as unknown as FileDriver;
       }
+
+      if (
+        this.fileDriver === FileDriver.S3 ||
+        this.fileDriver === FileDriver.S3_PRESIGNED
+      ) {
+        const region = storage?.awsS3Region || this.configService.get('file.awsS3Region');
+        const accessKeyId = storage?.accessKeyId || this.configService.get('file.accessKeyId');
+        const secretAccessKey = storage?.secretAccessKey || this.configService.get('file.secretAccessKey');
+        const bucket = storage?.awsDefaultS3Bucket || this.configService.get('file.awsDefaultS3Bucket');
+
+        if (region && accessKeyId && secretAccessKey && bucket) {
+          this.s3Client = new S3Client({
+            region,
+            credentials: { accessKeyId, secretAccessKey },
+          });
+          this.s3Bucket = bucket;
+          this.s3Region = region;
+        }
+      }
+    } catch {
+      // ignore and use env-only config
     }
+
+    this.configLoaded = true;
+  }
+
+  /**
+   * Refresh storage configuration from DB (and env fallbacks)
+   */
+  async refreshConfig(): Promise<void> {
+    this.configLoaded = false;
+    await this.ensureConfigLoaded();
   }
 
   /**
@@ -76,6 +102,7 @@ export class FileStorageService {
     file: Express.Multer.File,
     context: FileUploadContext,
   ): Promise<UploadedFileInfo> {
+    await this.ensureConfigLoaded();
     // Validate file
     this.validateFile(file, context.type);
 
@@ -229,6 +256,7 @@ export class FileStorageService {
     folderPath: string,
     filename: string,
   ): Promise<string> {
+    await this.ensureConfigLoaded();
     const s3Key = path.join(folderPath, filename).replace(/\\/g, '/');
 
     await this.s3Client.send(

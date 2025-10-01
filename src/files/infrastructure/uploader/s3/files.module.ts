@@ -36,8 +36,10 @@ const infrastructurePersistenceModule = RelationalFilePersistenceModule;
         });
 
         return {
+          // Allow common document, archive, and media types in addition to images
           fileFilter: (request, file, callback) => {
-            if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/i)) {
+            const allowed = /\.(jpg|jpeg|png|gif|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|mp4|mov|avi|mkv|webm|zip|rar|7z|tar|gz)$/i;
+            if (!allowed.test(file.originalname)) {
               return callback(
                 new UnprocessableEntityException({
                   status: HttpStatus.UNPROCESSABLE_ENTITY,

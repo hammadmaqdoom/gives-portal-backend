@@ -129,6 +129,39 @@ export class SettingsEntity extends EntityRelationalHelper {
   @Column({ type: 'varchar', length: 255, nullable: true })
   socialInstagram: string | null;
 
+  // File Storage Configuration
+  @Column({ type: 'varchar', length: 32, nullable: true, default: 'local' })
+  fileDriver: string | null; // local | s3 | s3-presigned | azure-blob-sas
+
+  // AWS S3
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  accessKeyId: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  secretAccessKey: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  awsDefaultS3Bucket: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  awsS3Region: string | null;
+
+  // Azure Blob (SAS)
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  azureStorageAccountName: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  azureStorageAccountKey: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  azureContainerName: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  azureBlobSasExpirySeconds: number | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  azureBlobPublicBaseUrl: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
