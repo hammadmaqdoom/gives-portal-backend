@@ -13,6 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUN_SEEDS: ${{ secrets.RUN_SEEDS }}
+      SSH_HOST: ${{ secrets.SSH_HOST || secrets.LIGHTSAIL_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER || secrets.LIGHTSAIL_USER }}
+      SSH_KEY: ${{ secrets.SSH_KEY || secrets.LIGHTSAIL_SSH_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,10 +26,10 @@ jobs:
       - name: Run migrations on remote host
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          key: ${{ env.SSH_KEY }}
+          port: 22
           script_stop: true
           script: |
             set -euo pipefail
@@ -46,10 +49,10 @@ jobs:
         if: ${{ github.event.inputs.runSeeds == 'true' || env.RUN_SEEDS == 'true' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          key: ${{ env.SSH_KEY }}
+          port: 22
           script_stop: true
           script: |
             set -euo pipefail
@@ -59,10 +62,10 @@ jobs:
       - name: Show applied migrations
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          key: ${{ env.SSH_KEY }}
+          port: 22
           script_stop: true
           script: |
             docker exec backend_postgres sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT id, timestamp, name FROM migrations ORDER BY id;"'
