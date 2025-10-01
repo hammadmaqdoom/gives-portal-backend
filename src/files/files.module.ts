@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
+import { SettingsModule } from '../settings/settings.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RelationalFilePersistenceModule } from './infrastructure/persistence/relational/relational-persistence.module';
 import { FilesService } from './files.service';
@@ -12,6 +13,7 @@ import { FileRepository } from './infrastructure/persistence/relational/reposito
   imports: [
     RelationalFilePersistenceModule,
     TypeOrmModule.forFeature([FileEntity]),
+    forwardRef(() => SettingsModule),
   ],
   controllers: [FilesController],
   providers: [FilesService, FileStorageService, FileMapper, FileRepository],
