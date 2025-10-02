@@ -80,7 +80,9 @@ export class SettingsService {
 
     // Attempt to refresh file storage configuration immediately (best-effort)
     try {
-      const { FileStorageService } = await import('../files/file-storage.service');
+      const { FileStorageService } = await import(
+        '../files/file-storage.service'
+      );
       const app = (global as any).nestjsApp as any;
       if (app) {
         const storage = app.get?.(FileStorageService);

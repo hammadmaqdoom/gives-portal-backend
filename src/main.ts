@@ -77,7 +77,9 @@ async function bootstrap() {
       })
       .build();
 
-    const document = SwaggerModule.createDocument(app, options, { deepScanRoutes: true });
+    const document = SwaggerModule.createDocument(app, options, {
+      deepScanRoutes: true,
+    });
     SwaggerModule.setup('docs', app, document);
   }
 

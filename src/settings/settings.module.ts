@@ -5,7 +5,10 @@ import { RelationalSettingsPersistenceModule } from './infrastructure/persistenc
 import { CurrencyModule } from '../currency/currency.module';
 
 @Module({
-  imports: [RelationalSettingsPersistenceModule, forwardRef(() => CurrencyModule)],
+  imports: [
+    RelationalSettingsPersistenceModule,
+    forwardRef(() => CurrencyModule),
+  ],
   controllers: [SettingsController],
   providers: [SettingsService],
   exports: [SettingsService],

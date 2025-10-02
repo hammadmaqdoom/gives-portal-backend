@@ -23,13 +23,14 @@ export class SafepayService {
       this.logger.log('Safepay SDK initialized successfully');
       this.logger.log('Using API Key:', credentials.apiKey);
       this.logger.log('Environment:', credentials.environment);
-      
+
       // Initialize Safepay SDK with correct configuration
       const safepay = require('@sfpy/node-core')(credentials.secretKey, {
         authType: 'secret',
-        host: credentials.environment === 'production' 
-          ? 'https://api.getsafepay.com' 
-          : 'https://sandbox.api.getsafepay.com'
+        host:
+          credentials.environment === 'production'
+            ? 'https://api.getsafepay.com'
+            : 'https://sandbox.api.getsafepay.com',
       });
 
       this.logger.log('Safepay SDK object:', Object.keys(safepay));
@@ -39,8 +40,11 @@ export class SafepayService {
       if (customerInfo) {
         try {
           this.logger.log('Creating customer with info:', customerInfo);
-          this.logger.log('Available user methods:', Object.keys(safepay.user || {}));
-          
+          this.logger.log(
+            'Available user methods:',
+            Object.keys(safepay.user || {}),
+          );
+
           // Try different possible customer creation methods
           let customerResponse;
           try {
@@ -52,14 +56,21 @@ export class SafepayService {
                 email: customerInfo.email || 'customer@example.com',
                 phone_number: customerInfo.phone || '+923001234567',
                 country: 'PK',
-                is_guest: true
-              }
+                is_guest: true,
+              },
             });
           } catch (error) {
-            this.logger.warn('user.customers.create failed, trying alternative methods:', error.message);
-            
+            this.logger.warn(
+              'user.customers.create failed, trying alternative methods:',
+              error.message,
+            );
+
             // Try alternative methods
-            if (safepay.user && safepay.user.object && safepay.user.object.create) {
+            if (
+              safepay.user &&
+              safepay.user.object &&
+              safepay.user.object.create
+            ) {
               this.logger.log('Trying user.object.create...');
               customerResponse = await safepay.user.object.create({
                 first_name: customerInfo.firstName || 'Customer',
@@ -67,7 +78,7 @@ export class SafepayService {
                 email: customerInfo.email || 'customer@example.com',
                 phone_number: customerInfo.phone || '+923001234567',
                 country: 'PK',
-                is_guest: true
+                is_guest: true,
               });
             } else if (safepay.customers && safepay.customers.create) {
               this.logger.log('Trying customers.create...');
@@ -77,22 +88,31 @@ export class SafepayService {
                 email: customerInfo.email || 'customer@example.com',
                 phone_number: customerInfo.phone || '+923001234567',
                 country: 'PK',
-                is_guest: true
+                is_guest: true,
               });
             } else {
               throw new Error('No valid customer creation method found');
             }
           }
-          
+
           customerToken = customerResponse.data.token;
-          this.logger.log('Customer created successfully, token:', customerToken);
+          this.logger.log(
+            'Customer created successfully, token:',
+            customerToken,
+          );
         } catch (error) {
-          this.logger.warn('Customer creation failed, proceeding without customer:', error);
+          this.logger.warn(
+            'Customer creation failed, proceeding without customer:',
+            error,
+          );
         }
       }
 
       // Step 2: Create payment session
-      this.logger.log('Creating payment session with amount:', transaction.amount);
+      this.logger.log(
+        'Creating payment session with amount:',
+        transaction.amount,
+      );
       this.logger.log('Currency:', transaction.currency);
 
       const sessionResponse = await safepay.payments.session.setup({
@@ -109,22 +129,35 @@ export class SafepayService {
         include_fees: false,
       });
 
-      this.logger.log('Payment session created:', sessionResponse.data.tracker.token);
+      this.logger.log(
+        'Payment session created:',
+        sessionResponse.data.tracker.token,
+      );
 
       // Step 3: Create authentication token
       this.logger.log('Creating authentication token...');
-      this.logger.log('Available auth methods:', Object.keys(safepay.auth || {}));
-      
+      this.logger.log(
+        'Available auth methods:',
+        Object.keys(safepay.auth || {}),
+      );
+
       // Try different possible auth methods
       let authResponse;
       try {
         // Try the method from the documentation
         authResponse = await safepay.auth.passport.create();
       } catch (error) {
-        this.logger.warn('auth.passport.create failed, trying alternative methods:', error.message);
-        
+        this.logger.warn(
+          'auth.passport.create failed, trying alternative methods:',
+          error.message,
+        );
+
         // Try alternative methods
-        if (safepay.client && safepay.client.passport && safepay.client.passport.create) {
+        if (
+          safepay.client &&
+          safepay.client.passport &&
+          safepay.client.passport.create
+        ) {
           this.logger.log('Trying client.passport.create...');
           authResponse = await safepay.client.passport.create();
         } else if (safepay.auth && safepay.auth.create) {
@@ -134,21 +167,25 @@ export class SafepayService {
           throw new Error('No valid authentication method found');
         }
       }
-      
+
       this.logger.log('Authentication token created');
 
       // Step 4: Generate checkout URL
-      const appUrl = this.configService.get('APP_URL', { infer: true }) || this.configService.get('FRONTEND_DOMAIN', { infer: true }) || 'http://localhost:3000';
+      const appUrl =
+        this.configService.get('APP_URL', { infer: true }) ||
+        this.configService.get('FRONTEND_DOMAIN', { infer: true }) ||
+        'http://localhost:3000';
       this.logger.log('App URL from config:', appUrl);
-      
+
       // Ensure we have a valid redirect URL
       this.logger.log('Transaction callback URL:', transaction.callbackUrl);
       this.logger.log('App URL from config:', appUrl);
-      
-      const redirectUrl = transaction.callbackUrl || `${appUrl}/payment/callback`;
+
+      const redirectUrl =
+        transaction.callbackUrl || `${appUrl}/payment/callback`;
       const cancelUrl = `${appUrl}/dashboard/fees`;
       const webhookUrl = `${appUrl}/api/v1/webhooks/safepay`;
-      
+
       this.logger.log('Final redirect URL:', redirectUrl);
       this.logger.log('Final cancel URL:', cancelUrl);
       this.logger.log('Webhook URL:', webhookUrl);
@@ -164,7 +201,8 @@ export class SafepayService {
         checkoutUrl = safepay.checkouts.payment.create({
           tracker: sessionResponse.data.tracker.token,
           tbt: authResponse.data,
-          environment: credentials.environment === 'production' ? 'production' : 'sandbox',
+          environment:
+            credentials.environment === 'production' ? 'production' : 'sandbox',
           source: 'hosted',
           user_id: customerToken,
           redirect_url: redirectUrl,
@@ -172,15 +210,21 @@ export class SafepayService {
           webhook_url: webhookUrl,
         });
       } catch (error) {
-        this.logger.warn('checkouts.payment.create failed, trying alternative methods:', error.message);
-        
+        this.logger.warn(
+          'checkouts.payment.create failed, trying alternative methods:',
+          error.message,
+        );
+
         // Try alternative methods
         if (safepay.checkout && safepay.checkout.createCheckoutUrl) {
           this.logger.log('Trying checkout.createCheckoutUrl...');
           checkoutUrl = safepay.checkout.createCheckoutUrl({
             tracker: sessionResponse.data.tracker.token,
             tbt: authResponse.data,
-            env: credentials.environment === 'production' ? 'production' : 'sandbox',
+            env:
+              credentials.environment === 'production'
+                ? 'production'
+                : 'sandbox',
             source: 'hosted',
             user_id: customerToken,
             redirect_url: redirectUrl,
@@ -214,23 +258,30 @@ export class SafepayService {
       };
     } catch (error) {
       this.logger.error('Safepay payment session creation failed:', error);
-      throw new Error(`Safepay payment session creation failed: ${error.message}`);
+      throw new Error(
+        `Safepay payment session creation failed: ${error.message}`,
+      );
     }
   }
 
-  async verifyPayment(transactionId: string, credentials: PaymentGatewayCredentials): Promise<boolean> {
+  async verifyPayment(
+    transactionId: string,
+    credentials: PaymentGatewayCredentials,
+  ): Promise<boolean> {
     try {
       // Initialize Safepay SDK
       const safepay = require('@sfpy/node-core')(credentials.secretKey, {
         authType: 'secret',
-        host: credentials.environment === 'production' 
-          ? 'https://api.getsafepay.com' 
-          : 'https://sandbox.api.getsafepay.com'
+        host:
+          credentials.environment === 'production'
+            ? 'https://api.getsafepay.com'
+            : 'https://sandbox.api.getsafepay.com',
       });
 
       // Verify payment using Safepay API
-      const verificationResponse = await safepay.reporter.payments.fetch(transactionId);
-      
+      const verificationResponse =
+        await safepay.reporter.payments.fetch(transactionId);
+
       // Check if payment is completed
       return verificationResponse.data.tracker.state === 'TRACKER_ENDED';
     } catch (error) {
@@ -239,7 +290,15 @@ export class SafepayService {
     }
   }
 
-  async getPaymentDetails(transactionId: string, credentials: PaymentGatewayCredentials): Promise<{ success: boolean; status: string; message: string; trackerData?: any }> {
+  async getPaymentDetails(
+    transactionId: string,
+    credentials: PaymentGatewayCredentials,
+  ): Promise<{
+    success: boolean;
+    status: string;
+    message: string;
+    trackerData?: any;
+  }> {
     try {
       this.logger.log('Getting payment details from Safepay...');
       this.logger.log('Transaction ID:', transactionId);
@@ -247,54 +306,63 @@ export class SafepayService {
       // Initialize Safepay SDK
       const safepay = require('@sfpy/node-core')(credentials.secretKey, {
         authType: 'secret',
-        host: credentials.environment === 'production' 
-          ? 'https://api.getsafepay.com' 
-          : 'https://sandbox.api.getsafepay.com'
+        host:
+          credentials.environment === 'production'
+            ? 'https://api.getsafepay.com'
+            : 'https://sandbox.api.getsafepay.com',
       });
 
       // Get payment details using reporter API
       const response = await safepay.reporter.payments.fetch(transactionId);
-      
-      this.logger.log('Safepay payment details response:', JSON.stringify(response, null, 2));
+
+      this.logger.log(
+        'Safepay payment details response:',
+        JSON.stringify(response, null, 2),
+      );
 
       if (response.data && response.data.tracker) {
         const tracker = response.data.tracker;
         const isCompleted = tracker.state === 'TRACKER_ENDED';
-        
+
         this.logger.log('Tracker state:', tracker.state);
         this.logger.log('Payment completed:', isCompleted);
-        
+
         return {
           success: isCompleted,
           status: isCompleted ? 'completed' : 'pending',
-          message: isCompleted ? 'Payment verified successfully' : 'Payment is still pending',
-          trackerData: response.data
+          message: isCompleted
+            ? 'Payment verified successfully'
+            : 'Payment is still pending',
+          trackerData: response.data,
         };
       }
 
       return {
         success: false,
         status: 'failed',
-        message: 'Invalid response from Safepay'
+        message: 'Invalid response from Safepay',
       };
     } catch (error) {
       this.logger.error('Safepay payment details fetch failed:', error);
       return {
         success: false,
         status: 'failed',
-        message: `Payment details fetch failed: ${error.message}`
+        message: `Payment details fetch failed: ${error.message}`,
       };
     }
   }
 
-  async testConnection(credentials: PaymentGatewayCredentials): Promise<boolean> {
+  async testConnection(
+    credentials: PaymentGatewayCredentials,
+  ): Promise<boolean> {
     try {
       // Initialize Safepay SDK
       const safepay = require('@sfpy/node-core')(credentials.secretKey, {
         authType: 'secret',
-        host: credentials.environment === 'production' 
-          ? 'https://api.getsafepay.com' 
-          : 'https://sandbox.api.getsafepay.com'
+        host:
+          credentials.environment === 'production'
+            ? 'https://api.getsafepay.com'
+            : 'https://sandbox.api.getsafepay.com',
       });
 
       // Test connection by creating a test session
@@ -321,7 +389,7 @@ export class SafepayService {
   async processWebhook(
     credentials: PaymentGatewayCredentials,
     webhookData: any,
-    signature: string
+    signature: string,
   ): Promise<{
     eventType: string;
     transactionId: string;
@@ -333,9 +401,10 @@ export class SafepayService {
       // Initialize Safepay SDK
       const safepay = require('@sfpy/node-core')(credentials.secretKey, {
         authType: 'secret',
-        host: credentials.environment === 'production' 
-          ? 'https://api.getsafepay.com' 
-          : 'https://sandbox.api.getsafepay.com'
+        host:
+          credentials.environment === 'production'
+            ? 'https://api.getsafepay.com'
+            : 'https://sandbox.api.getsafepay.com',
       });
 
       // Verify webhook signature and process payload

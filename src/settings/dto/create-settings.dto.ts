@@ -80,7 +80,10 @@ export class CreateSettingsDto {
   @MaxLength(255)
   companyLegalName?: string;
 
-  @ApiPropertyOptional({ example: 'PKR', description: 'ISO 4217 currency code used as default across the company' })
+  @ApiPropertyOptional({
+    example: 'PKR',
+    description: 'ISO 4217 currency code used as default across the company',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(3)
@@ -227,7 +230,10 @@ export class CreateSettingsDto {
   socialInstagram?: string;
 
   // File Storage
-  @ApiPropertyOptional({ example: 'local', description: 'local | s3 | s3-presigned | azure-blob-sas' })
+  @ApiPropertyOptional({
+    example: 'local',
+    description: 'local | s3 | s3-presigned | azure-blob-sas',
+  })
   @IsOptional()
   @IsString()
   fileDriver?: string;

@@ -374,7 +374,10 @@ export class FilesController {
         try {
           const { stream, contentType, contentLength } =
             await this.fileStorageService.getObjectStream(file.path);
-          res.setHeader('Content-Type', contentType || file.mimeType || 'application/octet-stream');
+          res.setHeader(
+            'Content-Type',
+            contentType || file.mimeType || 'application/octet-stream',
+          );
           if (contentLength) res.setHeader('Content-Length', contentLength);
           res.setHeader(
             'Content-Disposition',
@@ -747,7 +750,10 @@ export class FilesController {
       try {
         const { stream, contentType, contentLength } =
           await this.fileStorageService.getObjectStream(file.path);
-        res.setHeader('Content-Type', contentType || file.mimeType || 'application/octet-stream');
+        res.setHeader(
+          'Content-Type',
+          contentType || file.mimeType || 'application/octet-stream',
+        );
         res.setHeader(
           'Content-Disposition',
           `attachment; filename="${file.originalName}"`,

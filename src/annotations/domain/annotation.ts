@@ -49,10 +49,10 @@ export interface TextAnnotation extends AnnotationBase {
   fontColor: string;
 }
 
-export type Annotation = 
-  | HighlightAnnotation 
-  | CommentAnnotation 
-  | DrawingAnnotation 
+export type Annotation =
+  | HighlightAnnotation
+  | CommentAnnotation
+  | DrawingAnnotation
   | TextAnnotation;
 
 export type AnnotationType = 'highlight' | 'comment' | 'drawing' | 'text';

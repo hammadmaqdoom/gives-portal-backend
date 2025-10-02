@@ -5,7 +5,10 @@ import { CurrencyService } from './currency.service';
 import { SettingsModule } from '../settings/settings.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CurrencyRateEntity]), forwardRef(() => SettingsModule)],
+  imports: [
+    TypeOrmModule.forFeature([CurrencyRateEntity]),
+    forwardRef(() => SettingsModule),
+  ],
   providers: [CurrencyService],
   exports: [CurrencyService],
 })

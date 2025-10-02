@@ -13,7 +13,12 @@ import {
   Request,
   NotFoundException,
 } from '@nestjs/common';
-import { ApiTags, ApiResponse, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiOperation,
+} from '@nestjs/swagger';
 import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
@@ -309,7 +314,9 @@ export class StudentsController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(RoleEnum.admin)
-  @ApiOperation({ summary: 'Automatically link all students to their user accounts by email' })
+  @ApiOperation({
+    summary: 'Automatically link all students to their user accounts by email',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Students linked to users successfully',

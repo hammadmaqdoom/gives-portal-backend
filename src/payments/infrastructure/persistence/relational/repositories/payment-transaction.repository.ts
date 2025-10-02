@@ -47,7 +47,13 @@ export class PaymentTransactionRepositoryImpl
     return entity ? PaymentTransactionMapper.toDomain(entity) : null;
   }
 
-  async findWithFilters(filters: PaymentTransactionFilters & { includeJoins?: boolean; classId?: number; teacherId?: number }): Promise<{
+  async findWithFilters(
+    filters: PaymentTransactionFilters & {
+      includeJoins?: boolean;
+      classId?: number;
+      teacherId?: number;
+    },
+  ): Promise<{
     data: PaymentTransaction[];
     meta: PaymentTransactionMeta;
   }> {

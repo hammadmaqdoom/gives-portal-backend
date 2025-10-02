@@ -177,12 +177,17 @@ export class StudentsService {
   }
 
   async findByUserId(userId: number): Promise<NullableType<Student>> {
-    console.log(`🔍 StudentsService.findByUserId called with userId: ${userId}`);
+    console.log(
+      `🔍 StudentsService.findByUserId called with userId: ${userId}`,
+    );
 
     const student = await this.studentsRepository.findByUserId(userId);
 
     console.log(`🔍 StudentsService.findByUserId result:`, student);
-    console.log(`🔍 StudentsService.findByUserId result userId:`, student?.userId);
+    console.log(
+      `🔍 StudentsService.findByUserId result userId:`,
+      student?.userId,
+    );
 
     return student;
   }
@@ -680,7 +685,10 @@ export class StudentsService {
   }
 
   // Student-User Linking Methods
-  async linkStudentToUser(studentId: number, userId: number): Promise<Student | null> {
+  async linkStudentToUser(
+    studentId: number,
+    userId: number,
+  ): Promise<Student | null> {
     const student = await this.studentsRepository.findById(studentId);
     if (!student) {
       throw new UnprocessableEntityException({
@@ -703,11 +711,17 @@ export class StudentsService {
     }
 
     // Update student with userId
-    const updatedStudent = await this.studentsRepository.update(studentId, { userId });
+    const updatedStudent = await this.studentsRepository.update(studentId, {
+      userId,
+    });
     return updatedStudent;
   }
 
-  async autoLinkStudentsToUsers(): Promise<{ linked: number; notFound: number; errors: number }> {
+  async autoLinkStudentsToUsers(): Promise<{
+    linked: number;
+    notFound: number;
+    errors: number;
+  }> {
     const students = await this.studentsRepository.findManyWithPagination({
       filterOptions: { userId: null as any },
       sortOptions: null,
@@ -725,12 +739,18 @@ export class StudentsService {
           // Find user by email
           const user = await this.usersService.findByEmail(student.email);
           if (user) {
-            await this.studentsRepository.update(student.id, { userId: Number(user.id) });
+            await this.studentsRepository.update(student.id, {
+              userId: Number(user.id),
+            });
             linked++;
-            console.log(`✅ Linked student "${student.name}" to user ID ${user.id}`);
+            console.log(
+              `✅ Linked student "${student.name}" to user ID ${user.id}`,
+            );
           } else {
             notFound++;
-            console.log(`❌ No user found for student "${student.name}" with email ${student.email}`);
+            console.log(
+              `❌ No user found for student "${student.name}" with email ${student.email}`,
+            );
           }
         } else {
           notFound++;

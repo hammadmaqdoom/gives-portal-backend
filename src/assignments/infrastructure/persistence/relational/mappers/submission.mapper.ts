@@ -17,8 +17,8 @@ export class SubmissionMapper {
     submission.comments = raw.comments;
     submission.fileUrl = raw.fileUrl;
     // Convert comma-separated string back to array for domain model
-    submission.attachments = raw.attachments 
-      ? raw.attachments.split(',').filter(att => att.trim() !== '')
+    submission.attachments = raw.attachments
+      ? raw.attachments.split(',').filter((att) => att.trim() !== '')
       : null;
     submission.submittedAt = raw.submittedAt;
     submission.gradedAt = raw.gradedAt;
@@ -94,8 +94,8 @@ export class SubmissionMapper {
     }
     if (submission.attachments !== undefined) {
       // Convert array to comma-separated string for database storage
-      submissionEntity.attachments = Array.isArray(submission.attachments) 
-        ? submission.attachments.join(',') 
+      submissionEntity.attachments = Array.isArray(submission.attachments)
+        ? submission.attachments.join(',')
         : submission.attachments;
     }
     if (submission.assignment !== undefined) {

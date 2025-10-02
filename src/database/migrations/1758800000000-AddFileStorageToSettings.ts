@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddFileStorageToSettings1758800000000 implements MigrationInterface {
+export class AddFileStorageToSettings1758800000000
+  implements MigrationInterface
+{
   name = 'AddFileStorageToSettings1758800000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -36,5 +38,3 @@ export class AddFileStorageToSettings1758800000000 implements MigrationInterface
     `);
   }
 }
-
-

@@ -146,7 +146,10 @@ export class ClassesService {
     });
 
     // Map sections by old->new
-    const sections = await this.sectionRepo.find({ where: { classId: id }, order: { orderIndex: 'ASC', id: 'ASC' } as any });
+    const sections = await this.sectionRepo.find({
+      where: { classId: id },
+      order: { orderIndex: 'ASC', id: 'ASC' } as any,
+    });
     const sectionIdMap = new Map<number, number>();
     for (const s of sections) {
       const created = await this.sectionRepo.save(
@@ -160,9 +163,14 @@ export class ClassesService {
     }
 
     // Copy modules (preserve drip configuration)
-    const modules = await this.moduleRepo.find({ where: { classId: id } as any, order: { orderIndex: 'ASC', id: 'ASC' } });
+    const modules = await this.moduleRepo.find({
+      where: { classId: id } as any,
+      order: { orderIndex: 'ASC', id: 'ASC' },
+    });
     for (const m of modules) {
-      const newSectionId = m.sectionId ? sectionIdMap.get(m.sectionId) || null : null;
+      const newSectionId = m.sectionId
+        ? sectionIdMap.get(m.sectionId) || null
+        : null;
       await this.moduleRepo.save(
         this.moduleRepo.create({
           title: m.title,
@@ -189,7 +197,10 @@ export class ClassesService {
     }
 
     // Copy assignments created by admin/teacher (owned by class)
-    const assignments = await this.assignmentRepo.find({ where: { class: { id } } as any, order: { id: 'ASC' } });
+    const assignments = await this.assignmentRepo.find({
+      where: { class: { id } } as any,
+      order: { id: 'ASC' },
+    });
     for (const a of assignments) {
       await this.assignmentRepo.save(
         this.assignmentRepo.create({
@@ -202,7 +213,9 @@ export class ClassesService {
           markingCriteria: a.markingCriteria,
           attachments: a.attachments as any,
           class: { id: duplicateClass.id } as any,
-          teacher: a.teacher ? ({ id: (a.teacher as any).id } as any) : undefined,
+          teacher: a.teacher
+            ? ({ id: (a.teacher as any).id } as any)
+            : undefined,
         } as any),
       );
     }

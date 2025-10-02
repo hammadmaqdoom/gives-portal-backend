@@ -35,7 +35,6 @@ export class InvoiceEntity extends EntityRelationalHelper {
   @JoinColumn()
   parent?: ParentEntity;
 
-
   @OneToMany(() => InvoiceItemEntity, (item) => item.invoice, { cascade: true })
   items?: InvoiceItemEntity[];
 

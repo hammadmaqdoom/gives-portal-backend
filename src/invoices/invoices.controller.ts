@@ -145,7 +145,10 @@ export class InvoicesController {
 
     console.log('🔍 getMyInvoices - User ID:', userId);
     console.log('🔍 getMyInvoices - User Role:', userRole);
-    console.log('🔍 getMyInvoices - Full user object:', JSON.stringify(req.user, null, 2));
+    console.log(
+      '🔍 getMyInvoices - Full user object:',
+      JSON.stringify(req.user, null, 2),
+    );
 
     if (userRole === 'parent') {
       // Find parent by user ID first, then get their invoices

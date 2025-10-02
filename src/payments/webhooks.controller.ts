@@ -54,28 +54,34 @@ export class WebhooksController {
       }
 
       // Get active credentials
-      const credentials = await this.paymentsService.getActiveCredentials(gateway.id);
+      const credentials = await this.paymentsService.getActiveCredentials(
+        gateway.id,
+      );
       if (!credentials) {
         this.logger.error('❌ Safepay credentials not found');
         return { success: false, message: 'Safepay credentials not found' };
       }
 
-      this.logger.log('✅ Safepay gateway and credentials found, processing webhook');
+      this.logger.log(
+        '✅ Safepay gateway and credentials found, processing webhook',
+      );
       this.logger.log('Credentials details:', {
         id: credentials.id,
         environment: credentials.environment,
         hasApiKey: !!credentials.apiKey,
         hasSecretKey: !!credentials.secretKey,
         hasWebhookSecret: !!credentials.webhookSecret,
-        webhookSecretPreview: credentials.webhookSecret ? credentials.webhookSecret.substring(0, 10) + '...' : 'NOT FOUND'
+        webhookSecretPreview: credentials.webhookSecret
+          ? credentials.webhookSecret.substring(0, 10) + '...'
+          : 'NOT FOUND',
       });
 
       // Process the webhook
       const safepaySignature = headers['x-sfpy-signature'];
-      
+
       this.logger.log('Available headers:', Object.keys(headers));
       this.logger.log('Signature found:', safepaySignature);
-      
+
       return await this.webhookService.processSafepayWebhook(
         webhookData,
         safepaySignature,
@@ -116,13 +122,17 @@ export class WebhooksController {
       }
 
       // Get active credentials
-      const credentials = await this.paymentsService.getActiveCredentials(gateway.id);
+      const credentials = await this.paymentsService.getActiveCredentials(
+        gateway.id,
+      );
       if (!credentials) {
         this.logger.error('❌ Stripe credentials not found');
         return { success: false, message: 'Stripe credentials not found' };
       }
 
-      this.logger.log('✅ Stripe gateway and credentials found, processing webhook');
+      this.logger.log(
+        '✅ Stripe gateway and credentials found, processing webhook',
+      );
 
       // Process the webhook
       const stripeSignature = headers['stripe-signature'];

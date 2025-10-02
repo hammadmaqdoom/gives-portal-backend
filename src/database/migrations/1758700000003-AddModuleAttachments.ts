@@ -7,7 +7,11 @@ export class AddModuleAttachments1758700000003 implements MigrationInterface {
     if (!has) {
       await queryRunner.addColumn(
         'learning_module',
-        new TableColumn({ name: 'attachments', type: 'jsonb', isNullable: true }),
+        new TableColumn({
+          name: 'attachments',
+          type: 'jsonb',
+          isNullable: true,
+        }),
       );
     }
   }
@@ -20,5 +24,3 @@ export class AddModuleAttachments1758700000003 implements MigrationInterface {
     }
   }
 }
-
-

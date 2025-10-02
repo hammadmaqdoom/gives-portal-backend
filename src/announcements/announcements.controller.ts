@@ -1,4 +1,12 @@
-import { Controller, Post, Body, UseGuards, Request, Get, Query } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Request,
+  Get,
+  Query,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -35,13 +43,17 @@ export class AnnouncementsController {
     // Set author ID from the authenticated user
     createAnnouncementDto.authorId = req.user.id;
 
-    const saved = await this.announcementsService.createAnnouncement(createAnnouncementDto);
+    const saved = await this.announcementsService.createAnnouncement(
+      createAnnouncementDto,
+    );
     return saved;
   }
 
   @Get()
   @ApiOperation({ summary: 'List announcements (optional classId filter)' })
   async list(@Query('classId') classId?: string) {
-    return this.announcementsService.listAnnouncements(classId ? Number(classId) : undefined);
+    return this.announcementsService.listAnnouncements(
+      classId ? Number(classId) : undefined,
+    );
   }
 }

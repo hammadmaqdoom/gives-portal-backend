@@ -63,7 +63,10 @@ export class PaymentGatewayFactory {
             };
           },
           verifyPayment: async (credentials, trackerToken) => {
-            const isCompleted = await this.safepayService.verifyPayment(trackerToken, credentials);
+            const isCompleted = await this.safepayService.verifyPayment(
+              trackerToken,
+              credentials,
+            );
             return {
               status: isCompleted ? 'completed' : 'failed',
               transactionId: trackerToken,
@@ -72,7 +75,11 @@ export class PaymentGatewayFactory {
             };
           },
           processWebhook: async (credentials, webhookData, signature) => {
-            const result = await this.safepayService.processWebhook(credentials, webhookData, signature);
+            const result = await this.safepayService.processWebhook(
+              credentials,
+              webhookData,
+              signature,
+            );
             return {
               eventType: 'payment.completed',
               transactionId: result.transactionId,

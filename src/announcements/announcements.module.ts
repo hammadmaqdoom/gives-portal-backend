@@ -9,7 +9,13 @@ import { ParentsModule } from '../parents/parents.module';
 import { AnnouncementEntity } from './infrastructure/persistence/relational/entities/announcement.entity';
 
 @Module({
-  imports: [NotificationModule, UsersModule, StudentsModule, ParentsModule, TypeOrmModule.forFeature([AnnouncementEntity])],
+  imports: [
+    NotificationModule,
+    UsersModule,
+    StudentsModule,
+    ParentsModule,
+    TypeOrmModule.forFeature([AnnouncementEntity]),
+  ],
   controllers: [AnnouncementsController],
   providers: [AnnouncementsService],
   exports: [AnnouncementsService],

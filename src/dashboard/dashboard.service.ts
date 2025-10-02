@@ -248,7 +248,9 @@ export class DashboardService {
       .where('fee.status = :status', { status: PaymentStatus.PAID })
       .getRawOne();
     const total = parseFloat(result?.total || '0');
-    const defaultCurrency = (await this.settingsService.getSettingsOrCreate() as any).defaultCurrency || 'PKR';
+    const defaultCurrency =
+      ((await this.settingsService.getSettingsOrCreate()) as any)
+        .defaultCurrency || 'PKR';
     // Convert aggregated total to PKR
     return await this.currencyService.convert(total, defaultCurrency, 'PKR');
   }
@@ -260,7 +262,9 @@ export class DashboardService {
       .where('fee.status = :status', { status: PaymentStatus.UNPAID })
       .getRawOne();
     const total = parseFloat(result?.total || '0');
-    const defaultCurrency = (await this.settingsService.getSettingsOrCreate() as any).defaultCurrency || 'PKR';
+    const defaultCurrency =
+      ((await this.settingsService.getSettingsOrCreate()) as any)
+        .defaultCurrency || 'PKR';
     return await this.currencyService.convert(total, defaultCurrency, 'PKR');
   }
 
@@ -334,16 +338,25 @@ export class DashboardService {
       .orderBy('month', 'ASC')
       .getRawMany();
 
-    const defaultCurrency = (await this.settingsService.getSettingsOrCreate() as any).defaultCurrency || 'PKR';
-    const mapped = await Promise.all(result.map(async (item) => {
-      const date = new Date(item.month);
-      const amount = parseFloat(item.total);
-      const revenuePKR = await this.currencyService.convert(amount, defaultCurrency, 'PKR', date);
-      return {
-        month: date.toLocaleDateString('en-US', { month: 'short' }),
-        revenue: revenuePKR,
-      };
-    }));
+    const defaultCurrency =
+      ((await this.settingsService.getSettingsOrCreate()) as any)
+        .defaultCurrency || 'PKR';
+    const mapped = await Promise.all(
+      result.map(async (item) => {
+        const date = new Date(item.month);
+        const amount = parseFloat(item.total);
+        const revenuePKR = await this.currencyService.convert(
+          amount,
+          defaultCurrency,
+          'PKR',
+          date,
+        );
+        return {
+          month: date.toLocaleDateString('en-US', { month: 'short' }),
+          revenue: revenuePKR,
+        };
+      }),
+    );
     return mapped;
   }
 

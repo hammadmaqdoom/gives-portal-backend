@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, Index, CreateDateColumn, UpdateDateColumn, Unique } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  Index,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Unique,
+} from 'typeorm';
 
 @Entity({ name: 'currency_rate' })
 @Unique(['base', 'date'])
@@ -28,5 +36,3 @@ export class CurrencyRateEntity {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-
-

@@ -10,7 +10,12 @@ import {
   Request,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { RolesGuard } from '../roles/roles.guard';
 import { Roles } from '../roles/roles.decorator';
 import { RoleEnum } from '../roles/roles.enum';
@@ -31,7 +36,10 @@ export class AnnotationsController {
   @Post()
   @Roles(RoleEnum.teacher, RoleEnum.admin)
   @ApiOperation({ summary: 'Create annotation document' })
-  @ApiResponse({ status: 201, description: 'Annotation document created successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Annotation document created successfully',
+  })
   create(@Body() createAnnotationDocumentDto: CreateAnnotationDocumentDto) {
     return this.annotationsService.create(createAnnotationDocumentDto);
   }
@@ -39,7 +47,10 @@ export class AnnotationsController {
   @Get(':id')
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.user)
   @ApiOperation({ summary: 'Get annotation document by ID' })
-  @ApiResponse({ status: 200, description: 'Annotation document retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Annotation document retrieved successfully',
+  })
   findOne(@Param('id') id: string) {
     return this.annotationsService.findById(id);
   }
@@ -47,7 +58,10 @@ export class AnnotationsController {
   @Get('submission/:submissionId')
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.user)
   @ApiOperation({ summary: 'Get annotation document by submission ID' })
-  @ApiResponse({ status: 200, description: 'Annotation document retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Annotation document retrieved successfully',
+  })
   findBySubmissionId(@Param('submissionId') submissionId: string) {
     return this.annotationsService.findBySubmissionId(submissionId);
   }
@@ -55,7 +69,10 @@ export class AnnotationsController {
   @Get('file/:fileId')
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.user)
   @ApiOperation({ summary: 'Get annotation document by file ID' })
-  @ApiResponse({ status: 200, description: 'Annotation document retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Annotation document retrieved successfully',
+  })
   findByFileId(@Param('fileId') fileId: string) {
     return this.annotationsService.findByFileId(fileId);
   }
@@ -63,7 +80,10 @@ export class AnnotationsController {
   @Patch(':id')
   @Roles(RoleEnum.teacher, RoleEnum.admin)
   @ApiOperation({ summary: 'Update annotation document' })
-  @ApiResponse({ status: 200, description: 'Annotation document updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Annotation document updated successfully',
+  })
   update(
     @Param('id') id: string,
     @Body() updateAnnotationDocumentDto: UpdateAnnotationDocumentDto,
@@ -74,7 +94,10 @@ export class AnnotationsController {
   @Post('save')
   @Roles(RoleEnum.teacher, RoleEnum.admin)
   @ApiOperation({ summary: 'Save or update annotation document' })
-  @ApiResponse({ status: 200, description: 'Annotation document saved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Annotation document saved successfully',
+  })
   saveOrUpdate(
     @Body() body: { submissionId: string; fileId: string; layers: any[] },
   ) {
@@ -88,7 +111,10 @@ export class AnnotationsController {
   @Delete(':id')
   @Roles(RoleEnum.teacher, RoleEnum.admin)
   @ApiOperation({ summary: 'Delete annotation document' })
-  @ApiResponse({ status: 200, description: 'Annotation document deleted successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Annotation document deleted successfully',
+  })
   remove(@Param('id') id: string) {
     return this.annotationsService.delete(id);
   }

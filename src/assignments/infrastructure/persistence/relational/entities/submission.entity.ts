@@ -68,7 +68,6 @@ export class SubmissionEntity extends EntityRelationalHelper {
   @JoinColumn({ name: 'assignmentId' })
   assignment?: AssignmentEntity | null;
 
-
   @CreateDateColumn()
   createdAt: Date;
 

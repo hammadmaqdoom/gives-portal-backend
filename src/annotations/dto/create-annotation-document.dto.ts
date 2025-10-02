@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsArray, IsObject, IsNumber, IsOptional } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsArray,
+  IsObject,
+  IsNumber,
+  IsOptional,
+} from 'class-validator';
 
 export class CreateAnnotationDocumentDto {
   @ApiProperty({ example: 'submission-123' })
@@ -12,7 +19,7 @@ export class CreateAnnotationDocumentDto {
   @IsString()
   fileId: string;
 
-  @ApiProperty({ 
+  @ApiProperty({
     example: [
       {
         pageNumber: 1,
@@ -27,11 +34,11 @@ export class CreateAnnotationDocumentDto {
             createdBy: 'teacher-123',
             color: '#ffff00',
             opacity: 0.5,
-            text: 'Important text'
-          }
-        ]
-      }
-    ]
+            text: 'Important text',
+          },
+        ],
+      },
+    ],
   })
   @IsArray()
   @IsObject({ each: true })

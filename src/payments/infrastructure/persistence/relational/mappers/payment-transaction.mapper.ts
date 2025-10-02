@@ -24,12 +24,14 @@ export class PaymentTransactionMapper {
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
       deletedAt: entity.deletedAt,
-      gateway: entity.gateway ? {
-        id: entity.gateway.id,
-        name: entity.gateway.name,
-        displayName: entity.gateway.displayName,
-        logoUrl: entity.gateway.logoUrl,
-      } : undefined,
+      gateway: entity.gateway
+        ? {
+            id: entity.gateway.id,
+            name: entity.gateway.name,
+            displayName: entity.gateway.displayName,
+            logoUrl: entity.gateway.logoUrl,
+          }
+        : undefined,
     };
   }
 

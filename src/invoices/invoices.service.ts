@@ -135,22 +135,30 @@ export class InvoicesService {
   }
 
   async findByStudentUserId(userId: number): Promise<Invoice[]> {
-    console.log('🔍 findByStudentUserId - Looking for student with user ID:', userId);
-    
+    console.log(
+      '🔍 findByStudentUserId - Looking for student with user ID:',
+      userId,
+    );
+
     // First find the student by user ID
     const student = await this.studentsService.findByUserId(userId);
     console.log('🔍 findByStudentUserId - Found student:', student);
-    
+
     if (!student) {
-      console.log('🔍 findByStudentUserId - No student found, returning empty array');
+      console.log(
+        '🔍 findByStudentUserId - No student found, returning empty array',
+      );
       return [];
     }
-    
+
     // Then get invoices for that student
-    console.log('🔍 findByStudentUserId - Getting invoices for student ID:', student.id);
+    console.log(
+      '🔍 findByStudentUserId - Getting invoices for student ID:',
+      student.id,
+    );
     const invoices = await this.invoiceRepository.findByStudent(student.id);
     console.log('🔍 findByStudentUserId - Found invoices:', invoices);
-    
+
     return invoices;
   }
 

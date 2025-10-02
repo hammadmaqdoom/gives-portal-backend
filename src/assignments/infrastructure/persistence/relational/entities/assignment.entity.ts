@@ -53,8 +53,8 @@ export class AssignmentEntity extends EntityRelationalHelper {
   @Column({ type: 'text', nullable: true })
   markingCriteria?: string | null;
 
-  @Column({ type: 'simple-array', nullable: true })
-  attachments?: string[] | null;
+  @Column({ type: 'jsonb', nullable: true })
+  attachments?: any;
 
   @ManyToOne(() => ClassEntity, {
     eager: true,

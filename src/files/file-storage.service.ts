@@ -66,10 +66,16 @@ export class FileStorageService {
         this.fileDriver === FileDriver.S3 ||
         this.fileDriver === FileDriver.S3_PRESIGNED
       ) {
-        const region = storage?.awsS3Region || this.configService.get('file.awsS3Region');
-        const accessKeyId = storage?.accessKeyId || this.configService.get('file.accessKeyId');
-        const secretAccessKey = storage?.secretAccessKey || this.configService.get('file.secretAccessKey');
-        const bucket = storage?.awsDefaultS3Bucket || this.configService.get('file.awsDefaultS3Bucket');
+        const region =
+          storage?.awsS3Region || this.configService.get('file.awsS3Region');
+        const accessKeyId =
+          storage?.accessKeyId || this.configService.get('file.accessKeyId');
+        const secretAccessKey =
+          storage?.secretAccessKey ||
+          this.configService.get('file.secretAccessKey');
+        const bucket =
+          storage?.awsDefaultS3Bucket ||
+          this.configService.get('file.awsDefaultS3Bucket');
 
         if (region && accessKeyId && secretAccessKey && bucket) {
           this.s3Client = new S3Client({
@@ -451,7 +457,7 @@ export class FileStorageService {
     // S3 and s3-presigned
     const key = filePath.replace(/\\/g, '/');
     const obj = await this.s3Client.send(
-      new GetObjectCommand({ Bucket: this.s3Bucket, Key: key })
+      new GetObjectCommand({ Bucket: this.s3Bucket, Key: key }),
     );
     return {
       stream: obj.Body as NodeJS.ReadableStream,
@@ -478,7 +484,7 @@ export class FileStorageService {
 
     const key = filePath.replace(/\\/g, '/');
     const head = await this.s3Client.send(
-      new HeadObjectCommand({ Bucket: this.s3Bucket, Key: key })
+      new HeadObjectCommand({ Bucket: this.s3Bucket, Key: key }),
     );
     return {
       contentType: head.ContentType,

@@ -65,14 +65,13 @@ export class CreateAssignmentDto {
   markingCriteria?: string;
 
   @ApiProperty({
-    example: ['assignment.pdf', 'rubric.docx'],
+    example: [{ id: 'uuid', filename: 'assignment.pdf', originalName: 'Assignment.pdf', url: 'https://...', size: 1024, mimeType: 'application/pdf' }],
     required: false,
-    description: 'Array of file URLs attached to the assignment',
+    description: 'Array of file objects attached to the assignment',
   })
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  attachments?: string[];
+  attachments?: any[];
 
   @ApiProperty({ example: 1 })
   @IsNotEmpty()

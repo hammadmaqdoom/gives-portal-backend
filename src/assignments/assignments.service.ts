@@ -74,10 +74,7 @@ export class AssignmentsService {
 
     const assignmentData: Partial<Assignment> = {
       ...otherFields,
-      attachments:
-        attachments && attachments.length > 0
-          ? attachments.filter((att) => att && att.trim() !== '')
-          : undefined,
+      attachments: attachments || [],
     };
 
     // Only transform class field if it's being updated

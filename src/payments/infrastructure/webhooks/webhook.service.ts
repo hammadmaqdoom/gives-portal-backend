@@ -35,7 +35,12 @@ export class WebhookService {
       this.logger.log('Signature:', signature);
       this.logger.log('Credentials ID:', credentials?.id || 'N/A');
       this.logger.log('Webhook Secret Present:', !!credentials?.webhookSecret);
-      this.logger.log('Webhook Secret (first 10 chars):', credentials?.webhookSecret ? credentials.webhookSecret.substring(0, 10) + '...' : 'NOT FOUND');
+      this.logger.log(
+        'Webhook Secret (first 10 chars):',
+        credentials?.webhookSecret
+          ? credentials.webhookSecret.substring(0, 10) + '...'
+          : 'NOT FOUND',
+      );
       this.logger.log('================================');
 
       // Verify webhook signature using Safepay SDK
@@ -44,9 +49,10 @@ export class WebhookService {
           // Initialize Safepay SDK for verification
           const safepay = require('@sfpy/node-core')(credentials.secretKey, {
             authType: 'secret',
-            host: credentials.environment === 'production' 
-              ? 'https://api.getsafepay.com' 
-              : 'https://sandbox.api.getsafepay.com'
+            host:
+              credentials.environment === 'production'
+                ? 'https://api.getsafepay.com'
+                : 'https://sandbox.api.getsafepay.com',
           });
 
           // Create a mock request object for Safepay verification
@@ -55,38 +61,47 @@ export class WebhookService {
           const mockRequest = {
             body: webhookData,
             headers: {
-              'x-sfpy-signature': signature
-            }
+              'x-sfpy-signature': signature,
+            },
           };
 
           // For Payments 2.0, Safepay has a bug where signature verification fails
           // We'll skip signature verification for now and log a warning
-          this.logger.warn('⚠️ Skipping Safepay signature verification due to Payments 2.0 bug');
+          this.logger.warn(
+            '⚠️ Skipping Safepay signature verification due to Payments 2.0 bug',
+          );
           this.logger.log('Received signature:', signature);
           this.logger.log('Webhook data structure:', {
             hasToken: !!webhookData.token,
             hasVersion: !!webhookData.version,
             hasData: !!webhookData.data,
-            hasTracker: !!webhookData.data?.tracker
+            hasTracker: !!webhookData.data?.tracker,
           });
 
-          this.logger.log('✅ Safepay webhook processing completed (signature verification skipped due to Payments 2.0 bug)');
+          this.logger.log(
+            '✅ Safepay webhook processing completed (signature verification skipped due to Payments 2.0 bug)',
+          );
         } catch (error) {
-          this.logger.error('Error verifying Safepay webhook signature:', error);
+          this.logger.error(
+            'Error verifying Safepay webhook signature:',
+            error,
+          );
           this.logger.warn('⚠️ Skipping signature verification due to error');
         }
       } else {
-        this.logger.warn('⚠️ No webhook secret provided, skipping signature verification');
+        this.logger.warn(
+          '⚠️ No webhook secret provided, skipping signature verification',
+        );
       }
 
       // Extract data from webhook structure - handle both old and new formats
       const webhookType = webhookData.type;
       const paymentData = webhookData.data || webhookData;
       const { tracker, state, amount, currency } = paymentData;
-      
+
       this.logger.log('Webhook Type:', webhookType);
       this.logger.log('Payment Data:', paymentData);
-      
+
       // Map webhook type to our status
       let status = 'pending';
       if (webhookType === 'payment.succeeded') {
@@ -111,26 +126,55 @@ export class WebhookService {
           status = 'cancelled';
         }
       }
-      
-      this.logger.log('Extracted data - Type:', webhookType, 'Tracker:', tracker, 'State:', state, 'Status:', status, 'Amount:', amount, 'Currency:', currency);
+
+      this.logger.log(
+        'Extracted data - Type:',
+        webhookType,
+        'Tracker:',
+        tracker,
+        'State:',
+        state,
+        'Status:',
+        status,
+        'Amount:',
+        amount,
+        'Currency:',
+        currency,
+      );
 
       // Find transaction by gateway transaction ID (Safepay tracker)
-      this.logger.log(`🔍 Looking for transaction with Safepay tracker: ${tracker}`);
+      this.logger.log(
+        `🔍 Looking for transaction with Safepay tracker: ${tracker}`,
+      );
       const transaction =
-        await this.paymentsService.getTransactionByGatewayTransactionId(tracker);
+        await this.paymentsService.getTransactionByGatewayTransactionId(
+          tracker,
+        );
 
       if (!transaction) {
         this.logger.warn(`❌ Transaction not found for tracker: ${tracker}`);
-        this.logger.warn('This might be a test webhook or the transaction was not created in our system');
-        this.logger.log('✅ Webhook processed successfully (test webhook - no transaction to update)');
-        return { success: true, message: 'Webhook processed successfully - test webhook received' };
+        this.logger.warn(
+          'This might be a test webhook or the transaction was not created in our system',
+        );
+        this.logger.log(
+          '✅ Webhook processed successfully (test webhook - no transaction to update)',
+        );
+        return {
+          success: true,
+          message: 'Webhook processed successfully - test webhook received',
+        };
       }
 
-      this.logger.log(`✅ Transaction found: ${transaction.transactionId} (Status: ${transaction.status})`);
+      this.logger.log(
+        `✅ Transaction found: ${transaction.transactionId} (Status: ${transaction.status})`,
+      );
 
       // Update transaction status based on webhook data
-      const newStatus: PaymentTransaction['status'] = status as PaymentTransaction['status'];
-      this.logger.log(`🔄 Processing status change from '${transaction.status}' to '${newStatus}'`);
+      const newStatus: PaymentTransaction['status'] =
+        status as PaymentTransaction['status'];
+      this.logger.log(
+        `🔄 Processing status change from '${transaction.status}' to '${newStatus}'`,
+      );
 
       // Log the status change
       switch (newStatus) {
@@ -154,7 +198,9 @@ export class WebhookService {
       }
 
       // Update transaction with webhook data
-      this.logger.log(`💾 Updating transaction ${transaction.transactionId} to status: ${newStatus}`);
+      this.logger.log(
+        `💾 Updating transaction ${transaction.transactionId} to status: ${newStatus}`,
+      );
       await this.paymentsService.updateTransactionStatus(
         transaction.transactionId,
         newStatus,
@@ -179,7 +225,9 @@ export class WebhookService {
 
         // Process invoice payment if transaction is linked to an invoice
         if (transaction.invoiceId) {
-          this.logger.log(`📄 Processing invoice payment for invoice: ${transaction.invoiceId}`);
+          this.logger.log(
+            `📄 Processing invoice payment for invoice: ${transaction.invoiceId}`,
+          );
           await this.invoicePaymentService.processPaymentSuccess(
             transaction.transactionId,
           );
@@ -188,7 +236,9 @@ export class WebhookService {
         this.logger.log('💥 Payment failed - triggering failure actions');
         // Process payment failure if transaction is linked to an invoice
         if (transaction.invoiceId) {
-          this.logger.log(`📄 Processing invoice payment failure for invoice: ${transaction.invoiceId}`);
+          this.logger.log(
+            `📄 Processing invoice payment failure for invoice: ${transaction.invoiceId}`,
+          );
           await this.invoicePaymentService.processPaymentFailure(
             transaction.transactionId,
             webhookData.error_message || 'Payment failed',
@@ -306,7 +356,6 @@ export class WebhookService {
       return { success: false, message: error.message };
     }
   }
-
 
   private verifyStripeSignature(
     webhookData: any,

@@ -47,14 +47,21 @@ export class CurrencyService implements OnModuleInit {
 
   async getRateForDate(date: Date, base = 'USD'): Promise<CurrencyRateEntity> {
     const day = this.formatDate(date);
-    let record = await this.currencyRepo.findOne({ where: { date: day, base } });
+    let record = await this.currencyRepo.findOne({
+      where: { date: day, base },
+    });
     if (record) return record;
 
     // Limit: fetch at most once per day
     const appId = this.configService.get<string>('OPENEXCHANGERATES_APP_ID');
     if (!appId) {
-      this.logger.warn('OPENEXCHANGERATES_APP_ID is not set; using latest cached/synthetic rates');
-      const latest = await this.currencyRepo.find({ order: { date: 'DESC' }, take: 1 });
+      this.logger.warn(
+        'OPENEXCHANGERATES_APP_ID is not set; using latest cached/synthetic rates',
+      );
+      const latest = await this.currencyRepo.find({
+        order: { date: 'DESC' },
+        take: 1,
+      });
       if (latest.length) return latest[0];
       return {
         id: 0,
@@ -72,11 +79,16 @@ export class CurrencyService implements OnModuleInit {
       const res = await fetch(url);
       if (!res.ok) {
         if (res.status === 401) {
-          this.logger.warn('OpenExchangeRates 401 (invalid app_id); using latest cached/synthetic rates');
+          this.logger.warn(
+            'OpenExchangeRates 401 (invalid app_id); using latest cached/synthetic rates',
+          );
         } else {
           this.logger.error(`OpenExchangeRates HTTP ${res.status}`);
         }
-        const latest = await this.currencyRepo.find({ order: { date: 'DESC' }, take: 1 });
+        const latest = await this.currencyRepo.find({
+          order: { date: 'DESC' },
+          take: 1,
+        });
         if (latest.length) return latest[0];
         return {
           id: 0,
@@ -90,7 +102,9 @@ export class CurrencyService implements OnModuleInit {
         } as unknown as CurrencyRateEntity;
       }
       const data = await res.json();
-      const providerDate = new Date((data.timestamp || Date.now()/1000) * 1000);
+      const providerDate = new Date(
+        (data.timestamp || Date.now() / 1000) * 1000,
+      );
       const providerDay = this.formatDate(providerDate);
       record = this.currencyRepo.create({
         date: providerDay,
@@ -104,7 +118,10 @@ export class CurrencyService implements OnModuleInit {
     } catch (err) {
       this.logger.error('Failed to fetch currency rates', err as any);
       // fallback to latest available
-      const latest = await this.currencyRepo.find({ order: { date: 'DESC' }, take: 1 });
+      const latest = await this.currencyRepo.find({
+        order: { date: 'DESC' },
+        take: 1,
+      });
       if (latest.length) return latest[0];
       // As a last resort, synthesize minimal rates for PKR
       const synthetic: CurrencyRateEntity = {
@@ -121,7 +138,12 @@ export class CurrencyService implements OnModuleInit {
     }
   }
 
-  async convert(amount: number, from: string, to: string, date = new Date()): Promise<number> {
+  async convert(
+    amount: number,
+    from: string,
+    to: string,
+    date = new Date(),
+  ): Promise<number> {
     if (!amount || from === to) return amount;
     const { base, rates } = await this.getRateForDate(date);
     const getToBase = (code: string): number => {
@@ -136,5 +158,3 @@ export class CurrencyService implements OnModuleInit {
     return Number(converted.toFixed(2));
   }
 }
-
-

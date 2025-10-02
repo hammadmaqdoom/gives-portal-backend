@@ -10,8 +10,12 @@ export class AnnotationsService {
     private readonly annotationDocumentRepository: AnnotationDocumentRepository,
   ) {}
 
-  async create(createAnnotationDocumentDto: CreateAnnotationDocumentDto): Promise<AnnotationDocument> {
-    return this.annotationDocumentRepository.create(createAnnotationDocumentDto);
+  async create(
+    createAnnotationDocumentDto: CreateAnnotationDocumentDto,
+  ): Promise<AnnotationDocument> {
+    return this.annotationDocumentRepository.create(
+      createAnnotationDocumentDto,
+    );
   }
 
   async findById(id: string): Promise<AnnotationDocument> {
@@ -22,7 +26,9 @@ export class AnnotationsService {
     return document;
   }
 
-  async findBySubmissionId(submissionId: string): Promise<AnnotationDocument | null> {
+  async findBySubmissionId(
+    submissionId: string,
+  ): Promise<AnnotationDocument | null> {
     return this.annotationDocumentRepository.findBySubmissionId(submissionId);
   }
 
@@ -30,18 +36,29 @@ export class AnnotationsService {
     return this.annotationDocumentRepository.findByFileId(fileId);
   }
 
-  async update(id: string, updateAnnotationDocumentDto: UpdateAnnotationDocumentDto): Promise<AnnotationDocument> {
+  async update(
+    id: string,
+    updateAnnotationDocumentDto: UpdateAnnotationDocumentDto,
+  ): Promise<AnnotationDocument> {
     const existing = await this.findById(id);
     if (!existing) {
       throw new NotFoundException('Annotation document not found');
     }
-    return this.annotationDocumentRepository.update(id, updateAnnotationDocumentDto);
+    return this.annotationDocumentRepository.update(
+      id,
+      updateAnnotationDocumentDto,
+    );
   }
 
-  async saveOrUpdate(submissionId: string, fileId: string, layers: any[]): Promise<AnnotationDocument> {
+  async saveOrUpdate(
+    submissionId: string,
+    fileId: string,
+    layers: any[],
+  ): Promise<AnnotationDocument> {
     // Try to find existing document
-    let document = await this.annotationDocumentRepository.findBySubmissionId(submissionId);
-    
+    const document =
+      await this.annotationDocumentRepository.findBySubmissionId(submissionId);
+
     if (document) {
       // Update existing document
       return this.annotationDocumentRepository.update(document.id, { layers });

@@ -14,7 +14,11 @@ const infrastructurePersistenceModule = RelationalClassPersistenceModule;
   imports: [
     infrastructurePersistenceModule,
     forwardRef(() => StudentsModule),
-    TypeOrmModule.forFeature([LearningModuleEntity, LearningModuleSectionEntity, AssignmentEntity]),
+    TypeOrmModule.forFeature([
+      LearningModuleEntity,
+      LearningModuleSectionEntity,
+      AssignmentEntity,
+    ]),
   ],
   controllers: [ClassesController],
   providers: [ClassesService],

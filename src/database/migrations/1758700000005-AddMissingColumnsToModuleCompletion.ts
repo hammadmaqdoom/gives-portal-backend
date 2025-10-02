@@ -1,7 +1,9 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddMissingColumnsToModuleCompletion1758700000005 implements MigrationInterface {
-  name = 'AddMissingColumnsToModuleCompletion1758700000005'
+export class AddMissingColumnsToModuleCompletion1758700000005
+  implements MigrationInterface
+{
+  name = 'AddMissingColumnsToModuleCompletion1758700000005';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Add progress_percentage if not exists
@@ -89,5 +91,3 @@ export class AddMissingColumnsToModuleCompletion1758700000005 implements Migrati
     `);
   }
 }
-
-

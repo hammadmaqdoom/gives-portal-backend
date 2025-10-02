@@ -95,17 +95,31 @@ export class LearningModulesService {
   }
 
   // Sections CRUD
-  async listSectionsByClass(classId: number): Promise<LearningModuleSectionEntity[]> {
-    return this.sectionRepo.find({ where: { classId }, order: { orderIndex: 'ASC', id: 'ASC' } });
+  async listSectionsByClass(
+    classId: number,
+  ): Promise<LearningModuleSectionEntity[]> {
+    return this.sectionRepo.find({
+      where: { classId },
+      order: { orderIndex: 'ASC', id: 'ASC' },
+    });
   }
 
-  async createSection(classId: number, title: string, orderIndex = 0): Promise<LearningModuleSectionEntity> {
+  async createSection(
+    classId: number,
+    title: string,
+    orderIndex = 0,
+  ): Promise<LearningModuleSectionEntity> {
     const section = this.sectionRepo.create({ classId, title, orderIndex });
     return this.sectionRepo.save(section);
   }
 
-  async updateSection(sectionId: number, payload: Partial<LearningModuleSectionEntity>): Promise<LearningModuleSectionEntity> {
-    const section = await this.sectionRepo.findOne({ where: { id: sectionId } });
+  async updateSection(
+    sectionId: number,
+    payload: Partial<LearningModuleSectionEntity>,
+  ): Promise<LearningModuleSectionEntity> {
+    const section = await this.sectionRepo.findOne({
+      where: { id: sectionId },
+    });
     if (!section) throw new NotFoundException('Section not found');
     Object.assign(section, payload);
     return this.sectionRepo.save(section);
@@ -122,17 +136,31 @@ export class LearningModulesService {
     await this.sectionRepo.delete(sectionId);
   }
 
-  async createModuleInSection(sectionId: number, modulePayload: Partial<LearningModuleEntity>): Promise<LearningModuleEntity> {
-    const section = await this.sectionRepo.findOne({ where: { id: sectionId } });
+  async createModuleInSection(
+    sectionId: number,
+    modulePayload: Partial<LearningModuleEntity>,
+  ): Promise<LearningModuleEntity> {
+    const section = await this.sectionRepo.findOne({
+      where: { id: sectionId },
+    });
     if (!section) throw new NotFoundException('Section not found');
-    const module = this.repo.create({ ...modulePayload, classId: section.classId, sectionId: section.id });
+    const module = this.repo.create({
+      ...modulePayload,
+      classId: section.classId,
+      sectionId: section.id,
+    });
     return this.repo.save(module);
   }
 
-  async moveModuleToSection(moduleId: number, sectionId: number): Promise<LearningModuleEntity> {
+  async moveModuleToSection(
+    moduleId: number,
+    sectionId: number,
+  ): Promise<LearningModuleEntity> {
     const module = await this.repo.findOne({ where: { id: moduleId } });
     if (!module) throw new NotFoundException('Module not found');
-    const section = await this.sectionRepo.findOne({ where: { id: sectionId } });
+    const section = await this.sectionRepo.findOne({
+      where: { id: sectionId },
+    });
     if (!section) throw new NotFoundException('Section not found');
     module.sectionId = sectionId;
     module.classId = section.classId;
@@ -140,19 +168,22 @@ export class LearningModulesService {
   }
 
   // Drip Content Methods
-  async getModulesForStudent(classId: number, studentId: number): Promise<LearningModuleEntity[]> {
+  async getModulesForStudent(
+    classId: number,
+    studentId: number,
+  ): Promise<LearningModuleEntity[]> {
     const allModules = await this.list({ classId });
     const completions = await this.getCompletedModules(studentId);
     const completedModuleIds = new Set(completions.map((c) => c.moduleId));
 
-    return allModules.filter(module => {
+    return allModules.filter((module) => {
       // If drip content is not enabled for this module, show it
       if (!module.dripEnabled) return true;
 
       // Check if prerequisites are met
       if (module.dripPrerequisites && module.dripPrerequisites.length > 0) {
         const prerequisitesMet = module.dripPrerequisites.every((prereqId) =>
-          completedModuleIds.has(prereqId)
+          completedModuleIds.has(prereqId),
         );
         if (!prerequisitesMet) return false;
       }
@@ -164,18 +195,26 @@ export class LearningModulesService {
       }
 
       // Check delay days after prerequisites
-      if (module.dripDelayDays && module.dripPrerequisites && module.dripPrerequisites.length > 0) {
+      if (
+        module.dripDelayDays &&
+        module.dripPrerequisites &&
+        module.dripPrerequisites.length > 0
+      ) {
         const lastPrereqCompletion = Math.max(
           ...module.dripPrerequisites.map((prereqId) => {
             const completion = completions.find((c) => c.moduleId === prereqId);
             return completion
-              ? new Date((completion.completedAt as Date) || (completion.createdAt as Date)).getTime()
+              ? new Date(
+                  (completion.completedAt as Date) ||
+                    (completion.createdAt as Date),
+                ).getTime()
               : 0;
-          })
+          }),
         );
-        
+
         if (lastPrereqCompletion > 0) {
-          const releaseTime = lastPrereqCompletion + (module.dripDelayDays * 24 * 60 * 60 * 1000);
+          const releaseTime =
+            lastPrereqCompletion + module.dripDelayDays * 24 * 60 * 60 * 1000;
           if (Date.now() < releaseTime) return false;
         }
       }
@@ -185,9 +224,12 @@ export class LearningModulesService {
   }
 
   // Module Completion Methods
-  async markModuleCompleted(moduleId: number, studentId: number): Promise<ModuleCompletionEntity> {
+  async markModuleCompleted(
+    moduleId: number,
+    studentId: number,
+  ): Promise<ModuleCompletionEntity> {
     let completion = await this.completionRepo.findOne({
-      where: { moduleId, studentId }
+      where: { moduleId, studentId },
     });
 
     if (!completion) {
@@ -207,21 +249,31 @@ export class LearningModulesService {
     return this.completionRepo.save(completion);
   }
 
-  async getCompletedModules(studentId: number): Promise<ModuleCompletionEntity[]> {
+  async getCompletedModules(
+    studentId: number,
+  ): Promise<ModuleCompletionEntity[]> {
     return this.completionRepo.find({
       where: { studentId, isCompleted: true },
     });
   }
 
-  async getModuleCompletion(moduleId: number, studentId: number): Promise<ModuleCompletionEntity | null> {
+  async getModuleCompletion(
+    moduleId: number,
+    studentId: number,
+  ): Promise<ModuleCompletionEntity | null> {
     return this.completionRepo.findOne({
-      where: { moduleId, studentId }
+      where: { moduleId, studentId },
     });
   }
 
-  async updateModuleProgress(moduleId: number, studentId: number, progressPercentage: number, timeSpent?: number): Promise<ModuleCompletionEntity> {
+  async updateModuleProgress(
+    moduleId: number,
+    studentId: number,
+    progressPercentage: number,
+    timeSpent?: number,
+  ): Promise<ModuleCompletionEntity> {
     let completion = await this.completionRepo.findOne({
-      where: { moduleId, studentId }
+      where: { moduleId, studentId },
     });
 
     if (!completion) {
@@ -252,7 +304,9 @@ export class LearningModulesService {
         },
       );
       // Return fresh entity
-      return (await this.completionRepo.findOne({ where: { id: completion.id } })) as ModuleCompletionEntity;
+      return (await this.completionRepo.findOne({
+        where: { id: completion.id },
+      })) as ModuleCompletionEntity;
     }
   }
 }

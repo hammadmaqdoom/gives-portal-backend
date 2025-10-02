@@ -24,7 +24,9 @@ export class AnnotationDocumentRepository {
     return entity ? this.toDomain(entity) : null;
   }
 
-  async findBySubmissionId(submissionId: string): Promise<AnnotationDocument | null> {
+  async findBySubmissionId(
+    submissionId: string,
+  ): Promise<AnnotationDocument | null> {
     const entity = await this.annotationDocumentRepository.findOne({
       where: { submissionId, deletedAt: IsNull() },
     });
@@ -38,7 +40,10 @@ export class AnnotationDocumentRepository {
     return entity ? this.toDomain(entity) : null;
   }
 
-  async update(id: string, data: Partial<AnnotationDocument>): Promise<AnnotationDocument> {
+  async update(
+    id: string,
+    data: Partial<AnnotationDocument>,
+  ): Promise<AnnotationDocument> {
     await this.annotationDocumentRepository.update(id, {
       ...data,
       version: () => 'version + 1', // Increment version

@@ -73,12 +73,16 @@ export class PaymentsService {
       }
 
       // Log amount for debugging
-      this.logger.log(`Processing payment: ${transaction.amount} ${transaction.currency} for gateway ${gateway.name}`);
+      this.logger.log(
+        `Processing payment: ${transaction.amount} ${transaction.currency} for gateway ${gateway.name}`,
+      );
       this.logger.log('Retrieved credentials:', {
         id: credentials.id,
         gatewayId: credentials.gatewayId,
         isActive: credentials.isActive,
-        apiKey: credentials.apiKey ? `${credentials.apiKey.substring(0, 10)}...` : 'null',
+        apiKey: credentials.apiKey
+          ? `${credentials.apiKey.substring(0, 10)}...`
+          : 'null',
         environment: credentials.environment,
       });
 
@@ -404,7 +408,10 @@ export class PaymentsService {
   }> {
     // Reuse repository but request joins via a flag if supported, or compose here using filters
     // For now, call the same repo and rely on it to include relations when present
-    return this.paymentTransactionRepository.findWithFilters({ ...filters, includeJoins: true });
+    return this.paymentTransactionRepository.findWithFilters({
+      ...filters,
+      includeJoins: true,
+    });
   }
 
   async getUserTransactions(
@@ -428,8 +435,9 @@ export class PaymentsService {
     amount: number;
     currency: string;
   }): Promise<PaymentTransaction | null> {
-    const { invoiceId, studentId, parentId, gatewayId, amount, currency } = criteria;
-    
+    const { invoiceId, studentId, parentId, gatewayId, amount, currency } =
+      criteria;
+
     // Build query criteria
     const whereCriteria: any = {
       gatewayId,
@@ -451,11 +459,12 @@ export class PaymentsService {
     }
 
     // Find existing transaction
-    const transactions = await this.paymentTransactionRepository.findWithFilters({
-      ...whereCriteria,
-      page: 1,
-      limit: 1,
-    });
+    const transactions =
+      await this.paymentTransactionRepository.findWithFilters({
+        ...whereCriteria,
+        page: 1,
+        limit: 1,
+      });
 
     return transactions.data.length > 0 ? transactions.data[0] : null;
   }
@@ -463,12 +472,13 @@ export class PaymentsService {
   async cleanupExpiredPendingTransactions(): Promise<void> {
     // Clean up pending transactions older than 30 minutes
     const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-    
-    const expiredTransactions = await this.paymentTransactionRepository.findWithFilters({
-      status: 'pending',
-      page: 1,
-      limit: 100, // Process in batches
-    });
+
+    const expiredTransactions =
+      await this.paymentTransactionRepository.findWithFilters({
+        status: 'pending',
+        page: 1,
+        limit: 100, // Process in batches
+      });
 
     for (const transaction of expiredTransactions.data) {
       if (transaction.createdAt < thirtyMinutesAgo) {
@@ -476,11 +486,14 @@ export class PaymentsService {
           transaction.transactionId,
           {
             status: 'cancelled',
-            failureReason: 'Transaction expired - no payment received within 30 minutes',
-          }
+            failureReason:
+              'Transaction expired - no payment received within 30 minutes',
+          },
         );
-        
-        this.logger.log(`Cleaned up expired transaction: ${transaction.transactionId}`);
+
+        this.logger.log(
+          `Cleaned up expired transaction: ${transaction.transactionId}`,
+        );
       }
     }
   }
@@ -499,18 +512,26 @@ export class PaymentsService {
     referenceNumber: string | undefined,
     fileUrl: string,
     invoiceId?: number,
-    fileMeta?: { id?: string | number; originalName?: string; mimeType?: string; size?: number } | null,
+    fileMeta?: {
+      id?: string | number;
+      originalName?: string;
+      mimeType?: string;
+      size?: number;
+    } | null,
   ): Promise<PaymentTransaction> {
     try {
       // this.logger.log(`Creating bank transfer payment for student ${studentId}, amount: ${amount} ${currency}`);
 
       // Get bank transfer gateway (support common naming variants)
-      let bankTransferGateway = await this.paymentGatewayRepository.findByName('bank-transfer');
+      let bankTransferGateway =
+        await this.paymentGatewayRepository.findByName('bank-transfer');
       if (!bankTransferGateway) {
-        bankTransferGateway = await this.paymentGatewayRepository.findByName('bank_transfer');
+        bankTransferGateway =
+          await this.paymentGatewayRepository.findByName('bank_transfer');
       }
       if (!bankTransferGateway) {
-        bankTransferGateway = await this.paymentGatewayRepository.findByName('bank');
+        bankTransferGateway =
+          await this.paymentGatewayRepository.findByName('bank');
       }
       if (!bankTransferGateway) {
         throw new PaymentGatewayNotFoundError(0);
@@ -552,9 +573,12 @@ export class PaymentsService {
       transaction.callbackUrl = '/payment/bank-transfer/callback';
       transaction.redirectUrl = '/payment/bank-transfer/success';
 
-      const savedTransaction = await this.paymentTransactionRepository.create(transaction);
+      const savedTransaction =
+        await this.paymentTransactionRepository.create(transaction);
 
-      this.logger.log(`Bank transfer payment created: ${savedTransaction.transactionId}`);
+      this.logger.log(
+        `Bank transfer payment created: ${savedTransaction.transactionId}`,
+      );
 
       return savedTransaction;
     } catch (error) {

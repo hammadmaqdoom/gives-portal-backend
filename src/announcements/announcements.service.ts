@@ -60,7 +60,9 @@ export class AnnouncementsService {
       title: createAnnouncementDto.title,
       bodyHtml: createAnnouncementDto.message,
       pinned: !!createAnnouncementDto.pinned,
-      class: createAnnouncementDto.classId ? ({ id: createAnnouncementDto.classId } as any) : null,
+      class: createAnnouncementDto.classId
+        ? ({ id: createAnnouncementDto.classId } as any)
+        : null,
     });
     return await this.announcementRepo.save(entity);
   }
@@ -69,10 +71,7 @@ export class AnnouncementsService {
     if (classId) {
       // Include class-specific and global (no class) announcements
       return this.announcementRepo.find({
-        where: [
-          { class: { id: classId } } as any,
-          { class: null } as any,
-        ],
+        where: [{ class: { id: classId } } as any, { class: null } as any],
         order: { createdAt: 'DESC' },
       });
     }
@@ -131,7 +130,10 @@ export class AnnouncementsService {
             postDate,
           });
         } catch (error) {
-          console.error(`Error sending announcement to student ${student.email}:`, error);
+          console.error(
+            `Error sending announcement to student ${student.email}:`,
+            error,
+          );
         }
       }
     }
@@ -160,7 +162,10 @@ export class AnnouncementsService {
             postDate,
           });
         } catch (error) {
-          console.error(`Error sending announcement to parent ${parent.email}:`, error);
+          console.error(
+            `Error sending announcement to parent ${parent.email}:`,
+            error,
+          );
         }
       }
     }
@@ -191,7 +196,10 @@ export class AnnouncementsService {
             postDate,
           });
         } catch (error) {
-          console.error(`Error sending announcement to teacher ${teacher.email}:`, error);
+          console.error(
+            `Error sending announcement to teacher ${teacher.email}:`,
+            error,
+          );
         }
       }
     }

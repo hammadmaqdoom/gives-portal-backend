@@ -43,5 +43,3 @@ export class LearningModuleSectionEntity extends EntityRelationalHelper {
   @DeleteDateColumn()
   deletedAt: Date;
 }
-
-

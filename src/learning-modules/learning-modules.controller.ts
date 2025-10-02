@@ -147,7 +147,10 @@ export class LearningModulesController {
     @Param('classId') classId: string,
     @Param('studentId') studentId: string,
   ) {
-    return this.service.getModulesForStudent(Number(classId), Number(studentId));
+    return this.service.getModulesForStudent(
+      Number(classId),
+      Number(studentId),
+    );
   }
 
   @Post(':moduleId/complete/:studentId')
@@ -157,7 +160,10 @@ export class LearningModulesController {
     @Param('moduleId') moduleId: string,
     @Param('studentId') studentId: string,
   ) {
-    return this.service.markModuleCompleted(Number(moduleId), Number(studentId));
+    return this.service.markModuleCompleted(
+      Number(moduleId),
+      Number(studentId),
+    );
   }
 
   @Patch(':moduleId/progress/:studentId')
@@ -199,13 +205,22 @@ export class LearningModuleSectionsController {
 
   @Post()
   @Roles(RoleEnum.admin, RoleEnum.teacher)
-  async create(@Body() body: { classId: number; title: string; orderIndex?: number }) {
-    return this.service.createSection(body.classId, body.title, body.orderIndex ?? 0);
+  async create(
+    @Body() body: { classId: number; title: string; orderIndex?: number },
+  ) {
+    return this.service.createSection(
+      body.classId,
+      body.title,
+      body.orderIndex ?? 0,
+    );
   }
 
   @Patch(':id')
   @Roles(RoleEnum.admin, RoleEnum.teacher)
-  async update(@Param('id') id: string, @Body() body: { title?: string; orderIndex?: number }) {
+  async update(
+    @Param('id') id: string,
+    @Body() body: { title?: string; orderIndex?: number },
+  ) {
     return this.service.updateSection(Number(id), body);
   }
 
@@ -218,7 +233,10 @@ export class LearningModuleSectionsController {
 
   @Post(':id/modules')
   @Roles(RoleEnum.admin, RoleEnum.teacher)
-  async createModuleInSection(@Param('id') id: string, @Body() body: Partial<any>) {
+  async createModuleInSection(
+    @Param('id') id: string,
+    @Body() body: Partial<any>,
+  ) {
     return this.service.createModuleInSection(Number(id), body);
   }
 
@@ -228,7 +246,10 @@ export class LearningModuleSectionsController {
     @Param('moduleId') moduleId: string,
     @Param('sectionId') sectionId: string,
   ) {
-    return this.service.moveModuleToSection(Number(moduleId), Number(sectionId));
+    return this.service.moveModuleToSection(
+      Number(moduleId),
+      Number(sectionId),
+    );
   }
 
   // Drip Content Endpoints
@@ -239,7 +260,10 @@ export class LearningModuleSectionsController {
     @Param('classId') classId: string,
     @Param('studentId') studentId: string,
   ) {
-    return this.service.getModulesForStudent(Number(classId), Number(studentId));
+    return this.service.getModulesForStudent(
+      Number(classId),
+      Number(studentId),
+    );
   }
 
   // Module Completion Endpoints
@@ -250,7 +274,10 @@ export class LearningModuleSectionsController {
     @Param('moduleId') moduleId: string,
     @Param('studentId') studentId: string,
   ) {
-    return this.service.markModuleCompleted(Number(moduleId), Number(studentId));
+    return this.service.markModuleCompleted(
+      Number(moduleId),
+      Number(studentId),
+    );
   }
 
   @Get(':moduleId/completion/:studentId')
@@ -260,7 +287,10 @@ export class LearningModuleSectionsController {
     @Param('moduleId') moduleId: string,
     @Param('studentId') studentId: string,
   ) {
-    return this.service.getModuleCompletion(Number(moduleId), Number(studentId));
+    return this.service.getModuleCompletion(
+      Number(moduleId),
+      Number(studentId),
+    );
   }
 
   @Patch(':moduleId/progress/:studentId')

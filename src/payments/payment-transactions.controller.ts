@@ -121,21 +121,23 @@ export class PaymentTransactionsController {
     }
 
     // Check for existing pending transaction for idempotency
-    const existingTransaction = await this.paymentsService.findExistingPendingTransaction({
-      invoiceId,
-      studentId: studentId || undefined,
-      parentId: parentId || undefined,
-      gatewayId,
-      amount,
-      currency,
-    });
+    const existingTransaction =
+      await this.paymentsService.findExistingPendingTransaction({
+        invoiceId,
+        studentId: studentId || undefined,
+        parentId: parentId || undefined,
+        gatewayId,
+        amount,
+        currency,
+      });
 
     if (existingTransaction) {
       // Return existing session if transaction is still pending
       if (existingTransaction.status === 'pending') {
         const gateway = await this.paymentsService.getGatewayById(gatewayId);
-        const credentials = await this.paymentsService.getActiveCredentials(gatewayId);
-        
+        const credentials =
+          await this.paymentsService.getActiveCredentials(gatewayId);
+
         if (credentials) {
           const session = await this.paymentsService.createPaymentSession(
             gateway,
@@ -152,9 +154,11 @@ export class PaymentTransactionsController {
           };
         }
       }
-      
+
       // If transaction exists but is not pending, throw error
-      throw new Error(`Payment already exists for this invoice with status: ${existingTransaction.status}`);
+      throw new Error(
+        `Payment already exists for this invoice with status: ${existingTransaction.status}`,
+      );
     }
 
     // Get gateway and credentials
@@ -187,7 +191,7 @@ export class PaymentTransactionsController {
       amount,
       currency,
       status: 'pending',
-        callbackUrl: `${this.configService.get('APP_URL', { infer: true }) || this.configService.get('FRONTEND_DOMAIN', { infer: true }) || 'http://localhost:3000'}/payment/callback`,
+      callbackUrl: `${this.configService.get('APP_URL', { infer: true }) || this.configService.get('FRONTEND_DOMAIN', { infer: true }) || 'http://localhost:3000'}/payment/callback`,
     });
 
     // Create payment session
@@ -215,7 +219,6 @@ export class PaymentTransactionsController {
       transactionId: transaction.transactionId,
     };
   }
-
 
   @Post('webhook/:gatewayName')
   @HttpCode(HttpStatus.OK)
@@ -272,7 +275,9 @@ export class PaymentTransactionsController {
   // Admin-friendly flat response for dashboard tables
   @Get('admin/flat')
   @Roles(RoleEnum.admin)
-  @ApiOperation({ summary: 'Get payment transactions (flat view for dashboard)' })
+  @ApiOperation({
+    summary: 'Get payment transactions (flat view for dashboard)',
+  })
   async getTransactionsFlat(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
@@ -282,7 +287,10 @@ export class PaymentTransactionsController {
     @Query('teacherId') teacherId?: number,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
-  ): Promise<{ data: any[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
+  ): Promise<{
+    data: any[];
+    meta: { total: number; page: number; limit: number; totalPages: number };
+  }> {
     const { data, meta } = await this.paymentsService.getTransactionsWithJoins({
       page,
       limit,
@@ -341,11 +349,13 @@ export class PaymentTransactionsController {
     };
   }> {
     // Get student ID from user ID
-    const student = await this.studentsService.findByUserId(parseInt(req.user?.id, 10));
+    const student = await this.studentsService.findByUserId(
+      parseInt(req.user?.id, 10),
+    );
     if (!student) {
       throw new Error('Student profile not found for current user');
     }
-    
+
     return this.paymentsService.getUserTransactions(student.id, {
       page,
       limit,
@@ -482,7 +492,9 @@ export class PaymentTransactionsController {
       throw new Error(`${gatewayName} credentials not found`);
     }
 
-    this.logger.log(`✅ Gateway ${gatewayName} and credentials found, routing to handler`);
+    this.logger.log(
+      `✅ Gateway ${gatewayName} and credentials found, routing to handler`,
+    );
 
     // Route to appropriate webhook handler based on gateway name
     switch (gatewayName.toLowerCase()) {
@@ -526,12 +538,18 @@ export class PaymentTransactionsController {
   @ApiResponse({ status: 200, description: 'Payment verification result' })
   async verifyPayment(
     @Body() body: { tracker: string; gatewayId: number },
-  ): Promise<{ success: boolean; status: string; message: string; trackerData?: any }> {
+  ): Promise<{
+    success: boolean;
+    status: string;
+    message: string;
+    trackerData?: any;
+  }> {
     const { tracker, gatewayId } = body;
 
     // Get gateway and credentials
     const gateway = await this.paymentsService.getGatewayById(gatewayId);
-    const credentials = await this.paymentsService.getActiveCredentials(gatewayId);
+    const credentials =
+      await this.paymentsService.getActiveCredentials(gatewayId);
 
     if (!credentials) {
       throw new Error('No active credentials found for gateway');
@@ -557,7 +575,8 @@ export class PaymentTransactionsController {
   })
   async createBankTransferPayment(
     @Request() req: any,
-    @Body() body: {
+    @Body()
+    body: {
       amount: number;
       currency: string;
       invoiceId?: number;
@@ -576,7 +595,9 @@ export class PaymentTransactionsController {
 
       // Resolve studentId: prefer current user's student; fallback to invoice.studentId for admin/parent flows
       let resolvedStudentId: number | null = null;
-      const student = await this.studentsService.findByUserId(parseInt(req.user?.id, 10));
+      const student = await this.studentsService.findByUserId(
+        parseInt(req.user?.id, 10),
+      );
       if (student) {
         resolvedStudentId = student.id;
       } else if (body.invoiceId) {
@@ -586,7 +607,9 @@ export class PaymentTransactionsController {
         }
       }
       if (!resolvedStudentId) {
-        throw new Error('Student profile not found to attribute bank transfer payment');
+        throw new Error(
+          'Student profile not found to attribute bank transfer payment',
+        );
       }
 
       // Validate file
@@ -595,23 +618,23 @@ export class PaymentTransactionsController {
       }
 
       // Upload file and persist record in files table
-      const fileInfo = await this.filesService.uploadFileWithContext(
-        file,
-        {
-          type: 'payment-proof',
-          id: `bank-transfer-${Date.now()}`,
-          userId: req.user?.id,
-        },
-      );
+      const fileInfo = await this.filesService.uploadFileWithContext(file, {
+        type: 'payment-proof',
+        id: `bank-transfer-${Date.now()}`,
+        userId: req.user?.id,
+      });
 
-      this.logger.log('File uploaded successfully:', { id: (fileInfo as any)?.id, path: (fileInfo as any)?.path });
+      this.logger.log('File uploaded successfully:', {
+        id: (fileInfo as any)?.id,
+        path: (fileInfo as any)?.path,
+      });
 
       // Build previewable file URL (serve endpoint)
       // Always build preview URL from backend origin (not frontend)
       const backendOrigin = `${req.protocol}://${req.get('host')}`;
       const previewUrl = (fileInfo as any)?.id
         ? `${backendOrigin}/api/v1/files/serve/${fileInfo.id}`
-        : ((fileInfo as any)?.url || (fileInfo as any)?.path);
+        : (fileInfo as any)?.url || (fileInfo as any)?.path;
 
       // Create bank transfer payment
       const transaction = await this.paymentsService.createBankTransferPayment(
@@ -629,7 +652,10 @@ export class PaymentTransactionsController {
         },
       );
 
-      this.logger.log('Bank transfer payment created successfully:', transaction.transactionId);
+      this.logger.log(
+        'Bank transfer payment created successfully:',
+        transaction.transactionId,
+      );
 
       return transaction;
     } catch (error) {
@@ -640,7 +666,9 @@ export class PaymentTransactionsController {
 
   @Patch(':id/status')
   @Roles(RoleEnum.admin, RoleEnum.teacher)
-  @ApiOperation({ summary: 'Manually update bank-transfer transaction status (paid/unpaid)' })
+  @ApiOperation({
+    summary: 'Manually update bank-transfer transaction status (paid/unpaid)',
+  })
   async updateBankTransferStatus(
     @Param('id') id: string,
     @Body() body: { status: 'completed' | 'pending' },
@@ -650,11 +678,14 @@ export class PaymentTransactionsController {
       throw new Error('Transaction not found');
     }
     if ((tx.paymentMethod || '').toLowerCase() !== 'bank-transfer') {
-      throw new Error('Only bank-transfer transactions can be manually updated');
+      throw new Error(
+        'Only bank-transfer transactions can be manually updated',
+      );
     }
     const update: Partial<PaymentTransaction> = {
       status: body.status,
-      processedAt: body.status === 'completed' ? new Date() as any : null as any,
+      processedAt:
+        body.status === 'completed' ? (new Date() as any) : (null as any),
     };
     return this.paymentsService.updateTransaction(tx.id, update);
   }

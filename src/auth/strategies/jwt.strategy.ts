@@ -35,7 +35,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         typeof payload.id === 'string' ? parseInt(payload.id, 10) : payload.id,
     };
 
-    console.log('JWT Strategy - Processed payload:', processedPayload);
     return processedPayload;
   }
 }
