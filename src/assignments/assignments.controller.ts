@@ -11,6 +11,7 @@ import {
   HttpStatus,
   HttpCode,
   SerializeOptions,
+  Req,
 } from '@nestjs/common';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
 import { UpdateAssignmentDto } from './dto/update-assignment.dto';
@@ -50,8 +51,9 @@ export class AssignmentsController {
   @HttpCode(HttpStatus.CREATED)
   create(
     @Body() createAssignmentDto: CreateAssignmentDto,
+    @Req() req: any,
   ): Promise<Assignment> {
-    return this.assignmentsService.create(createAssignmentDto);
+    return this.assignmentsService.create(createAssignmentDto, req?.user);
   }
 
   @Get()

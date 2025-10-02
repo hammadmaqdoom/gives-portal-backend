@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Class } from '../../classes/domain/class';
+import { Teacher } from '../../teachers/domain/teacher';
 
 export enum AssignmentType {
   ASSIGNMENT = 'assignment',
@@ -57,4 +58,5 @@ export class Assignment {
   deletedAt: Date | null;
 
   class?: Class | null;
+  teacher?: Teacher | null;
 }
