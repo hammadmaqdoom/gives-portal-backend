@@ -30,7 +30,7 @@ export class NotificationService {
 
   private getAppName(): string {
     return (
-      this.configService.get('app.name', { infer: true }) || 'Gives Portal'
+      this.configService.get('app.name', { infer: true }) || 'LMS Portal'
     );
   }
 

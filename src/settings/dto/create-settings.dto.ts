@@ -297,7 +297,7 @@ export class CreateSettingsDto {
   @MaxLength(100)
   smsProvider?: string;
 
-  @ApiPropertyOptional({ example: 'givesacademydev@gmail.com' })
+  @ApiPropertyOptional({ example: 'digitaro.co.global@gmail.com' })
   @IsOptional()
   @IsEmail()
   @MaxLength(255)
