@@ -81,6 +81,34 @@ export class StudentClassEnrollmentRepository {
     );
   }
 
+  async findEnrollmentHistoryByStudentId(
+    studentId: number,
+  ): Promise<StudentClassEnrollment[]> {
+    const enrollments = await this.enrollmentRepository.find({
+      where: { studentId },
+      relations: ['student', 'class'],
+      order: { enrollmentDate: 'DESC' },
+    });
+
+    return enrollments.map((enrollment) =>
+      this.enrollmentMapper.toDomain(enrollment),
+    );
+  }
+
+  async findEnrollmentHistoryByClassId(
+    classId: number,
+  ): Promise<StudentClassEnrollment[]> {
+    const enrollments = await this.enrollmentRepository.find({
+      where: { classId },
+      relations: ['student', 'class'],
+      order: { enrollmentDate: 'DESC' },
+    });
+
+    return enrollments.map((enrollment) =>
+      this.enrollmentMapper.toDomain(enrollment),
+    );
+  }
+
   async update(
     id: number,
     data: Partial<StudentClassEnrollment>,
@@ -103,13 +131,22 @@ export class StudentClassEnrollmentRepository {
   }
 
   async remove(id: number): Promise<void> {
-    await this.enrollmentRepository.softDelete(id);
+    await this.enrollmentRepository.update(id, {
+      status: 'dropped',
+      deenrollmentDate: new Date(),
+    });
   }
 
   async removeByStudentAndClass(
     studentId: number,
     classId: number,
   ): Promise<void> {
-    await this.enrollmentRepository.softDelete({ studentId, classId });
+    await this.enrollmentRepository.update(
+      { studentId, classId },
+      {
+        status: 'dropped',
+        deenrollmentDate: new Date(),
+      },
+    );
   }
 }

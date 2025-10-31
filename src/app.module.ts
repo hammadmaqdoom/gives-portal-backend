@@ -28,6 +28,9 @@ import { SettingsModule } from './settings/settings.module';
 import { ZoomModule } from './zoom/zoom.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AnnotationsModule } from './annotations/annotations.module';
+import { SmsModule } from './sms/sms.module';
+import { FeeReminderModule } from './fee-reminders/fee-reminder.module';
+import { InvoiceGenerationModule } from './invoice-generation/invoice-generation.module';
 import { PublicController } from './public/public.controller';
 import { AppDataSource } from './database/data-source';
 import authConfig from './auth/config/auth.config';
@@ -78,6 +81,9 @@ import fileConfig from './files/config/file.config';
     ZoomModule,
     PaymentsModule,
     AnnotationsModule,
+      SmsModule,
+      FeeReminderModule,
+      InvoiceGenerationModule,
   ],
   controllers: [PublicController],
 })

@@ -10,6 +10,8 @@ export class StudentClassEnrollment {
 
   enrollmentDate: Date;
 
+  deenrollmentDate?: Date;
+
   status: 'active' | 'inactive' | 'completed' | 'dropped';
 
   student?: Student;

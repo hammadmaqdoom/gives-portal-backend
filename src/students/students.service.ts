@@ -476,6 +476,24 @@ export class StudentsService {
     return this.enrollmentRepository.findByStudentId(studentId);
   }
 
+  async getEnrollmentHistory(studentId: number): Promise<any[]> {
+    const student = await this.studentsRepository.findById(studentId);
+    if (!student) {
+      throw new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: {
+          studentId: 'studentNotExists',
+        },
+      });
+    }
+
+    return this.enrollmentRepository.findEnrollmentHistoryByStudentId(studentId);
+  }
+
+  async getClassEnrollmentHistory(classId: number): Promise<any[]> {
+    return this.enrollmentRepository.findEnrollmentHistoryByClassId(classId);
+  }
+
   async getStudentWithDetails(id: number): Promise<any> {
     const student = await this.studentsRepository.findById(id);
     if (!student) {

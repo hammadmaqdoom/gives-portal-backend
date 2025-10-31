@@ -41,6 +41,12 @@ RUN echo 'const crypto = require("crypto"); global.crypto = crypto; require("./d
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
 
+# Copy mail templates (needed at runtime)
+COPY --from=builder /app/src/mail/mail-templates ./src/mail/mail-templates
+
+# Create necessary directories and set permissions
+RUN mkdir -p src/mail/mail-templates && chown -R nestjs:nodejs src
+
 # Install wait-for-it script (used by startup checks)
 RUN curl -fsSL https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh -o /usr/local/bin/wait-for-it \
   && chmod +x /usr/local/bin/wait-for-it \

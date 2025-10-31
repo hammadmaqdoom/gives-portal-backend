@@ -112,6 +112,38 @@ export class Settings {
   @ApiProperty({ example: 'https://instagram.com/lmsportal' })
   socialInstagram?: string | null;
 
+  // SMS Configuration
+  @ApiProperty({ example: false })
+  smsEnabled: boolean;
+
+  @ApiProperty({ example: 'branded_sms_pakistan' })
+  smsProvider?: string | null;
+
+  @ApiProperty({ example: 'givesacademydev@gmail.com' })
+  smsApiEmail?: string | null;
+
+  @ApiProperty({ example: '1005dbcac3c1899ff30f63bbc2443a573a' })
+  smsApiKey?: string | null;
+
+  @ApiProperty({ example: 'H3 TEST SMS' })
+  smsMask?: string | null;
+
+  @ApiProperty({ example: 'https://secure.h3techs.com/sms/api/send' })
+  smsApiUrl?: string | null;
+
+  @ApiProperty({ example: true })
+  smsTestMode: boolean;
+
+  // WhatsApp Configuration
+  @ApiProperty({ example: false })
+  whatsappEnabled: boolean;
+
+  @ApiProperty({ example: 'DEVICE_ID' })
+  whatsappDeviceId?: string | null;
+
+  @ApiProperty({ example: 'https://secure.h3techs.com/sms/api/send_whatsapp' })
+  whatsappApiUrl?: string | null;
+
   @ApiProperty()
   createdAt: Date;
 

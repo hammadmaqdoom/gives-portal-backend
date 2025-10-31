@@ -33,6 +33,9 @@ export class StudentClassEnrollmentEntity extends EntityRelationalHelper {
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   enrollmentDate: Date;
 
+  @Column({ type: 'timestamp', nullable: true })
+  deenrollmentDate?: Date;
+
   @Column({ type: 'varchar', default: 'active' })
   status: 'active' | 'inactive' | 'completed' | 'dropped';
 

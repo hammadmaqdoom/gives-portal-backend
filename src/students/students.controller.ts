@@ -293,6 +293,30 @@ export class StudentsController {
     return this.studentsService.getEnrollments(+id);
   }
 
+  @Get(':id/enrollment-history')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.admin, RoleEnum.user)
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Student enrollment history retrieved successfully',
+  })
+  getEnrollmentHistory(@Param('id') id: string) {
+    return this.studentsService.getEnrollmentHistory(+id);
+  }
+
+  @Get('classes/:classId/enrollment-history')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.admin, RoleEnum.user)
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Class enrollment history retrieved successfully',
+  })
+  getClassEnrollmentHistory(@Param('classId') classId: string) {
+    return this.studentsService.getClassEnrollmentHistory(+classId);
+  }
+
   // Student-User Linking Endpoints
   @Post('link-to-user/:studentId/:userId')
   @ApiBearerAuth()

@@ -284,4 +284,63 @@ export class CreateSettingsDto {
   @IsOptional()
   @IsString()
   azureBlobPublicBaseUrl?: string;
+
+  // SMS Configuration
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  smsEnabled?: boolean;
+
+  @ApiPropertyOptional({ example: 'branded_sms_pakistan' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  smsProvider?: string;
+
+  @ApiPropertyOptional({ example: 'givesacademydev@gmail.com' })
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(255)
+  smsApiEmail?: string;
+
+  @ApiPropertyOptional({ example: '1005dbcac3c1899ff30f63bbc2443a573a' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  smsApiKey?: string;
+
+  @ApiPropertyOptional({ example: 'H3 TEST SMS' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  smsMask?: string;
+
+  @ApiPropertyOptional({ example: 'https://secure.h3techs.com/sms/api/send' })
+  @IsOptional()
+  @IsUrl()
+  @MaxLength(500)
+  smsApiUrl?: string;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  smsTestMode?: boolean;
+
+  // WhatsApp Configuration
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  whatsappEnabled?: boolean;
+
+  @ApiPropertyOptional({ example: 'DEVICE_ID' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  whatsappDeviceId?: string;
+
+  @ApiPropertyOptional({ example: 'https://secure.h3techs.com/sms/api/send_whatsapp' })
+  @IsOptional()
+  @IsUrl()
+  @MaxLength(500)
+  whatsappApiUrl?: string;
 }

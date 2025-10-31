@@ -162,6 +162,38 @@ export class SettingsEntity extends EntityRelationalHelper {
   @Column({ type: 'varchar', length: 500, nullable: true })
   azureBlobPublicBaseUrl: string | null;
 
+  // SMS Configuration
+  @Column({ type: 'boolean', default: false })
+  smsEnabled: boolean;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  smsProvider: string | null; // 'branded_sms_pakistan' | 'other'
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  smsApiEmail: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  smsApiKey: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  smsMask: string | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  smsApiUrl: string | null;
+
+  @Column({ type: 'boolean', default: true })
+  smsTestMode: boolean;
+
+  // WhatsApp Configuration
+  @Column({ type: 'boolean', default: false })
+  whatsappEnabled: boolean;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  whatsappDeviceId: string | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  whatsappApiUrl: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
