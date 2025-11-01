@@ -7,6 +7,8 @@ on:
 jobs:
   call-reusable:
     uses: ./.github/workflows/deploy-backend.yml
+    permissions:
+      contents: read
     with:
       environment: staging
       update_type: code
