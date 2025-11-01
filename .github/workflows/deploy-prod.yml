@@ -3,6 +3,25 @@ name: Deploy Backend (production)
 on:
   push:
     branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      update_type:
+        description: 'Update Type'
+        required: false
+        default: 'code'
+        type: choice
+        options:
+          - code
+          - config
+          - ssl
+      runSeeds:
+        description: 'Run seeds after migrations'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
 
 jobs:
   call-reusable:
@@ -11,6 +30,6 @@ jobs:
       contents: read
     with:
       environment: production
-      update_type: code
-      runSeeds: 'false'
+      update_type: ${{ inputs.update_type || 'code' }}
+      runSeeds: ${{ inputs.runSeeds || 'false' }}
 
