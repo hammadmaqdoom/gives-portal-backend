@@ -1,0 +1,14 @@
+name: Deploy Backend (staging)
+
+on:
+  push:
+    branches: [ "staging" ]
+
+jobs:
+  call-reusable:
+    uses: ./.github/workflows/deploy-backend.yml
+    with:
+      environment: staging
+      update_type: code
+      runSeeds: 'false'
+

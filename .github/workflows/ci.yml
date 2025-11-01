@@ -1,0 +1,25 @@
+name: Backend CI
+
+on:
+  pull_request:
+    branches: [ "staging", "main" ]
+  push:
+    branches: [ "staging" ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: be-ci-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm test --if-present -- --ci --reporters=default --reporters=jest-junit
+      - run: npm run build --if-present
+

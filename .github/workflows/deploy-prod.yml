@@ -1,0 +1,14 @@
+name: Deploy Backend (production)
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  call-reusable:
+    uses: ./.github/workflows/deploy-backend.yml
+    with:
+      environment: production
+      update_type: code
+      runSeeds: 'false'
+
