@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies (skip prepare script for production)
-RUN npm ci --only=production --ignore-scripts && npm cache clean --force
+RUN npm ci --only=production --ignore-scripts --legacy-peer-deps && npm cache clean --force
 
 # Install NestJS CLI for building
 RUN npm install -g @nestjs/cli
@@ -33,7 +33,7 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
 
 # Install only production dependencies (skip prepare script for production)
-RUN npm ci --only=production --ignore-scripts && npm cache clean --force
+RUN npm ci --only=production --ignore-scripts --legacy-peer-deps && npm cache clean --force
 
 # Create crypto polyfill script
 RUN echo 'const crypto = require("crypto"); global.crypto = crypto; require("./dist/main.js");' > start.js
