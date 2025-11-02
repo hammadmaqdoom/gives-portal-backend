@@ -299,28 +299,46 @@ jobs:
 
             # Generate SSL certificates
             echo "=== Step 17: Generating SSL certificates ==="
-            # Ensure nginx isn't started yet; we'll start it after certs
+            # Ensure nginx container doesn't exist yet and port 80 is free
             newgrp docker << EOF
             docker-compose -f docker-compose.prod.yml stop nginx || true
+            docker-compose -f docker-compose.prod.yml rm -f nginx || true
             EOF
 
-            # Generate certificates
+            # Generate certificates using standalone mode (needs port 80 free)
             # Issue cert only for domain; Let's Encrypt won't issue for bare IP
             sudo certbot certonly --standalone -d $BACKEND_DOMAIN --non-interactive --agree-tos --email ${{ secrets.EMAIL }}
             
-            # Start nginx
+            # Start nginx container (first time creation)
             newgrp docker << EOF
-            docker-compose -f docker-compose.prod.yml start nginx
+            echo "Starting nginx container for the first time..."
+            docker-compose -f docker-compose.prod.yml up -d nginx
+            echo "Waiting for nginx to start..."
+            sleep 5
+            docker ps | grep nginx || echo "Nginx container check"
+            EOF
+
+            # Verify nginx is running
+            echo "=== Step 18: Verifying nginx status ==="
+            newgrp docker << EOF
+            echo "=== Nginx Container Status ==="
+            docker ps | grep nginx || echo "Nginx not found in running containers"
+            docker logs backend_nginx --tail 20 || echo "Could not fetch nginx logs"
+            echo "=== Testing nginx port 80 ==="
+            curl -I http://localhost:80 || echo "Port 80 not accessible"
+            echo "=== Testing nginx port 443 ==="
+            curl -Ik https://localhost:443 || echo "Port 443 not accessible"
             EOF
 
             # Setup certificate renewal
-            echo "=== Step 18: Setting up certificate renewal ==="
+            echo "=== Step 19: Setting up certificate renewal ==="
             (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && cd $APP_HOME && newgrp docker -c 'docker-compose -f docker-compose.prod.yml restart nginx'") | crontab -
 
             echo "=== INITIAL DEPLOYMENT COMPLETED SUCCESSFULLY ==="
             echo "Backend is running on: https://$BACKEND_DOMAIN"
             echo "Static IP: https://$STATIC_IP"
             echo "Health check: https://$BACKEND_DOMAIN/health"
+            echo "API endpoint: https://$BACKEND_DOMAIN/api"
 
       - name: Run migrations
         uses: appleboy/ssh-action@v1.0.3
