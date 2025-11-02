@@ -1,4 +1,4 @@
-name: Initial AWS Lightsail Deployment
+name: Initial Backend Deployment (Lightsail)
 
 on:
   workflow_dispatch:
@@ -6,6 +6,10 @@ on:
 jobs:
   initial-deploy:
     runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: be-deploy-initial
+      cancel-in-progress: false
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -317,3 +321,31 @@ jobs:
             echo "Backend is running on: https://$BACKEND_DOMAIN"
             echo "Static IP: https://$STATIC_IP"
             echo "Health check: https://$BACKEND_DOMAIN/health"
+
+      - name: Run migrations
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            for i in $(seq 1 30); do
+              status=$(docker inspect --format='{{json .State.Health.Status}}' backend_app 2>/dev/null | tr -d '"' || echo 'starting')
+              if [ "$status" = "healthy" ]; then echo "backend_app healthy"; break; fi
+              echo "backend_app status: $status (retry $i)"; sleep 2;
+            done
+            docker exec backend_app sh -lc 'npx typeorm --dataSource=dist/database/data-source.js migration:run | cat'
+
+      - name: Run seeds
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            echo "== Run seeds =="
+            docker exec backend_app sh -lc 'node dist/database/seeds/relational/run-seed.js | cat'

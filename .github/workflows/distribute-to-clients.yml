@@ -48,13 +48,13 @@ jobs:
             const owner = context.repo.owner;  // e.g., "hammadmaqdoom"
             const repo = context.repo.repo;   // e.g., "lms-portal-backend" (base backend repo)
             const baseBranch = 'main';
-            const shortSha = context.sha.substring(0, 7);
+            const syncBranch = 'syncing';  // Fixed branch name for syncing
+            const defaultBranch = 'main';  // Always use main as default branch
             
             for (const c of clients) {
               const targetOwner = c.org;
               const targetRepo = c.repo;
               const targetBranch = c.target_branch || 'staging';
-              const syncBranch = `upstream-sync-${repo}-${shortSha}`;
               
               try {
                 console.log(`\n📦 Processing ${targetOwner}/${targetRepo}...`);
@@ -73,12 +73,18 @@ jobs:
                 execSync('git config user.name "github-actions[bot]"', { stdio: 'inherit' });
                 execSync('git config user.email "github-actions[bot]@users.noreply.github.com"', { stdio: 'inherit' });
                 
-                // Checkout target branch
+                // Ensure main branch exists (default branch)
                 try {
-                  execSync(`git checkout ${targetBranch}`, { stdio: 'inherit' });
+                  execSync(`git checkout ${defaultBranch}`, { stdio: 'inherit' });
                 } catch (e) {
-                  // Branch doesn't exist, create it
-                  execSync(`git checkout -b ${targetBranch}`, { stdio: 'inherit' });
+                  // Main branch doesn't exist, create it
+                  execSync(`git checkout -b ${defaultBranch}`, { stdio: 'inherit' });
+                  // Make initial commit if repo is empty
+                  try {
+                    execSync('git commit --allow-empty -m "Initial commit"', { stdio: 'inherit' });
+                  } catch (e) {
+                    // Already has commits
+                  }
                 }
                 
                 // Add base repo as remote and fetch
@@ -91,14 +97,14 @@ jobs:
                 
                 execSync('git fetch upstream main', { stdio: 'inherit' });
                 
-                // Create sync branch from current target branch
+                // Create or checkout syncing branch
                 try {
                   execSync(`git checkout -b ${syncBranch}`, { stdio: 'inherit' });
                 } catch (e) {
                   execSync(`git checkout ${syncBranch}`, { stdio: 'inherit' });
                 }
                 
-                // Merge upstream/main into sync branch (allow unrelated histories if needed)
+                // Merge upstream/main into syncing branch (allow unrelated histories if needed)
                 try {
                   execSync(`git merge upstream/main --no-edit --allow-unrelated-histories`, { stdio: 'inherit' });
                 } catch (e) {
@@ -113,17 +119,31 @@ jobs:
                   throw e;
                 }
                 
-                // Create PR
+                // Ensure staging branch exists (for PR target)
+                try {
+                  execSync(`git checkout ${targetBranch}`, { stdio: 'inherit' });
+                  execSync(`git push origin ${targetBranch}`, { stdio: 'inherit' });
+                } catch (e) {
+                  // Create staging branch from main if it doesn't exist
+                  execSync(`git checkout ${defaultBranch}`, { stdio: 'inherit' });
+                  execSync(`git checkout -b ${targetBranch}`, { stdio: 'inherit' });
+                  execSync(`git push origin ${targetBranch}`, { stdio: 'inherit' });
+                }
+                
+                // Go back to syncing branch
+                execSync(`git checkout ${syncBranch}`, { stdio: 'inherit' });
+                
+                // Create PR from syncing branch to staging branch
                 try {
                   const pr = await github.rest.pulls.create({
                     owner: targetOwner,
                     repo: targetRepo,
-                    title: `[Upstream Sync] ${owner}/${repo}@${shortSha} → ${targetBranch}`,
+                    title: `[Upstream Sync] ${owner}/${repo}@${context.sha.substring(0, 7)} → ${targetBranch}`,
                     head: syncBranch,
                     base: targetBranch,
                     body: `## 🔄 Automated Upstream Sync\n\n` +
                           `This PR syncs changes from the base repository:\n` +
-                          `- **Source**: \`${owner}/${repo}@${shortSha}\`\n` +
+                          `- **Source**: \`${owner}/${repo}@${context.sha.substring(0, 7)}\`\n` +
                           `- **Target**: \`${targetBranch}\` branch\n` +
                           `- **Base Commit**: ${context.sha}\n\n` +
                           `### What this does:\n` +
@@ -141,7 +161,7 @@ jobs:
                     if (/No commits between/.test(e.message)) {
                       console.log(`ℹ️  No changes to sync - repos are already in sync`);
                     } else if (/already exists/i.test(e.message)) {
-                      // Find existing PR
+                      // Find existing PR - check for any open PR from syncing branch
                       const existingPRs = await github.rest.pulls.list({
                         owner: targetOwner,
                         repo: targetRepo,

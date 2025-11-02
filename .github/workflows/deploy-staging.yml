@@ -24,12 +24,299 @@ on:
           - 'false'
 
 jobs:
-  call-reusable:
-    uses: ./.github/workflows/deploy-backend.yml
-    permissions:
-      contents: read
-    with:
-      environment: staging
-      update_type: ${{ inputs.update_type || 'code' }}
-      runSeeds: ${{ inputs.runSeeds || 'false' }}
+  deploy-backend:
+    runs-on: ubuntu-latest
+    environment: staging
+    concurrency:
+      group: be-deploy-staging
+      cancel-in-progress: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Copy updated code to Lightsail
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          source: "."
+          target: "/tmp/backend"
+          strip_components: 1
 
+      - name: Deploy update to AWS Lightsail
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          script: |
+            set -e
+            
+            echo "=== AWS LIGHTSAIL UPDATE DEPLOYMENT (STAGING) ==="
+            echo "Update Type: ${{ github.event.inputs.update_type || 'code' }}"
+            echo "Current user: $(whoami)"
+            echo "Current directory: $(pwd)"
+            
+            # Set variables
+            APP_HOME="/opt/backend"
+            BACKEND_DOMAIN="${{ secrets.BACKEND_DOMAIN }}"
+            FRONTEND_DOMAIN="${{ secrets.FRONTEND_DOMAIN }}"
+            STATIC_IP=$(curl -s http://checkip.amazonaws.com/)
+            UPDATE_TYPE="${{ github.event.inputs.update_type || 'code' }}"
+            
+            echo "Backend Domain: $BACKEND_DOMAIN"
+            echo "Frontend Domain: $FRONTEND_DOMAIN"
+            echo "Static IP: $STATIC_IP"
+            
+            # Move files from /tmp/backend to /opt/backend
+            echo "=== Moving updated files to application directory ==="
+            if [ -d "/tmp/backend" ]; then
+              sudo rm -rf $APP_HOME/*
+              sudo cp -r /tmp/backend/* $APP_HOME/
+              sudo chown -R "$USER":"$USER" $APP_HOME
+              sudo rm -rf /tmp/backend
+              echo "Files moved successfully to $APP_HOME"
+            else
+              echo "Warning: /tmp/backend directory not found"
+            fi
+            
+            cd $APP_HOME
+            
+            # Always update nginx configuration with actual domain (regardless of update type)
+            echo "=== Updating nginx configuration ==="
+            sudo sed -i "s/yourdomain.com/$BACKEND_DOMAIN/g" nginx/conf.d/backend.conf
+            sudo sed -i "s/server_name _/server_name $BACKEND_DOMAIN $STATIC_IP/g" nginx/conf.d/backend.conf
+            
+            # Update type: code
+            if [ "${UPDATE_TYPE}" = "code" ]; then
+              echo "=== Updating application code ==="
+              
+              # Stop system Nginx to free up port 80
+              echo "=== Stopping system Nginx ==="
+              sudo systemctl stop nginx || true
+              
+              # Stop services (no heredoc)
+              sg docker -c "docker-compose -f docker-compose.prod.yml down"
+              
+              # Update environment variables (write final values; no sed)
+              echo "=== Updating environment configuration ==="
+              printf "%s\n" \
+              "NODE_ENV=production" \
+              "APP_PORT=3000" \
+              "APP_NAME=${{ secrets.APP_NAME }}" \
+              "API_PREFIX=api" \
+              "APP_FALLBACK_LANGUAGE=en" \
+              "APP_HEADER_LANGUAGE=x-custom-lang" \
+              "FRONTEND_DOMAIN=$FRONTEND_DOMAIN" \
+              "BACKEND_DOMAIN=$BACKEND_DOMAIN" \
+              "DATABASE_TYPE=postgres" \
+              "DATABASE_HOST=postgres" \
+              "DATABASE_PORT=5432" \
+              "DATABASE_USERNAME=${{ secrets.DATABASE_USERNAME || secrets.POSTGRES_USER }}" \
+              "DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}" \
+              "DATABASE_NAME=${{ secrets.DATABASE_NAME }}" \
+              "DATABASE_SYNCHRONIZE=false" \
+              "DATABASE_MAX_CONNECTIONS=100" \
+              "DATABASE_SSL_ENABLED=false" \
+              "DATABASE_REJECT_UNAUTHORIZED=false" \
+              "DATABASE_CA=" \
+              "DATABASE_KEY=" \
+              "DATABASE_CERT=" \
+              "DATABASE_URL=" \
+              "FILE_DRIVER=${{ secrets.FILE_DRIVER }}" \
+              "ACCESS_KEY_ID=${{ secrets.S3AWS_ACCESS_KEY_ID }}" \
+              "SECRET_ACCESS_KEY=${{ secrets.S3AWS_SECRET_ACCESS_KEY }}" \
+              "AWS_S3_REGION=${{ secrets.S3AWS_REGION }}" \
+              "AWS_DEFAULT_S3_BUCKET=${{ secrets.S3AWS_DEFAULT_S3_BUCKET }}" \
+              "AZURE_STORAGE_ACCOUNT_NAME=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}" \
+              "AZURE_STORAGE_ACCOUNT_KEY=${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}" \
+              "AZURE_CONTAINER_NAME=${{ secrets.AZURE_CONTAINER_NAME }}" \
+              "AZURE_BLOB_SAS_EXPIRY_SECONDS=${{ secrets.AZURE_BLOB_SAS_EXPIRY_SECONDS }}" \
+              "AZURE_BLOB_PUBLIC_BASE_URL=${{ secrets.AZURE_BLOB_PUBLIC_BASE_URL }}" \
+              "AUTH_JWT_SECRET=secret" \
+              "AUTH_JWT_TOKEN_EXPIRES_IN=15m" \
+              "AUTH_REFRESH_SECRET=secret_for_refresh" \
+              "AUTH_REFRESH_TOKEN_EXPIRES_IN=3650d" \
+              "AUTH_FORGOT_SECRET=secret_for_forgot" \
+              "AUTH_FORGOT_TOKEN_EXPIRES_IN=30m" \
+              "AUTH_CONFIRM_EMAIL_SECRET=secret_for_confirm_email" \
+              "AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN=1d" \
+              "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" \
+              "FACEBOOK_APP_ID=${{ secrets.FACEBOOK_APP_ID }}" \
+              "FACEBOOK_APP_SECRET=${{ secrets.FACEBOOK_APP_SECRET }}" \
+              "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" \
+              "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+              "APPLE_APP_AUDIENCE=[]" \
+              "WORKER_HOST=redis://redis:6379/1" \
+              "REDIS_ENABLED=false" \
+              "REDIS_HOST=redis" \
+              "REDIS_PORT=6379" \
+              "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}" \
+              "REDIS_DB=0" \
+              "REDIS_TTL=3600" \
+              "ZOOM_OAUTH_CLIENT_ID=${{ secrets.ZOOM_OAUTH_CLIENT_ID }}" \
+              "ZOOM_OAUTH_CLIENT_SECRET=${{ secrets.ZOOM_OAUTH_CLIENT_SECRET }}" \
+              "ZOOM_OAUTH_REDIRECT_URI=${{ secrets.ZOOM_OAUTH_REDIRECT_URI }}" \
+              "OPENEXCHANGERATES_APP_ID=${{ secrets.OPENEXCHANGERATES_APP_ID }}" \
+              | sudo tee .env >/dev/null
+              
+              # Rebuild and start services (without health check dependencies)
+              sg docker -c "docker-compose -f docker-compose.prod.yml build --no-cache app"
+              sg docker -c "docker-compose -f docker-compose.prod.yml up -d postgres redis app"
+              echo "Waiting for app to start..."
+              sleep 30
+              
+              # Wait for services to be ready
+              echo "=== Waiting for services to be ready ==="
+              echo "Waiting for PostgreSQL..."
+              sg docker -c "docker exec backend_app ./wait-for-it.sh postgres:5432 --timeout=60 --strict -- echo 'PostgreSQL is ready'"
+              echo "Waiting for Redis..."
+              sg docker -c "docker exec backend_app ./wait-for-it.sh redis:6379 --timeout=30 --strict -- echo 'Redis is ready'"
+              echo "Waiting for App to be healthy..."
+              timeout 60 bash -c 'until docker exec backend_app curl -sf http://localhost:3000/api/v1/health; do sleep 2; done' || echo "App health check timeout"
+              echo "Application is ready"
+              echo "Starting Nginx..."
+              sg docker -c "docker-compose -f docker-compose.prod.yml up -d nginx"
+              
+              echo "=== Code update completed successfully ==="
+            fi
+            
+            # Update type: config
+            if [ "${UPDATE_TYPE}" = "config" ]; then
+              echo "=== Updating configuration ==="
+              
+              # Update environment variables (write final values; no sed)
+              echo "=== Updating environment configuration ==="
+              printf "%s\n" \
+              "NODE_ENV=production" \
+              "APP_PORT=3000" \
+              "APP_NAME=${{ secrets.APP_NAME }}" \
+              "API_PREFIX=api" \
+              "APP_FALLBACK_LANGUAGE=en" \
+              "APP_HEADER_LANGUAGE=x-custom-lang" \
+              "FRONTEND_DOMAIN=$FRONTEND_DOMAIN" \
+              "BACKEND_DOMAIN=$BACKEND_DOMAIN" \
+              "DATABASE_TYPE=postgres" \
+              "DATABASE_HOST=postgres" \
+              "DATABASE_PORT=5432" \
+              "DATABASE_USERNAME=${{ secrets.DATABASE_USERNAME || secrets.POSTGRES_USER }}" \
+              "DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}" \
+              "DATABASE_NAME=${{ secrets.DATABASE_NAME }}" \
+              "DATABASE_SYNCHRONIZE=false" \
+              "DATABASE_MAX_CONNECTIONS=100" \
+              "DATABASE_SSL_ENABLED=false" \
+              "DATABASE_REJECT_UNAUTHORIZED=false" \
+              "DATABASE_CA=" \
+              "DATABASE_KEY=" \
+              "DATABASE_CERT=" \
+              "DATABASE_URL=" \
+              "FILE_DRIVER=${{ secrets.FILE_DRIVER }}" \
+              "ACCESS_KEY_ID=${{ secrets.S3AWS_ACCESS_KEY_ID }}" \
+              "SECRET_ACCESS_KEY=${{ secrets.S3AWS_SECRET_ACCESS_KEY }}" \
+              "AWS_S3_REGION=${{ secrets.S3AWS_REGION }}" \
+              "AWS_DEFAULT_S3_BUCKET=${{ secrets.S3AWS_DEFAULT_S3_BUCKET }}" \
+              "AZURE_STORAGE_ACCOUNT_NAME=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}" \
+              "AZURE_STORAGE_ACCOUNT_KEY=${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}" \
+              "AZURE_CONTAINER_NAME=${{ secrets.AZURE_CONTAINER_NAME }}" \
+              "AZURE_BLOB_SAS_EXPIRY_SECONDS=${{ secrets.AZURE_BLOB_SAS_EXPIRY_SECONDS }}" \
+              "AZURE_BLOB_PUBLIC_BASE_URL=${{ secrets.AZURE_BLOB_PUBLIC_BASE_URL }}" \
+              "AUTH_JWT_SECRET=secret" \
+              "AUTH_JWT_TOKEN_EXPIRES_IN=15m" \
+              "AUTH_REFRESH_SECRET=secret_for_refresh" \
+              "AUTH_REFRESH_TOKEN_EXPIRES_IN=3650d" \
+              "AUTH_FORGOT_SECRET=secret_for_forgot" \
+              "AUTH_FORGOT_TOKEN_EXPIRES_IN=30m" \
+              "AUTH_CONFIRM_EMAIL_SECRET=secret_for_confirm_email" \
+              "AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN=1d" \
+              "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" \
+              "FACEBOOK_APP_ID=${{ secrets.FACEBOOK_APP_ID }}" \
+              "FACEBOOK_APP_SECRET=${{ secrets.FACEBOOK_APP_SECRET }}" \
+              "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" \
+              "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+              "APPLE_APP_AUDIENCE=[]" \
+              "WORKER_HOST=redis://redis:6379/1" \
+              "REDIS_ENABLED=false" \
+              "REDIS_HOST=redis" \
+              "REDIS_PORT=6379" \
+              "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}" \
+              "REDIS_DB=0" \
+              "REDIS_TTL=3600" \
+              "ZOOM_OAUTH_CLIENT_ID=${{ secrets.ZOOM_OAUTH_CLIENT_ID }}" \
+              "ZOOM_OAUTH_CLIENT_SECRET=${{ secrets.ZOOM_OAUTH_CLIENT_SECRET }}" \
+              "ZOOM_OAUTH_REDIRECT_URI=${{ secrets.ZOOM_OAUTH_REDIRECT_URI }}" \
+              "OPENEXCHANGERATES_APP_ID=${{ secrets.OPENEXCHANGERATES_APP_ID }}" \
+              | sudo tee .env >/dev/null
+              
+              # Restart services with new configuration
+              sg docker -c "docker-compose -f docker-compose.prod.yml restart app"
+              
+              # Force recreate nginx container to pick up updated config
+              sg docker -c "docker-compose -f docker-compose.prod.yml up -d --force-recreate nginx"
+                            
+              echo "=== Configuration update completed successfully ==="
+            fi
+              
+            # Update type: ssl
+            if [ "${UPDATE_TYPE}" = "ssl" ]; then
+              echo "=== Updating SSL certificates ==="
+              
+              # Stop nginx temporarily
+              sg docker -c "docker-compose -f docker-compose.prod.yml stop nginx"
+                              
+              # Renew certificates
+              sudo certbot renew --standalone --non-interactive
+              
+              # Start nginx
+              sg docker -c "docker-compose -f docker-compose.prod.yml start nginx"
+                              
+              echo "=== SSL certificate update completed successfully ==="
+            fi
+            
+            # Health check
+            echo "=== Performing health check ==="
+            sleep 10
+            
+            if curl -sf http://localhost:3000/api/v1/health > /dev/null 2>&1; then
+              echo "Health check passed - Application is running"
+            else
+              echo "Health check failed - Application may not be running properly"
+            fi
+            
+            # Cleanup old images
+            echo "=== Cleaning up old Docker images ==="
+            docker image prune -f || true
+            
+            echo "=== UPDATE DEPLOYMENT COMPLETED SUCCESSFULLY ==="
+            echo "Backend is running on: https://$BACKEND_DOMAIN"
+            echo "Static IP: https://$STATIC_IP"
+            echo "Health check: https://$BACKEND_DOMAIN/health"
+
+      - name: Run migrations
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            for i in $(seq 1 30); do
+              status=$(docker inspect --format='{{json .State.Health.Status}}' backend_app 2>/dev/null | tr -d '"' || echo 'starting')
+              if [ "$status" = "healthy" ]; then echo "backend_app healthy"; break; fi
+              echo "backend_app status: $status (retry $i)"; sleep 2;
+            done
+            docker exec backend_app sh -lc 'npx typeorm --dataSource=dist/database/data-source.js migration:run | cat'
+
+      - name: Optionally run seeds
+        if: ${{ github.event.inputs.runSeeds == 'true' }}
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            echo "== Run seeds =="
+            docker exec backend_app sh -lc 'node dist/database/seeds/relational/run-seed.js | cat'
