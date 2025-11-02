@@ -1,0 +1,179 @@
+name: Distribute updates to client repos
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  fanout:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.CLIENT_SYNC_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for proper syncing
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Process clients
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ env.GH_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const { execSync } = require('child_process');
+            
+            // Read clients.yml
+            const clientsYml = fs.readFileSync('clients.yml', 'utf8');
+            const yaml = require('js-yaml');
+            const clients = yaml.load(clientsYml).clients;
+            
+            const owner = context.repo.owner;  // e.g., "hammadmaqdoom"
+            const repo = context.repo.repo;   // e.g., "lms-portal-backend" (base backend repo)
+            const baseBranch = 'main';
+            const shortSha = context.sha.substring(0, 7);
+            
+            for (const c of clients) {
+              const targetOwner = c.org;
+              const targetRepo = c.repo;
+              const targetBranch = c.target_branch || 'staging';
+              const syncBranch = `upstream-sync-${repo}-${shortSha}`;
+              
+              try {
+                console.log(`\n📦 Processing ${targetOwner}/${targetRepo}...`);
+                
+                const tempDir = `/tmp/sync-${targetRepo}-${Date.now()}`;
+                
+                // Clone client repo
+                execSync(`git clone https://${process.env.GH_TOKEN}@github.com/${targetOwner}/${targetRepo}.git ${tempDir}`, {
+                  stdio: 'inherit',
+                  env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+                });
+                
+                process.chdir(tempDir);
+                
+                // Configure git
+                execSync('git config user.name "github-actions[bot]"', { stdio: 'inherit' });
+                execSync('git config user.email "github-actions[bot]@users.noreply.github.com"', { stdio: 'inherit' });
+                
+                // Checkout target branch
+                try {
+                  execSync(`git checkout ${targetBranch}`, { stdio: 'inherit' });
+                } catch (e) {
+                  // Branch doesn't exist, create it
+                  execSync(`git checkout -b ${targetBranch}`, { stdio: 'inherit' });
+                }
+                
+                // Add base repo as remote and fetch
+                try {
+                  execSync(`git remote add upstream https://${process.env.GH_TOKEN}@github.com/${owner}/${repo}.git`, { stdio: 'inherit' });
+                } catch (e) {
+                  execSync('git remote remove upstream', { stdio: 'inherit' });
+                  execSync(`git remote add upstream https://${process.env.GH_TOKEN}@github.com/${owner}/${repo}.git`, { stdio: 'inherit' });
+                }
+                
+                execSync('git fetch upstream main', { stdio: 'inherit' });
+                
+                // Create sync branch from current target branch
+                try {
+                  execSync(`git checkout -b ${syncBranch}`, { stdio: 'inherit' });
+                } catch (e) {
+                  execSync(`git checkout ${syncBranch}`, { stdio: 'inherit' });
+                }
+                
+                // Merge upstream/main into sync branch (allow unrelated histories if needed)
+                try {
+                  execSync(`git merge upstream/main --no-edit --allow-unrelated-histories`, { stdio: 'inherit' });
+                } catch (e) {
+                  console.log('Merge had conflicts or issues, but continuing...');
+                }
+                
+                // Push sync branch
+                try {
+                  execSync(`git push origin ${syncBranch} --force`, { stdio: 'inherit' });
+                } catch (e) {
+                  console.error('Failed to push:', e.message);
+                  throw e;
+                }
+                
+                // Create PR
+                try {
+                  const pr = await github.rest.pulls.create({
+                    owner: targetOwner,
+                    repo: targetRepo,
+                    title: `[Upstream Sync] ${owner}/${repo}@${shortSha} → ${targetBranch}`,
+                    head: syncBranch,
+                    base: targetBranch,
+                    body: `## 🔄 Automated Upstream Sync\n\n` +
+                          `This PR syncs changes from the base repository:\n` +
+                          `- **Source**: \`${owner}/${repo}@${shortSha}\`\n` +
+                          `- **Target**: \`${targetBranch}\` branch\n` +
+                          `- **Base Commit**: ${context.sha}\n\n` +
+                          `### What this does:\n` +
+                          `- Merges latest changes from base repo's \`main\` branch\n` +
+                          `- Creates PR into your \`${targetBranch}\` branch for review\n` +
+                          `- Once merged, triggers automatic deployment to ${targetBranch === 'staging' ? 'staging environment' : 'production'}\n\n` +
+                          `> ⚠️ **Important**: Review this PR carefully, especially if you have client-specific customizations. ` +
+                          `You may need to resolve merge conflicts manually.\n\n` +
+                          `*This PR was automatically created by the base repository workflow.*`,
+                    maintainer_can_modify: true
+                  });
+                  console.log(`✅ Opened PR #${pr.data.number}: ${pr.data.html_url}`);
+                } catch (e) {
+                  if (e.status === 422) {
+                    if (/No commits between/.test(e.message)) {
+                      console.log(`ℹ️  No changes to sync - repos are already in sync`);
+                    } else if (/already exists/i.test(e.message)) {
+                      // Find existing PR
+                      const existingPRs = await github.rest.pulls.list({
+                        owner: targetOwner,
+                        repo: targetRepo,
+                        state: 'open',
+                        head: `${targetOwner}:${syncBranch}`,
+                        base: targetBranch
+                      });
+                      if (existingPRs.data.length > 0) {
+                        console.log(`ℹ️  PR already exists: #${existingPRs.data[0].number}`);
+                      } else {
+                        // Try to find any open PR with similar title
+                        const allPRs = await github.rest.pulls.list({
+                          owner: targetOwner,
+                          repo: targetRepo,
+                          state: 'open',
+                          base: targetBranch
+                        });
+                        console.log(`ℹ️  Found ${allPRs.data.length} open PR(s) to ${targetBranch}`);
+                      }
+                    } else {
+                      console.warn(`⚠️  PR creation issue: ${e.message}`);
+                    }
+                  } else {
+                    throw e;
+                  }
+                }
+                
+                // Cleanup
+                process.chdir('/');
+                execSync(`rm -rf ${tempDir}`, { stdio: 'inherit' });
+                
+              } catch (error) {
+                console.error(`❌ Error processing ${targetOwner}/${targetRepo}:`, error.message);
+                // Cleanup on error
+                try {
+                  process.chdir('/');
+                  execSync(`rm -rf /tmp/sync-${targetRepo}-*`, { stdio: 'inherit' });
+                } catch (e) {}
+                // Don't fail entire workflow
+              }
+            }
+

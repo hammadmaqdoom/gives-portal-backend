@@ -1,0 +1,13 @@
+# List backend client repositories to receive upstream updates
+# org and repo can be either your user/org and repo name
+# target_branch is typically "staging"
+
+clients:
+  - org: hammadmaqdoom
+    repo: silveracademy-backend
+    target_branch: staging
+  # Add more backend client repos here:
+  # - org: hammadmaqdoom
+  #   repo: client-b-backend
+  #   target_branch: staging
+
