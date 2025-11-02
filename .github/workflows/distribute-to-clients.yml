@@ -25,6 +25,14 @@ jobs:
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
+      - name: Convert clients.yml to JSON
+        id: clients_json
+        run: |
+          yq -o=json '.clients' clients.yml > clients.json
+          echo "json<<EOF" >> $GITHUB_OUTPUT
+          cat clients.json >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Process clients
         uses: actions/github-script@v7
         with:
@@ -33,10 +41,9 @@ jobs:
             const fs = require('fs');
             const { execSync } = require('child_process');
             
-            // Read clients.yml
-            const clientsYml = fs.readFileSync('clients.yml', 'utf8');
-            const yaml = require('js-yaml');
-            const clients = yaml.load(clientsYml).clients;
+            // Read clients.json (converted from YAML)
+            const clientsJson = fs.readFileSync('clients.json', 'utf8');
+            const clients = JSON.parse(clientsJson);
             
             const owner = context.repo.owner;  // e.g., "hammadmaqdoom"
             const repo = context.repo.repo;   // e.g., "lms-portal-backend" (base backend repo)
