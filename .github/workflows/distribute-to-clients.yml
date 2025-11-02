@@ -73,17 +73,84 @@ jobs:
                 execSync('git config user.name "github-actions[bot]"', { stdio: 'inherit' });
                 execSync('git config user.email "github-actions[bot]@users.noreply.github.com"', { stdio: 'inherit' });
                 
-                // Ensure main branch exists (default branch)
+                // Check if repo is empty (no branches or no commits)
+                let isEmpty = false;
                 try {
-                  execSync(`git checkout ${defaultBranch}`, { stdio: 'inherit' });
+                  const branchOutput = execSync('git branch -a', { encoding: 'utf8' });
+                  const refsOutput = execSync('git show-ref', { encoding: 'utf8' });
+                  isEmpty = (branchOutput.trim().length === 0 || refsOutput.trim().length === 0);
                 } catch (e) {
-                  // Main branch doesn't exist, create it
-                  execSync(`git checkout -b ${defaultBranch}`, { stdio: 'inherit' });
-                  // Make initial commit if repo is empty
+                  isEmpty = true; // If git commands fail, repo is likely empty
+                }
+                
+                if (isEmpty) {
+                  console.log('📦 Repo is empty, initializing with main and staging branches...');
+                  // Create initial commit on main
+                  execSync('git checkout -b main', { stdio: 'inherit' });
+                  execSync('git commit --allow-empty -m "Initial commit"', { stdio: 'inherit' });
+                  execSync(`git push origin main`, { stdio: 'inherit' });
+                  
+                  // Create staging branch from main
+                  execSync(`git checkout -b ${targetBranch}`, { stdio: 'inherit' });
+                  execSync(`git push origin ${targetBranch}`, { stdio: 'inherit' });
+                  
+                  console.log(`✅ Created ${defaultBranch} and ${targetBranch} branches`);
+                } else {
+                  // Repo has content - ensure main branch exists
                   try {
-                    execSync('git commit --allow-empty -m "Initial commit"', { stdio: 'inherit' });
+                    execSync(`git checkout ${defaultBranch}`, { stdio: 'inherit' });
                   } catch (e) {
-                    // Already has commits
+                    // Main branch doesn't exist, create it from current branch or create new
+                    try {
+                      const currentBranch = execSync('git branch --show-current', { encoding: 'utf8' }).trim();
+                      if (currentBranch) {
+                        execSync(`git checkout -b ${defaultBranch}`, { stdio: 'inherit' });
+                      } else {
+                        execSync(`git checkout -b ${defaultBranch}`, { stdio: 'inherit' });
+                        execSync('git commit --allow-empty -m "Initial main branch"', { stdio: 'inherit' });
+                      }
+                    } catch (e) {
+                      execSync(`git checkout -b ${defaultBranch}`, { stdio: 'inherit' });
+                      execSync('git commit --allow-empty -m "Initial main branch"', { stdio: 'inherit' });
+                    }
+                  }
+                  
+                  // Ensure staging branch exists
+                  try {
+                    execSync(`git checkout ${targetBranch}`, { stdio: 'inherit' });
+                  } catch (e) {
+                    // Create staging branch from main
+                    execSync(`git checkout ${defaultBranch}`, { stdio: 'inherit' });
+                    execSync(`git checkout -b ${targetBranch}`, { stdio: 'inherit' });
+                  }
+                }
+                
+                // Add base repo as remote and fetch
+                try {
+                  execSync(`git remote add upstream https://${process.env.GH_TOKEN}@github.com/${owner}/${repo}.git`, { stdio: 'inherit' });
+                } catch (e) {
+                  execSync('git remote remove upstream', { stdio: 'inherit' });
+                  execSync(`git remote add upstream https://${process.env.GH_TOKEN}@github.com/${owner}/${repo}.git`, { stdio: 'inherit' });
+                }
+                
+                // Ensure main and staging branches are pushed to remote
+                if (isEmpty) {
+                  // Already pushed during initialization
+                  execSync(`git checkout ${defaultBranch}`, { stdio: 'inherit' });
+                } else {
+                  // Ensure branches are pushed
+                  execSync(`git checkout ${defaultBranch}`, { stdio: 'inherit' });
+                  try {
+                    execSync(`git push origin ${defaultBranch}`, { stdio: 'inherit' });
+                  } catch (e) {
+                    console.log('Main branch already exists remotely');
+                  }
+                  
+                  execSync(`git checkout ${targetBranch}`, { stdio: 'inherit' });
+                  try {
+                    execSync(`git push origin ${targetBranch}`, { stdio: 'inherit' });
+                  } catch (e) {
+                    console.log('Staging branch already exists remotely');
                   }
                 }
                 
@@ -97,7 +164,8 @@ jobs:
                 
                 execSync('git fetch upstream main', { stdio: 'inherit' });
                 
-                // Create or checkout syncing branch
+                // Create or checkout syncing branch from main
+                execSync(`git checkout ${defaultBranch}`, { stdio: 'inherit' });
                 try {
                   execSync(`git checkout -b ${syncBranch}`, { stdio: 'inherit' });
                 } catch (e) {
@@ -118,20 +186,6 @@ jobs:
                   console.error('Failed to push:', e.message);
                   throw e;
                 }
-                
-                // Ensure staging branch exists (for PR target)
-                try {
-                  execSync(`git checkout ${targetBranch}`, { stdio: 'inherit' });
-                  execSync(`git push origin ${targetBranch}`, { stdio: 'inherit' });
-                } catch (e) {
-                  // Create staging branch from main if it doesn't exist
-                  execSync(`git checkout ${defaultBranch}`, { stdio: 'inherit' });
-                  execSync(`git checkout -b ${targetBranch}`, { stdio: 'inherit' });
-                  execSync(`git push origin ${targetBranch}`, { stdio: 'inherit' });
-                }
-                
-                // Go back to syncing branch
-                execSync(`git checkout ${syncBranch}`, { stdio: 'inherit' });
                 
                 // Create PR from syncing branch to staging branch
                 try {
