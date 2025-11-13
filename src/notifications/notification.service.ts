@@ -218,4 +218,32 @@ export class NotificationService {
       },
     });
   }
+
+  async sendAccountCredentials(
+    data: NotificationData & {
+      userName: string;
+      email: string;
+      tempPassword: string;
+      isParent?: boolean;
+    },
+  ): Promise<void> {
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', {
+      infer: true,
+    });
+    const loginUrl = createUrl(frontendDomain, '/auth/login').toString();
+
+    await this.mailerService.sendMail({
+      to: data.to,
+      subject: `Your Account Credentials - ${this.getAppName()}`,
+      templatePath: this.getTemplatePath('account-credentials'),
+      context: {
+        app_name: this.getAppName(),
+        userName: data.userName,
+        email: data.email,
+        tempPassword: data.tempPassword,
+        loginUrl,
+        isParent: data.isParent || false,
+      },
+    });
+  }
 }

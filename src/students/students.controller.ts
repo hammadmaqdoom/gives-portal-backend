@@ -12,12 +12,20 @@ import {
   HttpStatus,
   Request,
   NotFoundException,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiResponse,
   ApiBearerAuth,
   ApiOperation,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
 import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
@@ -37,6 +45,7 @@ import {
   StudentResponseDto,
   StudentWithDetailsResponseDto,
 } from './dto/student-response.dto';
+import { BulkEnrollmentResultDto } from './dto/bulk-enrollment-response.dto';
 
 @ApiTags('Students')
 @Controller({
@@ -347,5 +356,49 @@ export class StudentsController {
   })
   async autoLinkStudents() {
     return this.studentsService.autoLinkStudentsToUsers();
+  }
+
+  @Post('bulk-enroll')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.admin)
+  @ApiOperation({
+    summary: 'Bulk enroll students from Excel/CSV file',
+    description:
+      'Upload an Excel or CSV file with student and parent details to bulk enroll students in classes',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Excel (.xlsx, .xls) or CSV file with student and parent data',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Bulk enrollment processed successfully',
+    type: BulkEnrollmentResultDto,
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  async bulkEnroll(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }), // 10MB
+          new FileTypeValidator({
+            fileType: /\.(xlsx|xls|csv)$/i,
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+  ): Promise<BulkEnrollmentResultDto> {
+    return this.studentsService.bulkEnrollFromFile(file);
   }
 }
