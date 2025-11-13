@@ -11,6 +11,15 @@ permissions:
 
 jobs:
   fanout:
+    # Only run on main repository, not on client repos
+    # Skip if this is a client repo (silveracademy-backend, etc.)
+    # Only run if this is the main LMS Portal repository
+    if: |
+      !contains(github.repository, 'silveracademy') &&
+      !contains(github.repository, 'client-') &&
+      (contains(github.repository, 'lms-portal') || 
+       github.repository == 'hammadmaqdoom/LMS Portal - Main' ||
+       github.repository == 'hammadmaqdoom/lms-portal-backend')
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.CLIENT_SYNC_TOKEN }}
