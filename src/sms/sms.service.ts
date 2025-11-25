@@ -46,12 +46,16 @@ export class SmsService {
   async sendSms(smsMessage: SmsMessage): Promise<SmsResponse> {
     try {
       const settings = await this.settingsService.getSettingsOrCreate();
-      
+
       if (!settings.smsEnabled) {
         throw new BadRequestException('SMS service is not enabled');
       }
 
-      if (!settings.smsProvider || !settings.smsApiEmail || !settings.smsApiKey) {
+      if (
+        !settings.smsProvider ||
+        !settings.smsApiEmail ||
+        !settings.smsApiKey
+      ) {
         throw new BadRequestException('SMS configuration is incomplete');
       }
 
@@ -68,7 +72,9 @@ export class SmsService {
       if (settings.smsProvider === 'branded_sms_pakistan') {
         response = await this.sendBrandedSmsPakistan(smsMessage, settings);
       } else {
-        throw new BadRequestException(`Unsupported SMS provider: ${settings.smsProvider}`);
+        throw new BadRequestException(
+          `Unsupported SMS provider: ${settings.smsProvider}`,
+        );
       }
 
       // Update SMS log with response
@@ -95,9 +101,10 @@ export class SmsService {
     settings: any,
   ): Promise<SmsResponse> {
     try {
-      const apiUrl = settings.smsApiUrl || 'https://secure.h3techs.com/sms/api/send';
+      const apiUrl =
+        settings.smsApiUrl || 'https://secure.h3techs.com/sms/api/send';
       const mask = smsMessage.mask || settings.smsMask || 'H3 TEST SMS';
-      
+
       const data = {
         email: settings.smsApiEmail,
         key: settings.smsApiKey,
@@ -127,13 +134,35 @@ export class SmsService {
       if (typeof responseText === 'string') {
         // Check if response contains error codes
         const errorCodes = [
-          '101', '201', '202', '203', '204', '205', '206', '207', '208', '209',
-          '210', '211', '212', '213', '214', '215', '216', '217', '218', '219',
-          '220', '221', '222', '223', '225'
+          '101',
+          '201',
+          '202',
+          '203',
+          '204',
+          '205',
+          '206',
+          '207',
+          '208',
+          '209',
+          '210',
+          '211',
+          '212',
+          '213',
+          '214',
+          '215',
+          '216',
+          '217',
+          '218',
+          '219',
+          '220',
+          '221',
+          '222',
+          '223',
+          '225',
         ];
 
-        const hasError = errorCodes.some(code => responseText.includes(code));
-        
+        const hasError = errorCodes.some((code) => responseText.includes(code));
+
         if (hasError) {
           return {
             success: false,
@@ -143,7 +172,10 @@ export class SmsService {
         }
 
         // Check for success (code 000)
-        if (responseText.includes('000') || responseText.includes('Message Queued Successfully')) {
+        if (
+          responseText.includes('000') ||
+          responseText.includes('Message Queued Successfully')
+        ) {
           // Extract message ID if present
           const messageIdMatch = responseText.match(/(\d+)/);
           return {
@@ -171,24 +203,26 @@ export class SmsService {
 
   async sendBulkSms(messages: SmsMessage[]): Promise<SmsResponse[]> {
     const results: SmsResponse[] = [];
-    
+
     for (const message of messages) {
       const result = await this.sendSms(message);
       results.push(result);
-      
+
       // Add delay between messages to avoid rate limiting
       if (messages.length > 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
-    
+
     return results;
   }
 
-  async checkSmsStatus(messageId: string): Promise<{ status: string; deliveredAt?: Date }> {
+  async checkSmsStatus(
+    messageId: string,
+  ): Promise<{ status: string; deliveredAt?: Date }> {
     try {
       const settings = await this.settingsService.getSettingsOrCreate();
-      
+
       if (settings.smsProvider === 'branded_sms_pakistan') {
         const apiUrl = 'https://secure.h3techs.com/sms/api/report';
         const params = {
@@ -198,19 +232,25 @@ export class SmsService {
         };
 
         const response = await axios.get(apiUrl, { params });
-        
+
         // Parse the response to determine status
         const responseText = response.data;
-        
-        if (responseText.includes('delivered') || responseText.includes('success')) {
+
+        if (
+          responseText.includes('delivered') ||
+          responseText.includes('success')
+        ) {
           return { status: 'delivered', deliveredAt: new Date() };
-        } else if (responseText.includes('pending') || responseText.includes('queued')) {
+        } else if (
+          responseText.includes('pending') ||
+          responseText.includes('queued')
+        ) {
           return { status: 'pending' };
         } else {
           return { status: 'failed' };
         }
       }
-      
+
       return { status: 'unknown' };
     } catch (error) {
       this.logger.error('Error checking SMS status:', error);
@@ -221,7 +261,7 @@ export class SmsService {
   async getSmsBalance(): Promise<{ balance: number; expiryDate?: string }> {
     try {
       const settings = await this.settingsService.getSettingsOrCreate();
-      
+
       if (settings.smsProvider === 'branded_sms_pakistan') {
         const apiUrl = 'https://secure.h3techs.com/sms/api/balance';
         const params = {
@@ -231,17 +271,17 @@ export class SmsService {
 
         const response = await axios.get(apiUrl, { params });
         const responseText = response.data;
-        
+
         // Parse balance response
         const balanceMatch = responseText.match(/balance[:\s]*(\d+)/i);
         const expiryMatch = responseText.match(/expir[:\s]*([^\s\n]+)/i);
-        
+
         return {
           balance: balanceMatch ? parseInt(balanceMatch[1]) : 0,
           expiryDate: expiryMatch ? expiryMatch[1] : undefined,
         };
       }
-      
+
       return { balance: 0 };
     } catch (error) {
       this.logger.error('Error getting SMS balance:', error);
@@ -269,7 +309,10 @@ export class SmsService {
     await this.smsLogRepository.update(id, updateData);
   }
 
-  async getSmsLogs(limit: number = 50, offset: number = 0): Promise<SmsLogEntity[]> {
+  async getSmsLogs(
+    limit: number = 50,
+    offset: number = 0,
+  ): Promise<SmsLogEntity[]> {
     return this.smsLogRepository.find({
       order: { createdAt: 'DESC' },
       take: limit,
@@ -292,7 +335,7 @@ export class SmsService {
     pending: number;
   }> {
     const logs = await this.smsLogRepository.find();
-    
+
     const stats = {
       total: logs.length,
       sent: 0,
@@ -301,7 +344,7 @@ export class SmsService {
       pending: 0,
     };
 
-    logs.forEach(log => {
+    logs.forEach((log) => {
       switch (log.status) {
         case 'sent':
           stats.sent++;

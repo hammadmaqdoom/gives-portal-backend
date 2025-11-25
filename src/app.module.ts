@@ -31,6 +31,7 @@ import { AnnotationsModule } from './annotations/annotations.module';
 import { SmsModule } from './sms/sms.module';
 import { FeeReminderModule } from './fee-reminders/fee-reminder.module';
 import { InvoiceGenerationModule } from './invoice-generation/invoice-generation.module';
+import { SentryModule } from './sentry/sentry.module';
 import { PublicController } from './public/public.controller';
 import { AppDataSource } from './database/data-source';
 import authConfig from './auth/config/auth.config';
@@ -40,12 +41,20 @@ import databaseConfig from './database/config/database.config';
 import appConfig from './config/app.config';
 import mailConfig from './mail/config/mail.config';
 import fileConfig from './files/config/file.config';
+import sentryConfig from './config/sentry.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig, authConfig, appConfig, mailConfig, fileConfig],
+      load: [
+        databaseConfig,
+        authConfig,
+        appConfig,
+        mailConfig,
+        fileConfig,
+        sentryConfig,
+      ],
       envFilePath: '.env',
     }),
     TypeOrmModule.forRootAsync({
@@ -55,6 +64,7 @@ import fileConfig from './files/config/file.config';
       },
     }),
     ScheduleModule.forRoot(),
+    SentryModule,
     AuthModule,
     UsersModule,
     FilesModule,
@@ -81,9 +91,9 @@ import fileConfig from './files/config/file.config';
     ZoomModule,
     PaymentsModule,
     AnnotationsModule,
-      SmsModule,
-      FeeReminderModule,
-      InvoiceGenerationModule,
+    SmsModule,
+    FeeReminderModule,
+    InvoiceGenerationModule,
   ],
   controllers: [PublicController],
 })

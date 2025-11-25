@@ -29,9 +29,7 @@ export class NotificationService {
   }
 
   private getAppName(): string {
-    return (
-      this.configService.get('app.name', { infer: true }) || 'LMS Portal'
-    );
+    return this.configService.get('app.name', { infer: true }) || 'LMS Portal';
   }
 
   private getFrontendUrl(): string {

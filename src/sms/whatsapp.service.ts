@@ -30,15 +30,21 @@ export class WhatsAppService {
     private readonly smsLogRepository: Repository<SmsLogEntity>,
   ) {}
 
-  async sendWhatsAppMessage(message: WhatsAppMessage): Promise<WhatsAppResponse> {
+  async sendWhatsAppMessage(
+    message: WhatsAppMessage,
+  ): Promise<WhatsAppResponse> {
     try {
       const settings = await this.settingsService.getSettingsOrCreate();
-      
+
       if (!settings.whatsappEnabled) {
         throw new BadRequestException('WhatsApp service is not enabled');
       }
 
-      if (!settings.whatsappDeviceId || !settings.smsApiEmail || !settings.smsApiKey) {
+      if (
+        !settings.whatsappDeviceId ||
+        !settings.smsApiEmail ||
+        !settings.smsApiKey
+      ) {
         throw new BadRequestException('WhatsApp configuration is incomplete');
       }
 
@@ -52,7 +58,10 @@ export class WhatsAppService {
 
       const whatsappLog = await this.createWhatsAppLog(logData);
 
-      const response = await this.sendBrandedWhatsAppPakistan(message, settings);
+      const response = await this.sendBrandedWhatsAppPakistan(
+        message,
+        settings,
+      );
 
       // Update log with response
       await this.updateWhatsAppLog(whatsappLog.id!, {
@@ -78,8 +87,10 @@ export class WhatsAppService {
     settings: any,
   ): Promise<WhatsAppResponse> {
     try {
-      const apiUrl = settings.whatsappApiUrl || 'https://secure.h3techs.com/sms/api/send_whatsapp';
-      
+      const apiUrl =
+        settings.whatsappApiUrl ||
+        'https://secure.h3techs.com/sms/api/send_whatsapp';
+
       const data = {
         email: settings.smsApiEmail,
         key: settings.smsApiKey,
@@ -115,13 +126,35 @@ export class WhatsAppService {
       // Parse response similar to SMS
       if (typeof responseText === 'string') {
         const errorCodes = [
-          '101', '201', '202', '203', '204', '205', '206', '207', '208', '209',
-          '210', '211', '212', '213', '214', '215', '216', '217', '218', '219',
-          '220', '221', '222', '223', '225'
+          '101',
+          '201',
+          '202',
+          '203',
+          '204',
+          '205',
+          '206',
+          '207',
+          '208',
+          '209',
+          '210',
+          '211',
+          '212',
+          '213',
+          '214',
+          '215',
+          '216',
+          '217',
+          '218',
+          '219',
+          '220',
+          '221',
+          '222',
+          '223',
+          '225',
         ];
 
-        const hasError = errorCodes.some(code => responseText.includes(code));
-        
+        const hasError = errorCodes.some((code) => responseText.includes(code));
+
         if (hasError) {
           return {
             success: false,
@@ -130,7 +163,10 @@ export class WhatsAppService {
           };
         }
 
-        if (responseText.includes('000') || responseText.includes('Message Queued Successfully')) {
+        if (
+          responseText.includes('000') ||
+          responseText.includes('Message Queued Successfully')
+        ) {
           const messageIdMatch = responseText.match(/(\d+)/);
           return {
             success: true,
@@ -154,19 +190,21 @@ export class WhatsAppService {
     }
   }
 
-  async sendBulkWhatsAppMessages(messages: WhatsAppMessage[]): Promise<WhatsAppResponse[]> {
+  async sendBulkWhatsAppMessages(
+    messages: WhatsAppMessage[],
+  ): Promise<WhatsAppResponse[]> {
     const results: WhatsAppResponse[] = [];
-    
+
     for (const message of messages) {
       const result = await this.sendWhatsAppMessage(message);
       results.push(result);
-      
+
       // Add delay between messages to avoid rate limiting
       if (messages.length > 1) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
     }
-    
+
     return results;
   }
 
@@ -190,7 +228,10 @@ export class WhatsAppService {
     await this.smsLogRepository.update(id, updateData);
   }
 
-  async getWhatsAppLogs(limit: number = 50, offset: number = 0): Promise<SmsLogEntity[]> {
+  async getWhatsAppLogs(
+    limit: number = 50,
+    offset: number = 0,
+  ): Promise<SmsLogEntity[]> {
     return this.smsLogRepository.find({
       where: { provider: 'whatsapp_branded_sms_pakistan' },
       order: { createdAt: 'DESC' },
@@ -209,7 +250,7 @@ export class WhatsAppService {
     const logs = await this.smsLogRepository.find({
       where: { provider: 'whatsapp_branded_sms_pakistan' },
     });
-    
+
     const stats = {
       total: logs.length,
       sent: 0,
@@ -218,7 +259,7 @@ export class WhatsAppService {
       pending: 0,
     };
 
-    logs.forEach(log => {
+    logs.forEach((log) => {
       switch (log.status) {
         case 'sent':
           stats.sent++;

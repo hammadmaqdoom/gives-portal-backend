@@ -50,7 +50,7 @@ export class InvoiceGenerationService {
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async checkAndGenerateInvoices() {
     this.logger.log('Starting daily invoice generation check...');
-    
+
     try {
       // Get all active enrollments
       const activeEnrollments = await this.getActiveEnrollments();
@@ -72,10 +72,12 @@ export class InvoiceGenerationService {
     return [];
   }
 
-  private async processEnrollmentForInvoiceGeneration(enrollment: any): Promise<void> {
+  private async processEnrollmentForInvoiceGeneration(
+    enrollment: any,
+  ): Promise<void> {
     try {
       const { studentId, classId, enrollmentDate, status } = enrollment;
-      
+
       if (status !== 'active') {
         return;
       }
@@ -89,21 +91,23 @@ export class InvoiceGenerationService {
 
       // Determine fee cycle (default to monthly)
       const feeCycle = this.determineFeeCycle(classDetails);
-      
+
       // Check if invoice should be generated based on enrollment date and fee cycle
       const shouldGenerate = await this.shouldGenerateInvoice(
         studentId,
         classId,
         enrollmentDate,
-        feeCycle
+        feeCycle,
       );
 
       if (shouldGenerate) {
         await this.generateInvoiceForEnrollment(studentId, classId, feeCycle);
       }
-
     } catch (error) {
-      this.logger.error(`Error processing enrollment for invoice generation:`, error);
+      this.logger.error(
+        `Error processing enrollment for invoice generation:`,
+        error,
+      );
     }
   }
 
@@ -121,15 +125,16 @@ export class InvoiceGenerationService {
     studentId: number,
     classId: number,
     enrollmentDate: Date,
-    feeCycle: FeeCycle
+    feeCycle: FeeCycle,
   ): Promise<boolean> {
     try {
       // Get existing invoices for this student and class
-      const existingInvoices = await this.invoicesService.findByStudent(studentId);
-      
+      const existingInvoices =
+        await this.invoicesService.findByStudent(studentId);
+
       // Filter invoices for this specific class (if class-specific invoices are supported)
-      const classInvoices = existingInvoices.filter(invoice => 
-        invoice.description?.includes(`Class ${classId}`) || true // For now, include all invoices
+      const classInvoices = existingInvoices.filter(
+        (invoice) => invoice.description?.includes(`Class ${classId}`) || true, // For now, include all invoices
       );
 
       const now = new Date();
@@ -137,16 +142,34 @@ export class InvoiceGenerationService {
 
       switch (feeCycle.type) {
         case 'monthly':
-          return this.shouldGenerateMonthlyInvoice(enrollment, now, classInvoices, feeCycle.dayOfMonth);
+          return this.shouldGenerateMonthlyInvoice(
+            enrollment,
+            now,
+            classInvoices,
+            feeCycle.dayOfMonth,
+          );
         case 'quarterly':
-          return this.shouldGenerateQuarterlyInvoice(enrollment, now, classInvoices, feeCycle.dayOfQuarter);
+          return this.shouldGenerateQuarterlyInvoice(
+            enrollment,
+            now,
+            classInvoices,
+            feeCycle.dayOfQuarter,
+          );
         case 'yearly':
-          return this.shouldGenerateYearlyInvoice(enrollment, now, classInvoices, feeCycle.dayOfYear);
+          return this.shouldGenerateYearlyInvoice(
+            enrollment,
+            now,
+            classInvoices,
+            feeCycle.dayOfYear,
+          );
         default:
           return false;
       }
     } catch (error) {
-      this.logger.error(`Error checking if invoice should be generated:`, error);
+      this.logger.error(
+        `Error checking if invoice should be generated:`,
+        error,
+      );
       return false;
     }
   }
@@ -155,7 +178,7 @@ export class InvoiceGenerationService {
     enrollmentDate: Date,
     currentDate: Date,
     existingInvoices: any[],
-    dayOfMonth: number = 1
+    dayOfMonth: number = 1,
   ): boolean {
     // Check if we're past the enrollment date
     if (currentDate < enrollmentDate) {
@@ -170,11 +193,13 @@ export class InvoiceGenerationService {
     // Check if invoice already exists for this month
     const currentMonth = currentDate.getMonth();
     const currentYear = currentDate.getFullYear();
-    
-    const hasInvoiceForThisMonth = existingInvoices.some(invoice => {
+
+    const hasInvoiceForThisMonth = existingInvoices.some((invoice) => {
       const invoiceDate = new Date(invoice.generatedDate);
-      return invoiceDate.getMonth() === currentMonth && 
-             invoiceDate.getFullYear() === currentYear;
+      return (
+        invoiceDate.getMonth() === currentMonth &&
+        invoiceDate.getFullYear() === currentYear
+      );
     });
 
     return !hasInvoiceForThisMonth;
@@ -184,7 +209,7 @@ export class InvoiceGenerationService {
     enrollmentDate: Date,
     currentDate: Date,
     existingInvoices: any[],
-    dayOfQuarter: number = 1
+    dayOfQuarter: number = 1,
   ): boolean {
     // Check if we're past the enrollment date
     if (currentDate < enrollmentDate) {
@@ -193,8 +218,12 @@ export class InvoiceGenerationService {
 
     // Check if it's the right day of the quarter
     const quarterStartMonth = Math.floor(currentDate.getMonth() / 3) * 3;
-    const quarterStartDate = new Date(currentDate.getFullYear(), quarterStartMonth, dayOfQuarter);
-    
+    const quarterStartDate = new Date(
+      currentDate.getFullYear(),
+      quarterStartMonth,
+      dayOfQuarter,
+    );
+
     if (currentDate.getTime() !== quarterStartDate.getTime()) {
       return false;
     }
@@ -202,12 +231,14 @@ export class InvoiceGenerationService {
     // Check if invoice already exists for this quarter
     const currentQuarter = Math.floor(currentDate.getMonth() / 3);
     const currentYear = currentDate.getFullYear();
-    
-    const hasInvoiceForThisQuarter = existingInvoices.some(invoice => {
+
+    const hasInvoiceForThisQuarter = existingInvoices.some((invoice) => {
       const invoiceDate = new Date(invoice.generatedDate);
       const invoiceQuarter = Math.floor(invoiceDate.getMonth() / 3);
-      return invoiceQuarter === currentQuarter && 
-             invoiceDate.getFullYear() === currentYear;
+      return (
+        invoiceQuarter === currentQuarter &&
+        invoiceDate.getFullYear() === currentYear
+      );
     });
 
     return !hasInvoiceForThisQuarter;
@@ -217,7 +248,7 @@ export class InvoiceGenerationService {
     enrollmentDate: Date,
     currentDate: Date,
     existingInvoices: any[],
-    dayOfYear: number = 1
+    dayOfYear: number = 1,
   ): boolean {
     // Check if we're past the enrollment date
     if (currentDate < enrollmentDate) {
@@ -226,15 +257,15 @@ export class InvoiceGenerationService {
 
     // Check if it's the right day of the year
     const yearStartDate = new Date(currentDate.getFullYear(), 0, dayOfYear);
-    
+
     if (currentDate.getTime() !== yearStartDate.getTime()) {
       return false;
     }
 
     // Check if invoice already exists for this year
     const currentYear = currentDate.getFullYear();
-    
-    const hasInvoiceForThisYear = existingInvoices.some(invoice => {
+
+    const hasInvoiceForThisYear = existingInvoices.some((invoice) => {
       const invoiceDate = new Date(invoice.generatedDate);
       return invoiceDate.getFullYear() === currentYear;
     });
@@ -245,7 +276,7 @@ export class InvoiceGenerationService {
   private async generateInvoiceForEnrollment(
     studentId: number,
     classId: number,
-    feeCycle: FeeCycle
+    feeCycle: FeeCycle,
   ): Promise<any> {
     try {
       // Get student details
@@ -271,7 +302,8 @@ export class InvoiceGenerationService {
       const currency = student.country === 'Pakistan' ? 'PKR' : 'USD';
 
       // Get the appropriate fee based on currency
-      const classFee = currency === 'PKR' ? classDetails.feePKR : classDetails.feeUSD;
+      const classFee =
+        currency === 'PKR' ? classDetails.feePKR : classDetails.feeUSD;
 
       // Calculate period dates
       const { periodStart, periodEnd } = this.calculatePeriodDates(feeCycle);
@@ -285,14 +317,21 @@ export class InvoiceGenerationService {
         currency,
         status: InvoiceStatus.DRAFT,
         dueDate: this.calculateDueDate(periodStart).toISOString(),
-        description: this.generateInvoiceDescription(classDetails, feeCycle, periodStart, periodEnd),
+        description: this.generateInvoiceDescription(
+          classDetails,
+          feeCycle,
+          periodStart,
+          periodEnd,
+        ),
         notes: `Auto-generated invoice for ${feeCycle.type} fee cycle`,
-        items: [{
-          description: `${classDetails.name} - ${feeCycle.type} fee`,
-          quantity: 1,
-          unitPrice: classFee,
-          total: classFee,
-        }],
+        items: [
+          {
+            description: `${classDetails.name} - ${feeCycle.type} fee`,
+            quantity: 1,
+            unitPrice: classFee,
+            total: classFee,
+          },
+        ],
       });
 
       // Log successful generation
@@ -308,13 +347,17 @@ export class InvoiceGenerationService {
         periodEnd,
       });
 
-      this.logger.log(`Invoice ${invoice.invoiceNumber} generated for student ${studentId}, class ${classId}`);
+      this.logger.log(
+        `Invoice ${invoice.invoiceNumber} generated for student ${studentId}, class ${classId}`,
+      );
 
       return invoice;
-
     } catch (error) {
-      this.logger.error(`Error generating invoice for student ${studentId}, class ${classId}:`, error);
-      
+      this.logger.error(
+        `Error generating invoice for student ${studentId}, class ${classId}:`,
+        error,
+      );
+
       // Log failed generation
       await this.createGenerationLog({
         studentId,
@@ -330,26 +373,29 @@ export class InvoiceGenerationService {
     }
   }
 
-  private calculatePeriodDates(feeCycle: FeeCycle): { periodStart: Date; periodEnd: Date } {
+  private calculatePeriodDates(feeCycle: FeeCycle): {
+    periodStart: Date;
+    periodEnd: Date;
+  } {
     const now = new Date();
-    
+
     switch (feeCycle.type) {
       case 'monthly':
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         return { periodStart: monthStart, periodEnd: monthEnd };
-        
+
       case 'quarterly':
         const quarter = Math.floor(now.getMonth() / 3);
         const quarterStart = new Date(now.getFullYear(), quarter * 3, 1);
         const quarterEnd = new Date(now.getFullYear(), (quarter + 1) * 3, 0);
         return { periodStart: quarterStart, periodEnd: quarterEnd };
-        
+
       case 'yearly':
         const yearStart = new Date(now.getFullYear(), 0, 1);
         const yearEnd = new Date(now.getFullYear(), 11, 31);
         return { periodStart: yearStart, periodEnd: yearEnd };
-        
+
       default:
         return { periodStart: now, periodEnd: now };
     }
@@ -366,7 +412,7 @@ export class InvoiceGenerationService {
     classDetails: any,
     feeCycle: FeeCycle,
     periodStart: Date,
-    periodEnd: Date
+    periodEnd: Date,
   ): string {
     const periodStr = this.formatPeriodString(periodStart, periodEnd);
     return `${classDetails.name} - ${feeCycle.type} fee for ${periodStr}`;
@@ -378,7 +424,9 @@ export class InvoiceGenerationService {
     return `${startStr} to ${endStr}`;
   }
 
-  async createGenerationLog(logData: Partial<InvoiceGenerationLog>): Promise<InvoiceGenerationLogEntity> {
+  async createGenerationLog(
+    logData: Partial<InvoiceGenerationLog>,
+  ): Promise<InvoiceGenerationLogEntity> {
     const generationLog = this.invoiceGenerationLogRepository.create({
       studentId: logData.studentId,
       classId: logData.classId,
@@ -395,7 +443,10 @@ export class InvoiceGenerationService {
     return this.invoiceGenerationLogRepository.save(generationLog);
   }
 
-  async getGenerationLogs(limit: number = 50, offset: number = 0): Promise<InvoiceGenerationLogEntity[]> {
+  async getGenerationLogs(
+    limit: number = 50,
+    offset: number = 0,
+  ): Promise<InvoiceGenerationLogEntity[]> {
     return this.invoiceGenerationLogRepository.find({
       order: { createdAt: 'DESC' },
       take: limit,
@@ -403,7 +454,9 @@ export class InvoiceGenerationService {
     });
   }
 
-  async getGenerationLogsByStudent(studentId: number): Promise<InvoiceGenerationLogEntity[]> {
+  async getGenerationLogsByStudent(
+    studentId: number,
+  ): Promise<InvoiceGenerationLogEntity[]> {
     return this.invoiceGenerationLogRepository.find({
       where: { studentId },
       order: { createdAt: 'DESC' },
@@ -420,7 +473,7 @@ export class InvoiceGenerationService {
     yearly: number;
   }> {
     const logs = await this.invoiceGenerationLogRepository.find();
-    
+
     const stats = {
       total: logs.length,
       success: 0,
@@ -431,7 +484,7 @@ export class InvoiceGenerationService {
       yearly: 0,
     };
 
-    logs.forEach(log => {
+    logs.forEach((log) => {
       switch (log.status) {
         case 'success':
           stats.success++;
@@ -464,19 +517,23 @@ export class InvoiceGenerationService {
   async generateManualInvoice(
     studentId: number,
     classId: number,
-    feeCycle: FeeCycle
+    feeCycle: FeeCycle,
   ): Promise<any> {
     await this.generateInvoiceForEnrollment(studentId, classId, feeCycle);
     return { message: 'Manual invoice generation initiated' };
   }
 
   // Generate monthly invoices for all active enrollments
-  async generateMonthlyInvoices(): Promise<{ success: boolean; message: string; generated: number }> {
+  async generateMonthlyInvoices(): Promise<{
+    success: boolean;
+    message: string;
+    generated: number;
+  }> {
     const feeCycle: FeeCycle = {
       type: 'monthly',
       startDate: new Date(),
     };
-    
+
     const result = await this.generateInvoicesForAllEnrollments(feeCycle);
     return {
       success: true,
@@ -486,12 +543,16 @@ export class InvoiceGenerationService {
   }
 
   // Generate quarterly invoices for all active enrollments
-  async generateQuarterlyInvoices(): Promise<{ success: boolean; message: string; generated: number }> {
+  async generateQuarterlyInvoices(): Promise<{
+    success: boolean;
+    message: string;
+    generated: number;
+  }> {
     const feeCycle: FeeCycle = {
       type: 'quarterly',
       startDate: new Date(),
     };
-    
+
     const result = await this.generateInvoicesForAllEnrollments(feeCycle);
     return {
       success: true,
@@ -501,12 +562,16 @@ export class InvoiceGenerationService {
   }
 
   // Generate yearly invoices for all active enrollments
-  async generateYearlyInvoices(): Promise<{ success: boolean; message: string; generated: number }> {
+  async generateYearlyInvoices(): Promise<{
+    success: boolean;
+    message: string;
+    generated: number;
+  }> {
     const feeCycle: FeeCycle = {
       type: 'yearly',
       startDate: new Date(),
     };
-    
+
     const result = await this.generateInvoicesForAllEnrollments(feeCycle);
     return {
       success: true,
@@ -516,14 +581,18 @@ export class InvoiceGenerationService {
   }
 
   // Generate invoice for specific student
-  async generateInvoiceForStudent(studentId: number): Promise<{ success: boolean; message: string; invoiceId?: number }> {
+  async generateInvoiceForStudent(
+    studentId: number,
+  ): Promise<{ success: boolean; message: string; invoiceId?: number }> {
     try {
       // Get enrollments for the student through the students service
       const enrollments = await this.studentsService.getEnrollments(studentId);
-      
+
       // Filter only active enrollments
-      const activeEnrollments = enrollments.filter(enrollment => enrollment.status === 'active');
-      
+      const activeEnrollments = enrollments.filter(
+        (enrollment) => enrollment.status === 'active',
+      );
+
       if (activeEnrollments.length === 0) {
         return {
           success: false,
@@ -540,7 +609,11 @@ export class InvoiceGenerationService {
           startDate: enrollment.enrollmentDate,
         };
 
-        const result = await this.generateInvoiceForEnrollment(studentId, enrollment.classId, feeCycle);
+        const result = await this.generateInvoiceForEnrollment(
+          studentId,
+          enrollment.classId,
+          feeCycle,
+        );
         if (result) {
           generatedCount++;
           lastInvoiceId = result.id;
@@ -562,7 +635,9 @@ export class InvoiceGenerationService {
   }
 
   // Generate invoices for all active enrollments
-  private async generateInvoicesForAllEnrollments(feeCycle: FeeCycle): Promise<{ generated: number }> {
+  private async generateInvoicesForAllEnrollments(
+    feeCycle: FeeCycle,
+  ): Promise<{ generated: number }> {
     // Get all students through pagination
     const students = await this.studentsService.findManyWithPagination({
       filterOptions: null,
@@ -570,22 +645,31 @@ export class InvoiceGenerationService {
       paginationOptions: { page: 1, limit: 1000 }, // Get a large number of students
       includeRelations: true,
     });
-    
+
     let generated = 0;
 
     for (const student of students) {
       try {
         // Get enrollments for this student
-        const enrollments = await this.studentsService.getEnrollments(student.id);
-        
+        const enrollments = await this.studentsService.getEnrollments(
+          student.id,
+        );
+
         for (const enrollment of enrollments) {
           if (enrollment.status === 'active') {
-            await this.generateInvoiceForEnrollment(student.id, enrollment.classId, feeCycle);
+            await this.generateInvoiceForEnrollment(
+              student.id,
+              enrollment.classId,
+              feeCycle,
+            );
             generated++;
           }
         }
       } catch (error) {
-        this.logger.error(`Failed to generate invoice for student ${student.id}:`, error);
+        this.logger.error(
+          `Failed to generate invoice for student ${student.id}:`,
+          error,
+        );
       }
     }
 

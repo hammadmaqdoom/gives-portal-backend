@@ -74,8 +74,16 @@ export class InvoiceGenerationController {
 
   @Get('logs')
   @Roles(RoleEnum.admin, RoleEnum.user)
-  @ApiQuery({ name: 'limit', required: false, description: 'Number of logs to retrieve' })
-  @ApiQuery({ name: 'offset', required: false, description: 'Number of logs to skip' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of logs to retrieve',
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    description: 'Number of logs to skip',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Invoice generation logs retrieved successfully',
@@ -84,7 +92,10 @@ export class InvoiceGenerationController {
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
   ) {
-    return this.invoiceGenerationService.getGenerationLogs(limit || 50, offset || 0);
+    return this.invoiceGenerationService.getGenerationLogs(
+      limit || 50,
+      offset || 0,
+    );
   }
 
   @Get('stats')

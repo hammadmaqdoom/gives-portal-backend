@@ -46,7 +46,7 @@ export class FeeReminderService {
   @Cron(CronExpression.EVERY_DAY_AT_9AM)
   async checkAndSendFeeReminders() {
     this.logger.log('Starting daily fee reminder check...');
-    
+
     try {
       const overdueInvoices = await this.invoicesService.findOverdue();
       this.logger.log(`Found ${overdueInvoices.length} overdue invoices`);
@@ -65,14 +65,16 @@ export class FeeReminderService {
   @Cron('0 10 * * 1')
   async sendUpcomingDueDateReminders() {
     this.logger.log('Starting weekly upcoming due date reminder check...');
-    
+
     try {
       const upcomingDueDate = new Date();
       upcomingDueDate.setDate(upcomingDueDate.getDate() + 7); // 7 days from now
 
       // Get invoices due in the next 7 days
       const upcomingInvoices = await this.getInvoicesDueInDays(7);
-      this.logger.log(`Found ${upcomingInvoices.length} invoices due in 7 days`);
+      this.logger.log(
+        `Found ${upcomingInvoices.length} invoices due in 7 days`,
+      );
 
       for (const invoice of upcomingInvoices) {
         await this.sendUpcomingDueDateReminder(invoice.id);
@@ -80,7 +82,10 @@ export class FeeReminderService {
 
       this.logger.log('Upcoming due date reminder check completed');
     } catch (error) {
-      this.logger.error('Error during upcoming due date reminder check:', error);
+      this.logger.error(
+        'Error during upcoming due date reminder check:',
+        error,
+      );
     }
   }
 
@@ -94,7 +99,9 @@ export class FeeReminderService {
 
       const student = await this.studentsService.findById(invoice.studentId);
       if (!student) {
-        this.logger.warn(`Student ${invoice.studentId} not found for invoice ${invoiceId}`);
+        this.logger.warn(
+          `Student ${invoice.studentId} not found for invoice ${invoiceId}`,
+        );
         return;
       }
 
@@ -105,7 +112,9 @@ export class FeeReminderService {
       }
 
       if (!parent) {
-        const parents = await this.parentsService.findByStudentId(invoice.studentId);
+        const parents = await this.parentsService.findByStudentId(
+          invoice.studentId,
+        );
         parent = parents && parents.length > 0 ? parents[0] : null;
       }
 
@@ -128,9 +137,11 @@ export class FeeReminderService {
       if (parent.mobile) {
         await this.sendWhatsAppReminder(invoice, student, parent);
       }
-
     } catch (error) {
-      this.logger.error(`Error sending fee reminder for invoice ${invoiceId}:`, error);
+      this.logger.error(
+        `Error sending fee reminder for invoice ${invoiceId}:`,
+        error,
+      );
     }
   }
 
@@ -144,7 +155,9 @@ export class FeeReminderService {
 
       const student = await this.studentsService.findById(invoice.studentId);
       if (!student) {
-        this.logger.warn(`Student ${invoice.studentId} not found for invoice ${invoiceId}`);
+        this.logger.warn(
+          `Student ${invoice.studentId} not found for invoice ${invoiceId}`,
+        );
         return;
       }
 
@@ -155,7 +168,9 @@ export class FeeReminderService {
       }
 
       if (!parent) {
-        const parents = await this.parentsService.findByStudentId(invoice.studentId);
+        const parents = await this.parentsService.findByStudentId(
+          invoice.studentId,
+        );
         parent = parents && parents.length > 0 ? parents[0] : null;
       }
 
@@ -176,18 +191,32 @@ export class FeeReminderService {
 
       // Send WhatsApp reminder
       if (parent.mobile) {
-        await this.sendUpcomingDueDateWhatsAppReminder(invoice, student, parent);
+        await this.sendUpcomingDueDateWhatsAppReminder(
+          invoice,
+          student,
+          parent,
+        );
       }
-
     } catch (error) {
-      this.logger.error(`Error sending upcoming due date reminder for invoice ${invoiceId}:`, error);
+      this.logger.error(
+        `Error sending upcoming due date reminder for invoice ${invoiceId}:`,
+        error,
+      );
     }
   }
 
-  private async sendEmailReminder(invoice: any, student: any, parent: any): Promise<void> {
+  private async sendEmailReminder(
+    invoice: any,
+    student: any,
+    parent: any,
+  ): Promise<void> {
     try {
-      const reminderMessage = this.generateOverdueFeeReminderMessage(invoice, student, parent);
-      
+      const reminderMessage = this.generateOverdueFeeReminderMessage(
+        invoice,
+        student,
+        parent,
+      );
+
       await this.mailService.sendInvoiceEmail({
         to: parent.email,
         parentName: parent.fullName,
@@ -210,27 +239,44 @@ export class FeeReminderService {
         sentAt: new Date(),
       });
 
-      this.logger.log(`Email reminder sent for invoice ${invoice.invoiceNumber} to ${parent.email}`);
+      this.logger.log(
+        `Email reminder sent for invoice ${invoice.invoiceNumber} to ${parent.email}`,
+      );
     } catch (error) {
-      this.logger.error(`Error sending email reminder for invoice ${invoice.invoiceNumber}:`, error);
-      
+      this.logger.error(
+        `Error sending email reminder for invoice ${invoice.invoiceNumber}:`,
+        error,
+      );
+
       await this.createReminderLog({
         studentId: student.id,
         parentId: parent.id,
         invoiceId: invoice.id,
         reminderType: 'email',
         status: 'failed',
-        message: this.generateOverdueFeeReminderMessage(invoice, student, parent),
+        message: this.generateOverdueFeeReminderMessage(
+          invoice,
+          student,
+          parent,
+        ),
         recipient: parent.email,
         errorMessage: error.message,
       });
     }
   }
 
-  private async sendSmsReminder(invoice: any, student: any, parent: any): Promise<void> {
+  private async sendSmsReminder(
+    invoice: any,
+    student: any,
+    parent: any,
+  ): Promise<void> {
     try {
-      const reminderMessage = this.generateOverdueFeeSmsMessage(invoice, student, parent);
-      
+      const reminderMessage = this.generateOverdueFeeSmsMessage(
+        invoice,
+        student,
+        parent,
+      );
+
       const smsResponse = await this.smsService.sendSms({
         to: parent.mobile,
         message: reminderMessage,
@@ -248,10 +294,15 @@ export class FeeReminderService {
         errorMessage: smsResponse.error,
       });
 
-      this.logger.log(`SMS reminder ${smsResponse.success ? 'sent' : 'failed'} for invoice ${invoice.invoiceNumber} to ${parent.mobile}`);
+      this.logger.log(
+        `SMS reminder ${smsResponse.success ? 'sent' : 'failed'} for invoice ${invoice.invoiceNumber} to ${parent.mobile}`,
+      );
     } catch (error) {
-      this.logger.error(`Error sending SMS reminder for invoice ${invoice.invoiceNumber}:`, error);
-      
+      this.logger.error(
+        `Error sending SMS reminder for invoice ${invoice.invoiceNumber}:`,
+        error,
+      );
+
       await this.createReminderLog({
         studentId: student.id,
         parentId: parent.id,
@@ -265,10 +316,18 @@ export class FeeReminderService {
     }
   }
 
-  private async sendWhatsAppReminder(invoice: any, student: any, parent: any): Promise<void> {
+  private async sendWhatsAppReminder(
+    invoice: any,
+    student: any,
+    parent: any,
+  ): Promise<void> {
     try {
-      const reminderMessage = this.generateOverdueFeeWhatsAppMessage(invoice, student, parent);
-      
+      const reminderMessage = this.generateOverdueFeeWhatsAppMessage(
+        invoice,
+        student,
+        parent,
+      );
+
       const whatsappResponse = await this.whatsappService.sendWhatsAppMessage({
         to: parent.mobile,
         message: reminderMessage,
@@ -287,27 +346,44 @@ export class FeeReminderService {
         errorMessage: whatsappResponse.error,
       });
 
-      this.logger.log(`WhatsApp reminder ${whatsappResponse.success ? 'sent' : 'failed'} for invoice ${invoice.invoiceNumber} to ${parent.mobile}`);
+      this.logger.log(
+        `WhatsApp reminder ${whatsappResponse.success ? 'sent' : 'failed'} for invoice ${invoice.invoiceNumber} to ${parent.mobile}`,
+      );
     } catch (error) {
-      this.logger.error(`Error sending WhatsApp reminder for invoice ${invoice.invoiceNumber}:`, error);
-      
+      this.logger.error(
+        `Error sending WhatsApp reminder for invoice ${invoice.invoiceNumber}:`,
+        error,
+      );
+
       await this.createReminderLog({
         studentId: student.id,
         parentId: parent.id,
         invoiceId: invoice.id,
         reminderType: 'whatsapp',
         status: 'failed',
-        message: this.generateOverdueFeeWhatsAppMessage(invoice, student, parent),
+        message: this.generateOverdueFeeWhatsAppMessage(
+          invoice,
+          student,
+          parent,
+        ),
         recipient: parent.mobile,
         errorMessage: error.message,
       });
     }
   }
 
-  private async sendUpcomingDueDateEmailReminder(invoice: any, student: any, parent: any): Promise<void> {
+  private async sendUpcomingDueDateEmailReminder(
+    invoice: any,
+    student: any,
+    parent: any,
+  ): Promise<void> {
     try {
-      const reminderMessage = this.generateUpcomingDueDateReminderMessage(invoice, student, parent);
-      
+      const reminderMessage = this.generateUpcomingDueDateReminderMessage(
+        invoice,
+        student,
+        parent,
+      );
+
       await this.mailService.sendInvoiceEmail({
         to: parent.email,
         parentName: parent.fullName,
@@ -330,27 +406,44 @@ export class FeeReminderService {
         sentAt: new Date(),
       });
 
-      this.logger.log(`Upcoming due date email reminder sent for invoice ${invoice.invoiceNumber} to ${parent.email}`);
+      this.logger.log(
+        `Upcoming due date email reminder sent for invoice ${invoice.invoiceNumber} to ${parent.email}`,
+      );
     } catch (error) {
-      this.logger.error(`Error sending upcoming due date email reminder for invoice ${invoice.invoiceNumber}:`, error);
-      
+      this.logger.error(
+        `Error sending upcoming due date email reminder for invoice ${invoice.invoiceNumber}:`,
+        error,
+      );
+
       await this.createReminderLog({
         studentId: student.id,
         parentId: parent.id,
         invoiceId: invoice.id,
         reminderType: 'email',
         status: 'failed',
-        message: this.generateUpcomingDueDateReminderMessage(invoice, student, parent),
+        message: this.generateUpcomingDueDateReminderMessage(
+          invoice,
+          student,
+          parent,
+        ),
         recipient: parent.email,
         errorMessage: error.message,
       });
     }
   }
 
-  private async sendUpcomingDueDateSmsReminder(invoice: any, student: any, parent: any): Promise<void> {
+  private async sendUpcomingDueDateSmsReminder(
+    invoice: any,
+    student: any,
+    parent: any,
+  ): Promise<void> {
     try {
-      const reminderMessage = this.generateUpcomingDueDateSmsMessage(invoice, student, parent);
-      
+      const reminderMessage = this.generateUpcomingDueDateSmsMessage(
+        invoice,
+        student,
+        parent,
+      );
+
       const smsResponse = await this.smsService.sendSms({
         to: parent.mobile,
         message: reminderMessage,
@@ -368,27 +461,44 @@ export class FeeReminderService {
         errorMessage: smsResponse.error,
       });
 
-      this.logger.log(`Upcoming due date SMS reminder ${smsResponse.success ? 'sent' : 'failed'} for invoice ${invoice.invoiceNumber} to ${parent.mobile}`);
+      this.logger.log(
+        `Upcoming due date SMS reminder ${smsResponse.success ? 'sent' : 'failed'} for invoice ${invoice.invoiceNumber} to ${parent.mobile}`,
+      );
     } catch (error) {
-      this.logger.error(`Error sending upcoming due date SMS reminder for invoice ${invoice.invoiceNumber}:`, error);
-      
+      this.logger.error(
+        `Error sending upcoming due date SMS reminder for invoice ${invoice.invoiceNumber}:`,
+        error,
+      );
+
       await this.createReminderLog({
         studentId: student.id,
         parentId: parent.id,
         invoiceId: invoice.id,
         reminderType: 'sms',
         status: 'failed',
-        message: this.generateUpcomingDueDateSmsMessage(invoice, student, parent),
+        message: this.generateUpcomingDueDateSmsMessage(
+          invoice,
+          student,
+          parent,
+        ),
         recipient: parent.mobile,
         errorMessage: error.message,
       });
     }
   }
 
-  private async sendUpcomingDueDateWhatsAppReminder(invoice: any, student: any, parent: any): Promise<void> {
+  private async sendUpcomingDueDateWhatsAppReminder(
+    invoice: any,
+    student: any,
+    parent: any,
+  ): Promise<void> {
     try {
-      const reminderMessage = this.generateUpcomingDueDateWhatsAppMessage(invoice, student, parent);
-      
+      const reminderMessage = this.generateUpcomingDueDateWhatsAppMessage(
+        invoice,
+        student,
+        parent,
+      );
+
       const whatsappResponse = await this.whatsappService.sendWhatsAppMessage({
         to: parent.mobile,
         message: reminderMessage,
@@ -407,26 +517,42 @@ export class FeeReminderService {
         errorMessage: whatsappResponse.error,
       });
 
-      this.logger.log(`Upcoming due date WhatsApp reminder ${whatsappResponse.success ? 'sent' : 'failed'} for invoice ${invoice.invoiceNumber} to ${parent.mobile}`);
+      this.logger.log(
+        `Upcoming due date WhatsApp reminder ${whatsappResponse.success ? 'sent' : 'failed'} for invoice ${invoice.invoiceNumber} to ${parent.mobile}`,
+      );
     } catch (error) {
-      this.logger.error(`Error sending upcoming due date WhatsApp reminder for invoice ${invoice.invoiceNumber}:`, error);
-      
+      this.logger.error(
+        `Error sending upcoming due date WhatsApp reminder for invoice ${invoice.invoiceNumber}:`,
+        error,
+      );
+
       await this.createReminderLog({
         studentId: student.id,
         parentId: parent.id,
         invoiceId: invoice.id,
         reminderType: 'whatsapp',
         status: 'failed',
-        message: this.generateUpcomingDueDateWhatsAppMessage(invoice, student, parent),
+        message: this.generateUpcomingDueDateWhatsAppMessage(
+          invoice,
+          student,
+          parent,
+        ),
         recipient: parent.mobile,
         errorMessage: error.message,
       });
     }
   }
 
-  private generateOverdueFeeReminderMessage(invoice: any, student: any, parent: any): string {
-    const daysOverdue = Math.ceil((new Date().getTime() - new Date(invoice.dueDate).getTime()) / (1000 * 60 * 60 * 24));
-    
+  private generateOverdueFeeReminderMessage(
+    invoice: any,
+    student: any,
+    parent: any,
+  ): string {
+    const daysOverdue = Math.ceil(
+      (new Date().getTime() - new Date(invoice.dueDate).getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+
     return `Dear ${parent.fullName},
 
 This is a reminder that the fee payment for ${student.name} is overdue.
@@ -446,15 +572,29 @@ Best regards,
 School Administration`;
   }
 
-  private generateOverdueFeeSmsMessage(invoice: any, student: any, parent: any): string {
-    const daysOverdue = Math.ceil((new Date().getTime() - new Date(invoice.dueDate).getTime()) / (1000 * 60 * 60 * 24));
-    
+  private generateOverdueFeeSmsMessage(
+    invoice: any,
+    student: any,
+    parent: any,
+  ): string {
+    const daysOverdue = Math.ceil(
+      (new Date().getTime() - new Date(invoice.dueDate).getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+
     return `Dear ${parent.fullName}, Fee payment for ${student.name} is overdue by ${daysOverdue} days. Invoice: ${invoice.invoiceNumber}, Amount: ${invoice.currency} ${invoice.amount.toFixed(2)}. Please pay immediately to avoid late fees.`;
   }
 
-  private generateOverdueFeeWhatsAppMessage(invoice: any, student: any, parent: any): string {
-    const daysOverdue = Math.ceil((new Date().getTime() - new Date(invoice.dueDate).getTime()) / (1000 * 60 * 60 * 24));
-    
+  private generateOverdueFeeWhatsAppMessage(
+    invoice: any,
+    student: any,
+    parent: any,
+  ): string {
+    const daysOverdue = Math.ceil(
+      (new Date().getTime() - new Date(invoice.dueDate).getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+
     return `🔔 *Fee Payment Overdue Reminder*
 
 Dear ${parent.fullName},
@@ -475,9 +615,16 @@ Best regards,
 School Administration`;
   }
 
-  private generateUpcomingDueDateReminderMessage(invoice: any, student: any, parent: any): string {
-    const daysUntilDue = Math.ceil((new Date(invoice.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    
+  private generateUpcomingDueDateReminderMessage(
+    invoice: any,
+    student: any,
+    parent: any,
+  ): string {
+    const daysUntilDue = Math.ceil(
+      (new Date(invoice.dueDate).getTime() - new Date().getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+
     return `Dear ${parent.fullName},
 
 This is a friendly reminder that the fee payment for ${student.name} is due soon.
@@ -497,15 +644,29 @@ Best regards,
 School Administration`;
   }
 
-  private generateUpcomingDueDateSmsMessage(invoice: any, student: any, parent: any): string {
-    const daysUntilDue = Math.ceil((new Date(invoice.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    
+  private generateUpcomingDueDateSmsMessage(
+    invoice: any,
+    student: any,
+    parent: any,
+  ): string {
+    const daysUntilDue = Math.ceil(
+      (new Date(invoice.dueDate).getTime() - new Date().getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+
     return `Dear ${parent.fullName}, Fee payment for ${student.name} is due in ${daysUntilDue} days. Invoice: ${invoice.invoiceNumber}, Amount: ${invoice.currency} ${invoice.amount.toFixed(2)}. Due: ${new Date(invoice.dueDate).toLocaleDateString()}.`;
   }
 
-  private generateUpcomingDueDateWhatsAppMessage(invoice: any, student: any, parent: any): string {
-    const daysUntilDue = Math.ceil((new Date(invoice.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    
+  private generateUpcomingDueDateWhatsAppMessage(
+    invoice: any,
+    student: any,
+    parent: any,
+  ): string {
+    const daysUntilDue = Math.ceil(
+      (new Date(invoice.dueDate).getTime() - new Date().getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+
     return `📅 *Upcoming Fee Payment Reminder*
 
 Dear ${parent.fullName},
@@ -532,7 +693,9 @@ School Administration`;
     return [];
   }
 
-  async createReminderLog(logData: Partial<FeeReminderLog>): Promise<FeeReminderLogEntity> {
+  async createReminderLog(
+    logData: Partial<FeeReminderLog>,
+  ): Promise<FeeReminderLogEntity> {
     const reminderLog = this.feeReminderLogRepository.create({
       studentId: logData.studentId,
       parentId: logData.parentId,
@@ -548,7 +711,10 @@ School Administration`;
     return this.feeReminderLogRepository.save(reminderLog);
   }
 
-  async getReminderLogs(limit: number = 50, offset: number = 0): Promise<FeeReminderLogEntity[]> {
+  async getReminderLogs(
+    limit: number = 50,
+    offset: number = 0,
+  ): Promise<FeeReminderLogEntity[]> {
     return this.feeReminderLogRepository.find({
       order: { createdAt: 'DESC' },
       take: limit,
@@ -556,7 +722,9 @@ School Administration`;
     });
   }
 
-  async getReminderLogsByStudent(studentId: number): Promise<FeeReminderLogEntity[]> {
+  async getReminderLogsByStudent(
+    studentId: number,
+  ): Promise<FeeReminderLogEntity[]> {
     return this.feeReminderLogRepository.find({
       where: { studentId },
       order: { createdAt: 'DESC' },
@@ -573,7 +741,7 @@ School Administration`;
     whatsapp: number;
   }> {
     const logs = await this.feeReminderLogRepository.find();
-    
+
     const stats = {
       total: logs.length,
       sent: 0,
@@ -584,7 +752,7 @@ School Administration`;
       whatsapp: 0,
     };
 
-    logs.forEach(log => {
+    logs.forEach((log) => {
       switch (log.status) {
         case 'sent':
           stats.sent++;

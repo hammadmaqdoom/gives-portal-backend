@@ -64,9 +64,13 @@ jobs:
               const targetOwner = c.org;
               const targetRepo = c.repo;
               const targetBranch = c.target_branch || 'staging';
+              const sentryDsn = c.sentry_dsn || '';
               
               try {
                 console.log(`\n📦 Processing ${targetOwner}/${targetRepo}...`);
+                if (sentryDsn) {
+                  console.log(`🔔 Sentry DSN configured for this client`);
+                }
                 
                 const tempDir = `/tmp/sync-${targetRepo}-${Date.now()}`;
                 
@@ -186,6 +190,57 @@ jobs:
                   execSync(`git merge upstream/main --no-edit --allow-unrelated-histories`, { stdio: 'inherit' });
                 } catch (e) {
                   console.log('Merge had conflicts or issues, but continuing...');
+                }
+                
+                // Inject Sentry DSN into .env file if provided
+                if (sentryDsn) {
+                  try {
+                    const envPath = '.env';
+                    let envContent = '';
+                    
+                    // Read existing .env if it exists
+                    if (fs.existsSync(envPath)) {
+                      envContent = fs.readFileSync(envPath, 'utf8');
+                    }
+                    
+                    // Update or add SENTRY_DSN
+                    if (envContent.includes('SENTRY_DSN=')) {
+                      // Replace existing SENTRY_DSN
+                      envContent = envContent.replace(
+                        /SENTRY_DSN=.*/g,
+                        `SENTRY_DSN=${sentryDsn}`
+                      );
+                    } else {
+                      // Append SENTRY_DSN if not present
+                      envContent += (envContent.endsWith('\n') ? '' : '\n') + `SENTRY_DSN=${sentryDsn}\n`;
+                    }
+                    
+                    // Ensure SENTRY_ENABLED is set
+                    if (!envContent.includes('SENTRY_ENABLED=')) {
+                      envContent += `SENTRY_ENABLED=true\n`;
+                    } else {
+                      envContent = envContent.replace(
+                        /SENTRY_ENABLED=.*/g,
+                        'SENTRY_ENABLED=true'
+                      );
+                    }
+                    
+                    // Write updated .env
+                    fs.writeFileSync(envPath, envContent);
+                    
+                    // Commit the .env update
+                    try {
+                      execSync('git add .env', { stdio: 'inherit' });
+                      execSync('git commit -m "chore: update Sentry DSN from upstream distribution"', { stdio: 'inherit' });
+                      console.log('✅ Updated .env with Sentry DSN');
+                    } catch (commitError) {
+                      // If commit fails (no changes or already committed), that's okay
+                      console.log('ℹ️  .env update already committed or no changes');
+                    }
+                  } catch (envError) {
+                    console.warn(`⚠️  Failed to update .env with Sentry DSN: ${envError.message}`);
+                    // Continue even if .env update fails
+                  }
                 }
                 
                 // Push sync branch

@@ -338,7 +338,9 @@ export class CreateSettingsDto {
   @MaxLength(255)
   whatsappDeviceId?: string;
 
-  @ApiPropertyOptional({ example: 'https://secure.h3techs.com/sms/api/send_whatsapp' })
+  @ApiPropertyOptional({
+    example: 'https://secure.h3techs.com/sms/api/send_whatsapp',
+  })
   @IsOptional()
   @IsUrl()
   @MaxLength(500)

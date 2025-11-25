@@ -201,6 +201,13 @@ jobs:
 
             # OpenExchangeRates API
             OPENEXCHANGERATES_APP_ID=${{ secrets.OPENEXCHANGERATES_APP_ID }}
+
+            # Sentry Error Tracking Configuration
+            SENTRY_DSN=${{ secrets.SENTRY_DSN || '' }}
+            SENTRY_ENABLED=${{ secrets.SENTRY_ENABLED || 'true' }}
+            SENTRY_ENVIRONMENT=${{ secrets.SENTRY_ENVIRONMENT || 'production' }}
+            SENTRY_TRACES_SAMPLE_RATE=${{ secrets.SENTRY_TRACES_SAMPLE_RATE || '0.1' }}
+            SENTRY_PROFILES_SAMPLE_RATE=${{ secrets.SENTRY_PROFILES_SAMPLE_RATE || '0.1' }}
             EOF
 
             # Use existing docker-compose.prod.yml from the copied code

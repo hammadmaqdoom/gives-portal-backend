@@ -90,3 +90,13 @@ ZOOM_OAUTH_CLIENT_SECRET=hbYpxb855Ew2pVjpe5LZ00bSAtXF8ym1
 # For local dev with Nest global prefix 'api' and version 'v1':
 # http://localhost:3000/api/v1/zoom/oauth/callback
 ZOOM_OAUTH_REDIRECT_URI=http://localhost:3000/api/v1/zoom/oauth/callback
+
+# Sentry Error Tracking Configuration
+# Get your DSN from https://sentry.io/settings/{org}/projects/{project}/keys/
+SENTRY_DSN=
+SENTRY_ENABLED=false
+SENTRY_ENVIRONMENT=development
+# Sample rate for performance monitoring (0.0 to 1.0)
+SENTRY_TRACES_SAMPLE_RATE=0.1
+# Sample rate for profiling (0.0 to 1.0)
+SENTRY_PROFILES_SAMPLE_RATE=0.1

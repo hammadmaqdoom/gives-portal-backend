@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import * as Sentry from '@sentry/node';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import {
   ClassSerializerInterceptor,
   ValidationPipe,
@@ -14,6 +16,25 @@ import { AllConfigType } from './config/config.type';
 import { ResolvePromisesInterceptor } from './utils/serializer.interceptor';
 
 async function bootstrap() {
+  // Initialize Sentry before creating the app
+  const sentryDsn = process.env.SENTRY_DSN;
+  const sentryEnabled = process.env.SENTRY_ENABLED === 'true' || !!sentryDsn;
+
+  if (sentryEnabled && sentryDsn) {
+    Sentry.init({
+      dsn: sentryDsn,
+      environment:
+        process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development',
+      integrations: [nodeProfilingIntegration()],
+      tracesSampleRate: process.env.SENTRY_TRACES_SAMPLE_RATE
+        ? parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE)
+        : 0.1,
+      profilesSampleRate: process.env.SENTRY_PROFILES_SAMPLE_RATE
+        ? parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE)
+        : 0.1,
+    });
+  }
+
   const app = await NestFactory.create(AppModule, { cors: true });
   (global as any).nestjsApp = app;
   useContainer(app.select(AppModule), { fallbackOnErrors: true });

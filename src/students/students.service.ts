@@ -490,7 +490,9 @@ export class StudentsService {
       });
     }
 
-    return this.enrollmentRepository.findEnrollmentHistoryByStudentId(studentId);
+    return this.enrollmentRepository.findEnrollmentHistoryByStudentId(
+      studentId,
+    );
   }
 
   async getClassEnrollmentHistory(classId: number): Promise<any[]> {
@@ -786,9 +788,7 @@ export class StudentsService {
     return { linked, notFound, errors };
   }
 
-  async bulkEnrollFromFile(
-    file: Express.Multer.File,
-  ): Promise<{
+  async bulkEnrollFromFile(file: Express.Multer.File): Promise<{
     totalRows: number;
     successful: number;
     failed: number;
@@ -804,11 +804,11 @@ export class StudentsService {
   }> {
     // Parse the file
     let rows: any[] = [];
-    
+
     try {
       if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
         // Parse CSV - XLSX can handle CSV files
-        const workbook = XLSX.read(file.buffer, { 
+        const workbook = XLSX.read(file.buffer, {
           type: 'buffer',
           cellDates: true,
           cellNF: false,
@@ -828,7 +828,7 @@ export class StudentsService {
         file.originalname.endsWith('.xls')
       ) {
         // Parse Excel
-        const workbook = XLSX.read(file.buffer, { 
+        const workbook = XLSX.read(file.buffer, {
           type: 'buffer',
           cellDates: true,
           cellNF: false,
@@ -1040,9 +1040,10 @@ export class StudentsService {
 
         // If no valid class IDs found, skip this row
         if (validClassIds.length === 0) {
-          const errorMessage = invalidClassIds.length > 0
-            ? `Class ID(s) not found: ${invalidClassIds.join(', ')}`
-            : 'No valid class IDs found';
+          const errorMessage =
+            invalidClassIds.length > 0
+              ? `Class ID(s) not found: ${invalidClassIds.join(', ')}`
+              : 'No valid class IDs found';
           results.push({
             row: rowNumber,
             studentName: studentName.trim(),
@@ -1171,13 +1172,16 @@ export class StudentsService {
                   | 'mother'
                   | 'guardian') || undefined,
             };
-            const createResult = await this.parentsService.create(
-              createParentDto,
-            );
+            const createResult =
+              await this.parentsService.create(createParentDto);
             parent1 = createResult.parent;
 
             // Send account credentials email to parent if email and password are available
-            if (parent1Email && parent1Email.trim() && createResult.tempPassword) {
+            if (
+              parent1Email &&
+              parent1Email.trim() &&
+              createResult.tempPassword
+            ) {
               try {
                 await this.notificationService.sendAccountCredentials({
                   to: parent1Email.trim(),
@@ -1235,13 +1239,16 @@ export class StudentsService {
                   | 'mother'
                   | 'guardian') || undefined,
             };
-            const createResult = await this.parentsService.create(
-              createParentDto,
-            );
+            const createResult =
+              await this.parentsService.create(createParentDto);
             parent2 = createResult.parent;
 
             // Send account credentials email to parent if email and password are available
-            if (parent2Email && parent2Email.trim() && createResult.tempPassword) {
+            if (
+              parent2Email &&
+              parent2Email.trim() &&
+              createResult.tempPassword
+            ) {
               try {
                 await this.notificationService.sendAccountCredentials({
                   to: parent2Email.trim(),

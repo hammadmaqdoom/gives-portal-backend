@@ -159,6 +159,11 @@ jobs:
               "ZOOM_OAUTH_CLIENT_SECRET=${{ secrets.ZOOM_OAUTH_CLIENT_SECRET }}" \
               "ZOOM_OAUTH_REDIRECT_URI=${{ secrets.ZOOM_OAUTH_REDIRECT_URI }}" \
               "OPENEXCHANGERATES_APP_ID=${{ secrets.OPENEXCHANGERATES_APP_ID }}" \
+              "SENTRY_DSN=${{ secrets.SENTRY_DSN || '' }}" \
+              "SENTRY_ENABLED=${{ secrets.SENTRY_ENABLED || 'false' }}" \
+              "SENTRY_ENVIRONMENT=${{ secrets.SENTRY_ENVIRONMENT || 'staging' }}" \
+              "SENTRY_TRACES_SAMPLE_RATE=${{ secrets.SENTRY_TRACES_SAMPLE_RATE || '0.1' }}" \
+              "SENTRY_PROFILES_SAMPLE_RATE=${{ secrets.SENTRY_PROFILES_SAMPLE_RATE || '0.1' }}" \
               | sudo tee .env >/dev/null
               
               # Rebuild and start services (without health check dependencies)
@@ -246,6 +251,11 @@ jobs:
               "ZOOM_OAUTH_CLIENT_SECRET=${{ secrets.ZOOM_OAUTH_CLIENT_SECRET }}" \
               "ZOOM_OAUTH_REDIRECT_URI=${{ secrets.ZOOM_OAUTH_REDIRECT_URI }}" \
               "OPENEXCHANGERATES_APP_ID=${{ secrets.OPENEXCHANGERATES_APP_ID }}" \
+              "SENTRY_DSN=${{ secrets.SENTRY_DSN || '' }}" \
+              "SENTRY_ENABLED=${{ secrets.SENTRY_ENABLED || 'true' }}" \
+              "SENTRY_ENVIRONMENT=${{ secrets.SENTRY_ENVIRONMENT || 'staging' }}" \
+              "SENTRY_TRACES_SAMPLE_RATE=${{ secrets.SENTRY_TRACES_SAMPLE_RATE || '0.1' }}" \
+              "SENTRY_PROFILES_SAMPLE_RATE=${{ secrets.SENTRY_PROFILES_SAMPLE_RATE || '0.1' }}" \
               | sudo tee .env >/dev/null
               
               # Restart services with new configuration

@@ -375,7 +375,8 @@ export class StudentsController {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'Excel (.xlsx, .xls) or CSV file with student and parent data',
+          description:
+            'Excel (.xlsx, .xls) or CSV file with student and parent data',
         },
       },
     },
