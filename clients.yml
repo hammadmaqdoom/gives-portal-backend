@@ -6,6 +6,10 @@ clients:
   - org: hammadmaqdoom
     repo: silveracademy-backend
     target_branch: staging
+  - org: hammadmaqdoom
+    repo: gives-portal-backend
+    target_branch: staging
+    
   # Add more backend client repos here:
   # - org: hammadmaqdoom
   #   repo: client-b-backend
