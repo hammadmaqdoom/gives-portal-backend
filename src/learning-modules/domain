@@ -1,7 +1,0 @@
-export interface ModuleCompletion {
-  id: number;
-  studentId: number;
-  moduleId: number;
-  completedAt: Date;
-  isCompleted: boolean;
-}
