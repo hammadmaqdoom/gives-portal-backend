@@ -196,60 +196,87 @@ jobs:
                   throw e;
                 }
                 
-                // Create PR from syncing branch to staging branch
+                // Attempt to fast-forward target branch directly
+                let autoMerged = false;
+                let syncHasUpdates = true;
                 try {
-                  const pr = await github.rest.pulls.create({
-                    owner: targetOwner,
-                    repo: targetRepo,
-                    title: `[Upstream Sync] ${owner}/${repo}@${context.sha.substring(0, 7)} → ${targetBranch}`,
-                    head: syncBranch,
-                    base: targetBranch,
-                    body: `## 🔄 Automated Upstream Sync\n\n` +
-                          `This PR syncs changes from the base repository:\n` +
-                          `- **Source**: \`${owner}/${repo}@${context.sha.substring(0, 7)}\`\n` +
-                          `- **Target**: \`${targetBranch}\` branch\n` +
-                          `- **Base Commit**: ${context.sha}\n\n` +
-                          `### What this does:\n` +
-                          `- Merges latest changes from base repo's \`main\` branch\n` +
-                          `- Creates PR into your \`${targetBranch}\` branch for review\n` +
-                          `- Once merged, triggers automatic deployment to ${targetBranch === 'staging' ? 'staging environment' : 'production'}\n\n` +
-                          `> ⚠️ **Important**: Review this PR carefully, especially if you have client-specific customizations. ` +
-                          `You may need to resolve merge conflicts manually.\n\n` +
-                          `*This PR was automatically created by the base repository workflow.*`,
-                    maintainer_can_modify: true
-                  });
-                  console.log(`✅ Opened PR #${pr.data.number}: ${pr.data.html_url}`);
+                  const diff = execSync(`git rev-list ${targetBranch}..${syncBranch}`, { encoding: 'utf8' }).trim();
+                  syncHasUpdates = diff.length > 0;
                 } catch (e) {
-                  if (e.status === 422) {
-                    if (/No commits between/.test(e.message)) {
-                      console.log(`ℹ️  No changes to sync - repos are already in sync`);
-                    } else if (/already exists/i.test(e.message)) {
-                      // Find existing PR - check for any open PR from syncing branch
-                      const existingPRs = await github.rest.pulls.list({
-                        owner: targetOwner,
-                        repo: targetRepo,
-                        state: 'open',
-                        head: `${targetOwner}:${syncBranch}`,
-                        base: targetBranch
-                      });
-                      if (existingPRs.data.length > 0) {
-                        console.log(`ℹ️  PR already exists: #${existingPRs.data[0].number}`);
-                      } else {
-                        // Try to find any open PR with similar title
-                        const allPRs = await github.rest.pulls.list({
+                  syncHasUpdates = true;
+                }
+                
+                if (syncHasUpdates) {
+                  try {
+                    console.log(`🔁 Attempting to auto-merge ${syncBranch} into ${targetBranch}`);
+                    execSync(`git checkout ${targetBranch}`, { stdio: 'inherit' });
+                    execSync(`git merge ${syncBranch} --no-edit`, { stdio: 'inherit' });
+                    execSync(`git push origin ${targetBranch}`, { stdio: 'inherit' });
+                    autoMerged = true;
+                    console.log(`✅ Auto-merged latest upstream changes into ${targetBranch}`);
+                  } catch (mergeError) {
+                    console.warn(`⚠️  Auto-merge failed for ${targetOwner}/${targetRepo}: ${mergeError.message}`);
+                    try {
+                      execSync('git merge --abort', { stdio: 'inherit' });
+                    } catch (abortError) {
+                      // Ignore if there was nothing to abort
+                    }
+                    execSync(`git checkout ${syncBranch}`, { stdio: 'inherit' });
+                  }
+                } else {
+                  console.log('ℹ️  No new commits to merge; target branch already up to date.');
+                }
+                
+                if (!autoMerged && syncHasUpdates) {
+                  // Create PR from syncing branch to staging branch
+                  try {
+                    const pr = await github.rest.pulls.create({
+                      owner: targetOwner,
+                      repo: targetRepo,
+                      title: `[Upstream Sync] ${owner}/${repo}@${context.sha.substring(0, 7)} → ${targetBranch}`,
+                      head: syncBranch,
+                      base: targetBranch,
+                      body: `## 🔄 Automated Upstream Sync\n\n` +
+                            `Auto-merge attempt failed; manual review required.\n\n` +
+                            `- **Source**: \`${owner}/${repo}@${context.sha.substring(0, 7)}\`\n` +
+                            `- **Target**: \`${targetBranch}\` branch\n` +
+                            `- **Base Commit**: ${context.sha}\n\n` +
+                            `Resolve conflicts (if any) and merge to keep client repo in sync.`,
+                      maintainer_can_modify: true
+                    });
+                    console.log(`✅ Opened PR #${pr.data.number}: ${pr.data.html_url}`);
+                  } catch (e) {
+                    if (e.status === 422) {
+                      if (/No commits between/.test(e.message)) {
+                        console.log(`ℹ️  No changes to sync - repos are already in sync`);
+                      } else if (/already exists/i.test(e.message)) {
+                        const existingPRs = await github.rest.pulls.list({
                           owner: targetOwner,
                           repo: targetRepo,
                           state: 'open',
+                          head: `${targetOwner}:${syncBranch}`,
                           base: targetBranch
                         });
-                        console.log(`ℹ️  Found ${allPRs.data.length} open PR(s) to ${targetBranch}`);
+                        if (existingPRs.data.length > 0) {
+                          console.log(`ℹ️  PR already exists: #${existingPRs.data[0].number}`);
+                        } else {
+                          const allPRs = await github.rest.pulls.list({
+                            owner: targetOwner,
+                            repo: targetRepo,
+                            state: 'open',
+                            base: targetBranch
+                          });
+                          console.log(`ℹ️  Found ${allPRs.data.length} open PR(s) to ${targetBranch}`);
+                        }
+                      } else {
+                        console.warn(`⚠️  PR creation issue: ${e.message}`);
                       }
                     } else {
-                      console.warn(`⚠️  PR creation issue: ${e.message}`);
+                      throw e;
                     }
-                  } else {
-                    throw e;
                   }
+                } else if (autoMerged) {
+                  console.log(`🎉 ${targetOwner}/${targetRepo}:${targetBranch} is now in sync with upstream without manual intervention.`);
                 }
                 
                 // Cleanup
