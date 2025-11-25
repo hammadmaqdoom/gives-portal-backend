@@ -1,0 +1,319 @@
+name: Initial AWS Lightsail Deployment
+
+on:
+  workflow_dispatch:
+
+jobs:
+  initial-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Copy source code to Lightsail
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          source: "."
+          target: "/tmp/backend"
+          strip_components: 1
+
+      - name: Deploy to AWS Lightsail
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          script: |
+            set -e
+            
+            echo "=== INITIAL AWS LIGHTSAIL DEPLOYMENT ==="
+            echo "Backend Domain: ${{ secrets.BACKEND_DOMAIN }}"
+            echo "Frontend Domain: ${{ secrets.FRONTEND_DOMAIN }}"
+            echo "Current user: $(whoami)"
+            echo "Current directory: $(pwd)"
+            
+            # Set variables
+            APP_HOME="/opt/backend"
+            BACKEND_DOMAIN="${{ secrets.BACKEND_DOMAIN }}"
+            FRONTEND_DOMAIN="${{ secrets.FRONTEND_DOMAIN }}"
+            STATIC_IP=$(curl -s http://checkip.amazonaws.com/)
+            
+            echo "Static IP: $STATIC_IP"
+            
+            # Update system
+            echo "=== Step 1: Updating system ==="
+            sudo apt-get update -y
+            sudo apt-get upgrade -y
+            
+            # Install Docker
+            echo "=== Step 2: Installing Docker ==="
+            if ! command -v docker &> /dev/null; then
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sudo sh get-docker.sh
+              sudo usermod -aG docker $USER
+              rm get-docker.sh
+              echo "Docker installed successfully"
+            else
+              echo "Docker already installed"
+            fi
+            
+            # Add user to docker group and refresh session
+            echo "=== Step 2.1: Setting up Docker permissions ==="
+            sudo usermod -aG docker $USER
+            # Use newgrp to refresh group membership for current session
+            newgrp docker << EOF
+            echo "Docker group permissions activated"
+            docker --version
+            EOF
+            
+            # Install Docker Compose
+            echo "=== Step 3: Installing Docker Compose ==="
+            if ! command -v docker-compose &> /dev/null; then
+              sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+              sudo chmod +x /usr/local/bin/docker-compose
+              echo "Docker Compose installed successfully"
+            else
+              echo "Docker Compose already installed"
+            fi
+            
+            # Install Nginx
+            echo "=== Step 4: Installing Nginx ==="
+            sudo apt-get install -y nginx
+            
+            # Install Certbot for SSL
+            echo "=== Step 5: Installing Certbot ==="
+            sudo apt-get install -y certbot python3-certbot-nginx
+            
+            # Create application directory
+            echo "=== Step 6: Setting up application directory ==="
+            sudo mkdir -p $APP_HOME
+            sudo chown "$USER":"$USER" $APP_HOME
+            
+            # Move files from /tmp/backend to /opt/backend
+            echo "=== Step 6.1: Moving files to application directory ==="
+            if [ -d "/tmp/backend" ]; then
+              sudo rm -rf $APP_HOME/*
+              sudo cp -r /tmp/backend/* $APP_HOME/
+              sudo chown -R "$USER":"$USER" $APP_HOME
+              sudo rm -rf /tmp/backend
+              echo "Files moved successfully to $APP_HOME"
+            else
+              echo "Warning: /tmp/backend directory not found"
+            fi
+            
+            # Create .env file
+            echo "=== Step 7: Creating environment configuration ==="
+            cat > $APP_HOME/.env << EOF
+            # Application Configuration
+            NODE_ENV=production
+            APP_PORT=3000
+            APP_NAME=${{ secrets.APP_NAME }}
+            API_PREFIX=api
+            APP_FALLBACK_LANGUAGE=en
+            APP_HEADER_LANGUAGE=x-custom-lang
+            FRONTEND_DOMAIN=${{ secrets.FRONTEND_DOMAIN }}
+            BACKEND_DOMAIN=${{ secrets.BACKEND_DOMAIN }}
+
+            # Database Configuration
+            DATABASE_TYPE=postgres
+            DATABASE_HOST=postgres
+            DATABASE_PORT=5432
+            DATABASE_USERNAME=${{ secrets.POSTGRES_USER }}
+            DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}
+            DATABASE_NAME=${{ secrets.DATABASE_NAME }}
+            # Enable once for first boot to auto-create tables; turn off later
+            DATABASE_SYNCHRONIZE=true
+            DATABASE_MAX_CONNECTIONS=100
+            DATABASE_SSL_ENABLED=false
+            DATABASE_REJECT_UNAUTHORIZED=false
+            DATABASE_CA=
+            DATABASE_KEY=
+            DATABASE_CERT=
+            DATABASE_URL=
+
+            # File Storage Configuration
+            FILE_DRIVER=${{ secrets.FILE_DRIVER }}
+            ACCESS_KEY_ID=${{ secrets.S3AWS_ACCESS_KEY_ID }}
+            SECRET_ACCESS_KEY=${{ secrets.S3AWS_SECRET_ACCESS_KEY }}
+            AWS_S3_REGION=${{ secrets.S3AWS_REGION }}
+            AWS_DEFAULT_S3_BUCKET=${{ secrets.S3AWS_DEFAULT_S3_BUCKET }}
+
+            # Azure Blob Storage (if using azure-blob-sas)
+            AZURE_STORAGE_ACCOUNT_NAME=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}
+            AZURE_STORAGE_ACCOUNT_KEY=${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}
+            AZURE_CONTAINER_NAME=${{ secrets.AZURE_CONTAINER_NAME }}
+            AZURE_BLOB_SAS_EXPIRY_SECONDS=${{ secrets.AZURE_BLOB_SAS_EXPIRY_SECONDS }}
+            AZURE_BLOB_PUBLIC_BASE_URL=${{ secrets.AZURE_BLOB_PUBLIC_BASE_URL }}
+
+            # Authentication
+            AUTH_JWT_SECRET=secret
+            AUTH_JWT_TOKEN_EXPIRES_IN=15m
+            AUTH_REFRESH_SECRET=secret_for_refresh
+            AUTH_REFRESH_TOKEN_EXPIRES_IN=3650d
+            AUTH_FORGOT_SECRET=secret_for_forgot
+            AUTH_FORGOT_TOKEN_EXPIRES_IN=30m
+            AUTH_CONFIRM_EMAIL_SECRET=secret_for_confirm_email
+            AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN=1d
+
+            # Payment Gateway Encryption Key
+            ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
+
+            # Mail Configuration
+            MAIL_HOST=${{ secrets.MAIL_HOST }}
+            MAIL_PORT=${{ secrets.MAIL_PORT }}
+            MAIL_USER=${{ secrets.MAIL_USER }}
+            MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
+            MAIL_DEFAULT_EMAIL=${{ secrets.MAIL_DEFAULT_EMAIL }}
+            MAIL_DEFAULT_NAME=${{ secrets.MAIL_DEFAULT_NAME }}
+            MAIL_IGNORE_TLS=${{ secrets.MAIL_IGNORE_TLS }}
+            MAIL_SECURE=${{ secrets.MAIL_SECURE }}
+            MAIL_REQUIRE_TLS=${{ secrets.MAIL_REQUIRE_TLS }}
+
+            # Social Auth
+            FACEBOOK_APP_ID=${{ secrets.FACEBOOK_APP_ID }}
+            FACEBOOK_APP_SECRET=${{ secrets.FACEBOOK_APP_SECRET }}
+            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+            APPLE_APP_AUDIENCE=[]
+
+            # Worker Configuration
+            WORKER_HOST=redis://redis:6379/1
+
+            # Redis Configuration
+            REDIS_ENABLED=false
+            REDIS_HOST=redis
+            REDIS_PORT=6379
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+            REDIS_DB=0
+            REDIS_TTL=3600
+
+            # Zoom OAuth
+            ZOOM_OAUTH_CLIENT_ID=${{ secrets.ZOOM_OAUTH_CLIENT_ID }}
+            ZOOM_OAUTH_CLIENT_SECRET=${{ secrets.ZOOM_OAUTH_CLIENT_SECRET }}
+            ZOOM_OAUTH_REDIRECT_URI=${{ secrets.ZOOM_OAUTH_REDIRECT_URI }}
+
+            # OpenExchangeRates API
+            OPENEXCHANGERATES_APP_ID=${{ secrets.OPENEXCHANGERATES_APP_ID }}
+            EOF
+
+            # Use existing docker-compose.prod.yml from the copied code
+            echo "=== Step 8: Using existing Docker Compose configuration ==="
+            # The docker-compose.prod.yml is already copied from the repository
+
+            # Use existing Dockerfile.prod from the copied code
+            echo "=== Step 9: Using existing production Dockerfile ==="
+            # The Dockerfile.prod is already copied from the repository
+
+            # Create wait-for-it script
+            echo "=== Step 10: Creating wait-for-it script ==="
+            curl -o $APP_HOME/wait-for-it.sh https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh
+            chmod +x $APP_HOME/wait-for-it.sh
+
+            # Use existing Nginx configuration from the copied code
+            echo "=== Step 11: Using existing Nginx configuration ==="
+            # The nginx configuration is already copied from the repository
+            # Update the backend.conf with the actual domain and IP
+            sed -i "s/yourdomain.com/$BACKEND_DOMAIN/g" $APP_HOME/nginx/conf.d/backend.conf
+            sed -i "s/server_name _/server_name $BACKEND_DOMAIN $STATIC_IP/g" $APP_HOME/nginx/conf.d/backend.conf
+
+            # Stop system Nginx to free up port 80
+            echo "=== Step 12: Stopping system Nginx ==="
+            sudo systemctl stop nginx || true
+            sudo systemctl disable nginx || true
+            
+            # Build and start services (without health check dependencies)
+            echo "=== Step 13: Building and starting services ==="
+            cd $APP_HOME
+            
+            # Use newgrp to ensure docker permissions
+            newgrp docker << EOF
+            echo "Building and starting services with docker permissions"
+            # Ensure fresh app image with updated base (Node 20)
+            docker-compose -f docker-compose.prod.yml build --no-cache app
+            # Start services without health check dependencies first
+            docker-compose -f docker-compose.prod.yml up -d postgres redis app
+            echo "Waiting for app to start..."
+            sleep 30
+            EOF
+
+            # Wait a moment for app to start
+            echo "=== Step 14: Waiting for app to initialize ==="
+            sleep 30
+            
+            # Check container status
+            echo "=== Step 15: Checking container status ==="
+            newgrp docker << EOF
+            echo "=== Container Status ==="
+            docker ps -a
+            echo "=== Container Health Status ==="
+            docker inspect backend_app --format='{{.State.Health.Status}}' || echo "No health status"
+            echo "=== App Container Details ==="
+            docker inspect backend_app --format='{{json .State}}' | jq '.' || echo "No container details"
+            echo "=== Container Logs (last 50 lines each) ==="
+            echo "--- PostgreSQL Logs ---"
+            docker logs backend_postgres --tail 50 || true
+            echo "--- Redis Logs ---"
+            docker logs backend_redis --tail 50 || true
+            echo "--- App Logs (Full) ---"
+            docker logs backend_app --tail 100 || true
+            echo "--- Nginx Logs ---"
+            docker logs backend_nginx --tail 50 || true
+            echo "=== Testing App Health Check ==="
+            docker exec backend_app curl -f http://localhost:3000/health || echo "Health check failed"
+            echo "=== Testing App Port ==="
+            docker exec backend_app netstat -tlnp || echo "Netstat failed"
+            echo "=== App Process List ==="
+            docker exec backend_app ps aux || echo "Process list failed"
+            EOF
+            
+            # Wait for services to be ready
+            echo "=== Step 16: Waiting for services to be ready ==="
+            newgrp docker << EOF
+            # Wait for PostgreSQL
+            echo "Waiting for PostgreSQL..."
+            docker exec backend_app ./wait-for-it.sh postgres:5432 --timeout=60 --strict -- echo "PostgreSQL is ready"
+            
+            # Wait for Redis
+            echo "Waiting for Redis..."
+            docker exec backend_app ./wait-for-it.sh redis:6379 --timeout=30 --strict -- echo "Redis is ready"
+            
+            # Wait for App to be healthy
+            echo "Waiting for App to be healthy..."
+            timeout 60 bash -c 'until docker exec backend_app curl -f http://localhost:3000/health; do sleep 2; done' || echo "App health check timeout"
+            echo "Application is ready"
+            
+            # Run database seed
+            echo "Running database seed..."
+            # Run the compiled seed file directly with environment variables
+            docker exec -e NODE_ENV=production backend_app node ./dist/database/seeds/relational/run-seed.js || \
+            echo "Seed command failed or not available"
+            echo "Database seed completed"
+            EOF
+
+            # Generate SSL certificates
+            echo "=== Step 17: Generating SSL certificates ==="
+            # Ensure nginx isn't started yet; we'll start it after certs
+            newgrp docker << EOF
+            docker-compose -f docker-compose.prod.yml stop nginx || true
+            EOF
+
+            # Generate certificates
+            # Issue cert only for domain; Let's Encrypt won't issue for bare IP
+            sudo certbot certonly --standalone -d $BACKEND_DOMAIN --non-interactive --agree-tos --email ${{ secrets.EMAIL }}
+            
+            # Start nginx
+            newgrp docker << EOF
+            docker-compose -f docker-compose.prod.yml start nginx
+            EOF
+
+            # Setup certificate renewal
+            echo "=== Step 18: Setting up certificate renewal ==="
+            (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && cd $APP_HOME && newgrp docker -c 'docker-compose -f docker-compose.prod.yml restart nginx'") | crontab -
+
+            echo "=== INITIAL DEPLOYMENT COMPLETED SUCCESSFULLY ==="
+            echo "Backend is running on: https://$BACKEND_DOMAIN"
+            echo "Static IP: https://$STATIC_IP"
+            echo "Health check: https://$BACKEND_DOMAIN/health"
