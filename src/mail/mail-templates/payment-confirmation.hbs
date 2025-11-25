@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{title}}</title>
+    <style>
+        .payment-success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .payment-details {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .amount {
+            font-size: 24px;
+            font-weight: bold;
+            color: #28a745;
+        }
+        .transaction-id {
+            font-family: monospace;
+            background-color: #e9ecef;
+            padding: 5px 10px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+
+<body style="margin:0;font-family:arial">
+    <table style="border:0;width:100%">
+        <tr style="background:#eeeeee">
+            <td style="padding:20px;color:#808080;text-align:center;font-size:40px;font-weight:600">
+                {{app_name}}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:20px;color:#808080;font-size:16px;font-weight:100">
+                {{text1}}<br>
+                {{text2}}<br>
+                {{text3}}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:20px;">
+                <div class="payment-success">
+                    <strong>✅ Payment Successful!</strong><br>
+                    Your payment has been processed successfully and your invoice has been marked as paid.
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:20px;">
+                <div class="payment-details">
+                    <h3 style="margin-top:0;color:#333;">Payment Details</h3>
+                    <p><strong>Invoice Number:</strong> {{invoiceNumber}}</p>
+                    <p><strong>Student:</strong> {{studentName}}</p>
+                    <p><strong>Amount Paid:</strong> <span class="amount">{{amount}}</span></p>
+                    <p><strong>Payment Method:</strong> {{paymentMethod}}</p>
+                    <p><strong>Transaction ID:</strong> <span class="transaction-id">{{transactionId}}</span></p>
+                    <p><strong>Payment Date:</strong> {{paymentDate}}</p>
+                    <p><strong>Description:</strong> {{description}}</p>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:20px;color:#808080;font-size:16px;font-weight:100">
+                <p><strong>What's Next?</strong></p>
+                <ul>
+                    <li>Your payment has been recorded in our system</li>
+                    <li>You can view your payment history in the student portal</li>
+                    <li>A receipt has been generated for your records</li>
+                    <li>If you have any questions, please contact our support team</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:20px;color:#808080;font-size:14px;font-weight:100;text-align:center;border-top:1px solid #eee">
+                <p>Thank you for your payment!<br>
+                This is an automated message, please do not reply to this email.</p>
+            </td>
+        </tr>
+    </table>
+</body>
+
+</html>
