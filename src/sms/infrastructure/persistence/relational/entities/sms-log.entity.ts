@@ -29,10 +29,10 @@ export class SmsLogEntity extends EntityRelationalHelper {
   messageId?: string;
 
   @Index()
-  @Column({ 
-    type: 'enum', 
+  @Column({
+    type: 'enum',
     enum: ['pending', 'sent', 'delivered', 'failed'],
-    default: 'pending'
+    default: 'pending',
   })
   status: 'pending' | 'sent' | 'delivered' | 'failed';
 

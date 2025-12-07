@@ -78,6 +78,9 @@ export class LearningModuleEntity extends EntityRelationalHelper {
   @Column({ type: 'int', nullable: true, name: 'drip_delay_days' })
   dripDelayDays?: number | null; // Days to wait after prerequisites are met
 
+  @Column({ type: 'boolean', default: false, name: 'is_previewable' })
+  isPreviewable: boolean;
+
   @ManyToOne(() => ClassEntity, { eager: true })
   @JoinColumn({ name: 'classId' })
   class?: ClassEntity | null;

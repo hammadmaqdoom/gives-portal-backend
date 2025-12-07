@@ -7,7 +7,13 @@ import {
   UseGuards,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../roles/roles.guard';
 import { RoleEnum } from '../roles/roles.enum';
@@ -26,7 +32,10 @@ export class FeeReminderController {
 
   @Post('send/:invoiceId')
   @Roles(RoleEnum.admin, RoleEnum.user)
-  @ApiParam({ name: 'invoiceId', description: 'Invoice ID to send reminder for' })
+  @ApiParam({
+    name: 'invoiceId',
+    description: 'Invoice ID to send reminder for',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Fee reminder sent successfully',
@@ -38,7 +47,10 @@ export class FeeReminderController {
 
   @Post('send-upcoming/:invoiceId')
   @Roles(RoleEnum.admin, RoleEnum.user)
-  @ApiParam({ name: 'invoiceId', description: 'Invoice ID to send upcoming due date reminder for' })
+  @ApiParam({
+    name: 'invoiceId',
+    description: 'Invoice ID to send upcoming due date reminder for',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Upcoming due date reminder sent successfully',
@@ -50,8 +62,16 @@ export class FeeReminderController {
 
   @Get('logs')
   @Roles(RoleEnum.admin, RoleEnum.user)
-  @ApiQuery({ name: 'limit', required: false, description: 'Number of logs to retrieve' })
-  @ApiQuery({ name: 'offset', required: false, description: 'Number of logs to skip' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of logs to retrieve',
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    description: 'Number of logs to skip',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Fee reminder logs retrieved successfully',
@@ -65,7 +85,10 @@ export class FeeReminderController {
 
   @Get('logs/student/:studentId')
   @Roles(RoleEnum.admin, RoleEnum.user)
-  @ApiParam({ name: 'studentId', description: 'Student ID to get reminder logs for' })
+  @ApiParam({
+    name: 'studentId',
+    description: 'Student ID to get reminder logs for',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Fee reminder logs for student retrieved successfully',

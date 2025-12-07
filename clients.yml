@@ -1,0 +1,21 @@
+# List backend client repositories to receive upstream updates
+# org and repo can be either your user/org and repo name
+# target_branch is typically "staging"
+# sentry_dsn is optional - if provided, will be injected into client repo's .env during distribution
+
+clients:
+  - org: hammadmaqdoom
+    repo: silveracademy-backend
+    target_branch: staging
+    sentry_dsn: "https://ffbfac920da1b12755c465f5a1e6fcd8@o4510283075551232.ingest.us.sentry.io/4510427265564672"  # Optional: Add your Sentry DSN here for this client
+  - org: hammadmaqdoom
+    repo: gives-portal-backend
+    target_branch: staging
+    sentry_dsn: "https://988e5640794d4f4f15fc36b1c6930739@o4510283075551232.ingest.us.sentry.io/4510427271790592"  # Optional: Add your Sentry DSN here for this client
+    
+  # Add more backend client repos here:
+  # - org: hammadmaqdoom
+  #   repo: client-b-backend
+  #   target_branch: staging
+  #   sentry_dsn: "https://your-sentry-dsn@sentry.io/project-id"
+

@@ -19,6 +19,10 @@ export class ClassMapper {
     classObj.feeUSD = raw.feeUSD;
     classObj.feePKR = raw.feePKR;
     classObj.classMode = raw.classMode;
+    (classObj as any).isPublicForSale = raw.isPublicForSale || false;
+    (classObj as any).thumbnailUrl = raw.thumbnailUrl;
+    (classObj as any).coverImageUrl = raw.coverImageUrl;
+    (classObj as any).features = raw.features;
     classObj.createdAt = raw.createdAt;
     classObj.updatedAt = raw.updatedAt;
     classObj.deletedAt = raw.deletedAt;
@@ -104,6 +108,18 @@ export class ClassMapper {
     }
     if (classObj.classMode !== undefined) {
       classEntity.classMode = classObj.classMode;
+    }
+    if ((classObj as any).isPublicForSale !== undefined) {
+      classEntity.isPublicForSale = (classObj as any).isPublicForSale;
+    }
+    if ((classObj as any).thumbnailUrl !== undefined) {
+      classEntity.thumbnailUrl = (classObj as any).thumbnailUrl;
+    }
+    if ((classObj as any).coverImageUrl !== undefined) {
+      classEntity.coverImageUrl = (classObj as any).coverImageUrl;
+    }
+    if ((classObj as any).features !== undefined) {
+      classEntity.features = (classObj as any).features;
     }
 
     // Map relations by id if provided as nested objects

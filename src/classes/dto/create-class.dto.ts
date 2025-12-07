@@ -86,6 +86,28 @@ export class CreateClassDto {
   @IsIn(['virtual', 'in-person'])
   classMode: 'virtual' | 'in-person';
 
+  @ApiProperty({ example: false, required: false })
+  @IsOptional()
+  @IsIn([true, false])
+  isPublicForSale?: boolean;
+
+  @ApiProperty({ example: 'https://example.com/thumbnail.jpg', required: false })
+  @IsOptional()
+  @IsString()
+  thumbnailUrl?: string;
+
+  @ApiProperty({ example: 'https://example.com/cover.jpg', required: false })
+  @IsOptional()
+  @IsString()
+  coverImageUrl?: string;
+
+  @ApiProperty({
+    example: { duration: '3 months', level: 'Beginner', format: 'Online' },
+    required: false,
+  })
+  @IsOptional()
+  features?: any;
+
   @ApiProperty({ type: IdParamDto })
   @IsNotEmpty()
   @ValidateNested()

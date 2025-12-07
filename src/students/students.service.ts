@@ -4,7 +4,9 @@ import {
   UnprocessableEntityException,
   Inject,
   forwardRef,
+  BadRequestException,
 } from '@nestjs/common';
+import * as XLSX from 'xlsx';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { NullableType } from '../utils/types/nullable.type';
 import { FilterStudentDto, SortStudentDto } from './dto/query-student.dto';
@@ -23,6 +25,7 @@ import {
   EnrollmentStatus,
 } from './dto/enrollment.dto';
 import { ParentsService } from '../parents/parents.service';
+import { Parent } from '../parents/domain/parent';
 import { InvoicesService } from '../invoices/invoices.service';
 import { ClassesService } from '../classes/classes.service';
 import { NotificationService } from '../notifications/notification.service';
@@ -487,11 +490,124 @@ export class StudentsService {
       });
     }
 
-    return this.enrollmentRepository.findEnrollmentHistoryByStudentId(studentId);
+    return this.enrollmentRepository.findEnrollmentHistoryByStudentId(
+      studentId,
+    );
   }
 
   async getClassEnrollmentHistory(classId: number): Promise<any[]> {
     return this.enrollmentRepository.findEnrollmentHistoryByClassId(classId);
+  }
+
+  async getAllEnrollments(options?: {
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: any[]; total: number; page: number; limit: number }> {
+    const page = options?.page || 1;
+    const limit = options?.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const [enrollments, total] = await Promise.all([
+      this.enrollmentRepository.findAll({
+        skip,
+        take: limit,
+        order: { enrollmentDate: 'DESC' },
+      }),
+      this.enrollmentRepository.count(),
+    ]);
+
+    return {
+      data: enrollments,
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async getEnrollmentStats(): Promise<{
+    total: number;
+    active: number;
+    dropped: number;
+    thisMonth: number;
+  }> {
+    const [total, active, dropped, thisMonth] = await Promise.all([
+      this.enrollmentRepository.count(),
+      this.enrollmentRepository.countByStatus('active'),
+      this.enrollmentRepository.countByStatus('dropped'),
+      this.enrollmentRepository.countThisMonth(),
+    ]);
+
+    return {
+      total,
+      active,
+      dropped,
+      thisMonth,
+    };
+  }
+
+  async bulkEnrollStudentInClasses(
+    studentId: number,
+    body: { classIds: number[]; status?: string; enrollmentDate?: string },
+  ): Promise<{ count: number; enrollments: any[] }> {
+    const student = await this.studentsRepository.findById(studentId);
+    if (!student) {
+      throw new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: {
+          studentId: 'studentNotExists',
+        },
+      });
+    }
+
+    const status = (body.status as any) || 'active';
+    const date = body.enrollmentDate
+      ? new Date(body.enrollmentDate)
+      : new Date();
+
+    const enrollments: any[] = [];
+    let created = 0;
+
+    for (const classId of body.classIds || []) {
+      try {
+        // Check if already enrolled
+        const exists = await this.enrollmentRepository.findByStudentAndClass(
+          studentId,
+          classId,
+        );
+        if (exists) {
+          continue; // Skip if already enrolled
+        }
+
+        const enrollment = await this.enrollmentRepository.create({
+          studentId,
+          classId,
+          enrollmentDate: date,
+          status,
+        });
+
+        enrollments.push(enrollment);
+        created++;
+
+        // Generate monthly invoice for the enrollment
+        try {
+          await this.generateMonthlyInvoice(studentId, classId);
+        } catch (error) {
+          console.error(`Error generating invoice for student ${studentId} in class ${classId}:`, error);
+        }
+
+        // Send enrollment notification email
+        try {
+          await this.sendEnrollmentNotification(studentId, classId);
+        } catch (error) {
+          console.error(`Error sending enrollment notification for student ${studentId} in class ${classId}:`, error);
+        }
+      } catch (error) {
+        console.error(`Error enrolling student ${studentId} in class ${classId}:`, error);
+        // Continue with other classes even if one fails
+      }
+    }
+
+    return { count: created, enrollments };
   }
 
   async getStudentWithDetails(id: number): Promise<any> {
@@ -506,7 +622,7 @@ export class StudentsService {
     }
 
     const enrollments = await this.enrollmentRepository.findByStudentId(id);
-    const parents = await this.parentsService.getStudents(id);
+    const parents = await this.parentsService.findByStudentId(id);
 
     return {
       ...student,
@@ -781,5 +897,540 @@ export class StudentsService {
     }
 
     return { linked, notFound, errors };
+  }
+
+  async bulkEnrollFromFile(file: Express.Multer.File): Promise<{
+    totalRows: number;
+    successful: number;
+    failed: number;
+    results: Array<{
+      row: number;
+      studentName: string;
+      status: 'success' | 'error' | 'skipped';
+      message: string;
+      studentId?: number;
+      parentIds?: number[];
+      classIds?: number[];
+    }>;
+  }> {
+    // Parse the file
+    let rows: any[] = [];
+
+    try {
+      if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+        // Parse CSV - XLSX can handle CSV files
+        const workbook = XLSX.read(file.buffer, {
+          type: 'buffer',
+          cellDates: true,
+          cellNF: false,
+          cellText: false,
+        });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(worksheet, {
+          defval: '', // Default value for empty cells
+          raw: false, // Use formatted strings
+        });
+      } else if (
+        file.mimetype ===
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        file.mimetype === 'application/vnd.ms-excel' ||
+        file.originalname.endsWith('.xlsx') ||
+        file.originalname.endsWith('.xls')
+      ) {
+        // Parse Excel
+        const workbook = XLSX.read(file.buffer, {
+          type: 'buffer',
+          cellDates: true,
+          cellNF: false,
+          cellText: false,
+        });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(worksheet, {
+          defval: '', // Default value for empty cells
+          raw: false, // Use formatted strings
+        });
+      } else {
+        throw new BadRequestException(
+          'Invalid file type. Please upload a CSV or Excel file.',
+        );
+      }
+    } catch (error: any) {
+      throw new BadRequestException(
+        `Failed to parse file: ${error.message || 'Unknown error'}`,
+      );
+    }
+
+    if (!rows || rows.length === 0) {
+      throw new BadRequestException('File is empty or contains no data');
+    }
+
+    const results: Array<{
+      row: number;
+      studentName: string;
+      status: 'success' | 'error' | 'skipped';
+      message: string;
+      studentId?: number;
+      parentIds?: number[];
+      classIds?: number[];
+    }> = [];
+
+    let successful = 0;
+    let failed = 0;
+
+    // Process each row
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNumber = i + 2; // +2 because Excel rows start at 1 and we have header
+
+      try {
+        // Extract and normalize data (handle different column name variations)
+        const classIdsStr =
+          row['Class ID'] ||
+          row['ClassID'] ||
+          row['class_id'] ||
+          row['ClassId'] ||
+          row['Class IDs'] ||
+          '';
+        const studentName =
+          row['Student Name'] ||
+          row['StudentName'] ||
+          row['student_name'] ||
+          row['Name'] ||
+          '';
+        const studentEmail =
+          row['Student Email'] ||
+          row['StudentEmail'] ||
+          row['student_email'] ||
+          row['Email'] ||
+          '';
+        const studentContact =
+          row['Student Contact'] ||
+          row['StudentContact'] ||
+          row['student_contact'] ||
+          row['Contact'] ||
+          row['Phone'] ||
+          '';
+        const studentAddress =
+          row['Student Address'] ||
+          row['StudentAddress'] ||
+          row['student_address'] ||
+          row['Address'] ||
+          '';
+        const studentCity =
+          row['Student City'] ||
+          row['StudentCity'] ||
+          row['student_city'] ||
+          row['City'] ||
+          '';
+        const studentState =
+          row['Student State'] ||
+          row['StudentState'] ||
+          row['student_state'] ||
+          row['State'] ||
+          '';
+        const studentCountry =
+          row['Student Country'] ||
+          row['StudentCountry'] ||
+          row['student_country'] ||
+          row['Country'] ||
+          '';
+        const studentDateOfBirth =
+          row['Student Date of Birth'] ||
+          row['StudentDateOfBirth'] ||
+          row['student_date_of_birth'] ||
+          row['Date of Birth'] ||
+          row['DOB'] ||
+          '';
+
+        // Parent 1
+        const parent1Name =
+          row['Parent 1 Name'] ||
+          row['Parent1Name'] ||
+          row['parent_1_name'] ||
+          row['Parent Name'] ||
+          '';
+        const parent1Email =
+          row['Parent 1 Email'] ||
+          row['Parent1Email'] ||
+          row['parent_1_email'] ||
+          row['Parent Email'] ||
+          '';
+        const parent1Mobile =
+          row['Parent 1 Mobile'] ||
+          row['Parent1Mobile'] ||
+          row['parent_1_mobile'] ||
+          row['Parent Mobile'] ||
+          row['Parent Contact'] ||
+          '';
+        const parent1Relationship =
+          row['Parent 1 Relationship'] ||
+          row['Parent1Relationship'] ||
+          row['parent_1_relationship'] ||
+          row['Relationship'] ||
+          '';
+
+        // Parent 2 (optional)
+        const parent2Name =
+          row['Parent 2 Name'] ||
+          row['Parent2Name'] ||
+          row['parent_2_name'] ||
+          '';
+        const parent2Email =
+          row['Parent 2 Email'] ||
+          row['Parent2Email'] ||
+          row['parent_2_email'] ||
+          '';
+        const parent2Mobile =
+          row['Parent 2 Mobile'] ||
+          row['Parent2Mobile'] ||
+          row['parent_2_mobile'] ||
+          '';
+        const parent2Relationship =
+          row['Parent 2 Relationship'] ||
+          row['Parent2Relationship'] ||
+          row['parent_2_relationship'] ||
+          '';
+
+        // Validation
+        if (!studentName || studentName.trim() === '') {
+          results.push({
+            row: rowNumber,
+            studentName: 'Unknown',
+            status: 'error',
+            message: 'Student name is required',
+          });
+          failed++;
+          continue;
+        }
+
+        if (!classIdsStr || classIdsStr.toString().trim() === '') {
+          results.push({
+            row: rowNumber,
+            studentName: studentName.trim(),
+            status: 'error',
+            message: 'Class ID is required',
+          });
+          failed++;
+          continue;
+        }
+
+        // Parse class IDs (can be comma-separated)
+        const classIdStrings = classIdsStr
+          .toString()
+          .split(',')
+          .map((id: string) => id.trim())
+          .filter((id: string) => id !== '');
+        const classIds = classIdStrings
+          .map((id: string) => parseInt(id, 10))
+          .filter((id: number) => !isNaN(id));
+
+        if (classIds.length === 0) {
+          results.push({
+            row: rowNumber,
+            studentName: studentName.trim(),
+            status: 'error',
+            message: 'Invalid class ID format',
+          });
+          failed++;
+          continue;
+        }
+
+        // Verify classes exist - omit invalid class IDs but continue if at least one is valid
+        const validClassIds: number[] = [];
+        const invalidClassIds: number[] = [];
+        for (const classId of classIds) {
+          const classEntity = await this.classesService.findById(classId);
+          if (!classEntity) {
+            invalidClassIds.push(classId);
+          } else {
+            validClassIds.push(classId);
+          }
+        }
+
+        // If no valid class IDs found, skip this row
+        if (validClassIds.length === 0) {
+          const errorMessage =
+            invalidClassIds.length > 0
+              ? `Class ID(s) not found: ${invalidClassIds.join(', ')}`
+              : 'No valid class IDs found';
+          results.push({
+            row: rowNumber,
+            studentName: studentName.trim(),
+            status: 'error',
+            message: errorMessage,
+          });
+          failed++;
+          continue;
+        }
+
+        // If some class IDs are invalid, log a warning but continue with valid ones
+        if (invalidClassIds.length > 0) {
+          console.warn(
+            `Row ${rowNumber}: Invalid class IDs ${invalidClassIds.join(', ')} will be omitted. Using valid class IDs: ${validClassIds.join(', ')}`,
+          );
+        }
+
+        // Check if student already exists (by email if provided)
+        let student: NullableType<Student> = null;
+        if (studentEmail && studentEmail.trim()) {
+          student = await this.studentsRepository.findByEmail(
+            studentEmail.trim(),
+          );
+        }
+
+        // Create or update student
+        let studentTempPassword: string | null = null;
+        if (!student) {
+          const createStudentDto: CreateStudentDto = {
+            name: studentName.trim(),
+            email: studentEmail?.trim() || undefined,
+            contact: studentContact?.trim() || undefined,
+            address: studentAddress?.trim() || undefined,
+            city: studentCity?.trim() || undefined,
+            state: studentState?.trim() || undefined,
+            country: studentCountry?.trim() || undefined,
+            dateOfBirth: studentDateOfBirth?.trim() || undefined,
+            classes: validClassIds.map((id) => ({ id })),
+          };
+
+          const createResult = await this.create(createStudentDto);
+          student = createResult.student;
+          studentTempPassword = createResult.tempPassword;
+
+          // Send account credentials email to student if email and password are available
+          if (studentEmail && studentEmail.trim() && studentTempPassword) {
+            try {
+              await this.notificationService.sendAccountCredentials({
+                to: studentEmail.trim(),
+                userName: studentName.trim(),
+                email: studentEmail.trim(),
+                tempPassword: studentTempPassword,
+                isParent: false,
+              });
+            } catch (emailError) {
+              console.error(
+                `Error sending account credentials email to student ${studentEmail}:`,
+                emailError,
+              );
+              // Don't fail the enrollment if email fails
+            }
+          }
+        } else if (student) {
+          // Enroll existing student in classes
+          for (const classId of validClassIds) {
+            try {
+              const existingEnrollment =
+                await this.enrollmentRepository.findByStudentAndClass(
+                  student.id,
+                  classId,
+                );
+              if (!existingEnrollment) {
+                await this.enrollmentRepository.create({
+                  studentId: student.id,
+                  classId,
+                  status: 'active',
+                  enrollmentDate: new Date(),
+                });
+              }
+            } catch (error) {
+              // Ignore duplicate enrollment errors
+              console.error(
+                `Error enrolling student ${student.id} in class ${classId}:`,
+                error,
+              );
+            }
+          }
+        }
+
+        // Ensure student is not null before proceeding
+        if (!student) {
+          results.push({
+            row: rowNumber,
+            studentName: studentName.trim(),
+            status: 'error',
+            message: 'Failed to create or find student',
+          });
+          failed++;
+          continue;
+        }
+
+        // Process parents
+        const parentIds: number[] = [];
+
+        // Parent 1
+        if (parent1Name && parent1Name.trim()) {
+          let parent1: NullableType<Parent> = null;
+          if (parent1Email && parent1Email.trim()) {
+            parent1 = await this.parentsService.findByEmail(
+              parent1Email.trim(),
+            );
+          } else if (parent1Mobile && parent1Mobile.trim()) {
+            parent1 = await this.parentsService.findByMobile(
+              parent1Mobile.trim(),
+            );
+          }
+
+          if (!parent1) {
+            const createParentDto = {
+              fullName: parent1Name.trim(),
+              email: parent1Email?.trim() || undefined,
+              mobile: parent1Mobile?.trim() || undefined,
+              relationship:
+                (parent1Relationship?.trim() as
+                  | 'father'
+                  | 'mother'
+                  | 'guardian') || undefined,
+            };
+            const createResult =
+              await this.parentsService.create(createParentDto);
+            parent1 = createResult.parent;
+
+            // Send account credentials email to parent if email and password are available
+            if (
+              parent1Email &&
+              parent1Email.trim() &&
+              createResult.tempPassword
+            ) {
+              try {
+                await this.notificationService.sendAccountCredentials({
+                  to: parent1Email.trim(),
+                  userName: parent1Name.trim(),
+                  email: parent1Email.trim(),
+                  tempPassword: createResult.tempPassword,
+                  isParent: true,
+                });
+              } catch (emailError) {
+                console.error(
+                  `Error sending account credentials email to parent ${parent1Email}:`,
+                  emailError,
+                );
+                // Don't fail the enrollment if email fails
+              }
+            }
+          }
+
+          if (parent1 && student) {
+            parentIds.push(parent1.id);
+            // Link parent to student if not already linked
+            try {
+              await this.parentsService.linkStudent(parent1.id, student.id);
+            } catch (error) {
+              // Ignore if already linked
+              console.error(
+                `Error linking parent ${parent1.id} to student ${student.id}:`,
+                error,
+              );
+            }
+          }
+        }
+
+        // Parent 2 (optional)
+        if (parent2Name && parent2Name.trim()) {
+          let parent2: NullableType<Parent> = null;
+          if (parent2Email && parent2Email.trim()) {
+            parent2 = await this.parentsService.findByEmail(
+              parent2Email.trim(),
+            );
+          } else if (parent2Mobile && parent2Mobile.trim()) {
+            parent2 = await this.parentsService.findByMobile(
+              parent2Mobile.trim(),
+            );
+          }
+
+          if (!parent2) {
+            const createParentDto = {
+              fullName: parent2Name.trim(),
+              email: parent2Email?.trim() || undefined,
+              mobile: parent2Mobile?.trim() || undefined,
+              relationship:
+                (parent2Relationship?.trim() as
+                  | 'father'
+                  | 'mother'
+                  | 'guardian') || undefined,
+            };
+            const createResult =
+              await this.parentsService.create(createParentDto);
+            parent2 = createResult.parent;
+
+            // Send account credentials email to parent if email and password are available
+            if (
+              parent2Email &&
+              parent2Email.trim() &&
+              createResult.tempPassword
+            ) {
+              try {
+                await this.notificationService.sendAccountCredentials({
+                  to: parent2Email.trim(),
+                  userName: parent2Name.trim(),
+                  email: parent2Email.trim(),
+                  tempPassword: createResult.tempPassword,
+                  isParent: true,
+                });
+              } catch (emailError) {
+                console.error(
+                  `Error sending account credentials email to parent ${parent2Email}:`,
+                  emailError,
+                );
+                // Don't fail the enrollment if email fails
+              }
+            }
+          }
+
+          if (parent2 && student) {
+            parentIds.push(parent2.id);
+            // Link parent to student if not already linked
+            try {
+              await this.parentsService.linkStudent(parent2.id, student.id);
+            } catch (error) {
+              // Ignore if already linked
+              console.error(
+                `Error linking parent ${parent2.id} to student ${student.id}:`,
+                error,
+              );
+            }
+          }
+        }
+
+        // Final check to ensure student exists before adding to results
+        if (student) {
+          results.push({
+            row: rowNumber,
+            studentName: studentName.trim(),
+            status: 'success',
+            message: `Student enrolled in ${validClassIds.length} class(es)`,
+            studentId: student.id,
+            parentIds,
+            classIds: validClassIds,
+          });
+          successful++;
+        } else {
+          results.push({
+            row: rowNumber,
+            studentName: studentName.trim(),
+            status: 'error',
+            message: 'Failed to create or find student',
+          });
+          failed++;
+        }
+      } catch (error: any) {
+        results.push({
+          row: rowNumber,
+          studentName: row['Student Name'] || row['Name'] || 'Unknown',
+          status: 'error',
+          message: error.message || 'Unknown error occurred',
+        });
+        failed++;
+        console.error(`Error processing row ${rowNumber}:`, error);
+      }
+    }
+
+    return {
+      totalRows: rows.length,
+      successful,
+      failed,
+      results,
+    };
   }
 }

@@ -10,6 +10,8 @@ import { NotificationModule } from '../notifications/notification.module';
 import { MailModule } from '../mail/mail.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { SettingsModule } from '../settings/settings.module';
+import { AccessControlModule } from '../access-control/access-control.module';
+import { ClassesModule } from '../classes/classes.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { SettingsModule } from '../settings/settings.module';
     forwardRef(() => PaymentsModule),
     forwardRef(() => StudentsModule),
     forwardRef(() => ParentsModule),
+    forwardRef(() => AccessControlModule),
+    ClassesModule,
   ],
   controllers: [InvoicesController, InvoicePaymentController],
   providers: [InvoicesService, InvoicePaymentService],

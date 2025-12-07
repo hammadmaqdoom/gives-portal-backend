@@ -45,6 +45,21 @@ export class Class {
   @ApiProperty({ example: 'virtual', enum: ['virtual', 'in-person'] })
   classMode: 'virtual' | 'in-person';
 
+  @ApiProperty({ example: false })
+  isPublicForSale?: boolean;
+
+  @ApiProperty({ example: 'https://example.com/thumbnail.jpg', nullable: true })
+  thumbnailUrl?: string | null;
+
+  @ApiProperty({ example: 'https://example.com/cover.jpg', nullable: true })
+  coverImageUrl?: string | null;
+
+  @ApiProperty({
+    example: { duration: '3 months', level: 'Beginner', format: 'Online' },
+    nullable: true,
+  })
+  features?: any | null;
+
   @ApiProperty({
     type: [ClassSchedule],
     description: 'Detailed schedule for each day',

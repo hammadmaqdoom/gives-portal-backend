@@ -13,6 +13,8 @@ import { InvoiceStatus } from './domain/invoice';
 import { MailService } from '../mail/mail.service';
 import { StudentsService } from '../students/students.service';
 import { ParentsService } from '../parents/parents.service';
+import { AccessControlService } from '../access-control/access-control.service';
+import { ClassesService } from '../classes/classes.service';
 
 @Injectable()
 export class InvoicePaymentService {
@@ -25,6 +27,9 @@ export class InvoicePaymentService {
     private mailService: MailService,
     private studentsService: StudentsService,
     private parentsService: ParentsService,
+    @Inject(forwardRef(() => AccessControlService))
+    private accessControlService: AccessControlService,
+    private classesService: ClassesService,
   ) {}
 
   async createPaymentSession(
@@ -146,6 +151,17 @@ export class InvoicePaymentService {
         `Invoice ${transaction.invoiceId} marked as paid via transaction ${transactionId}`,
       );
 
+      // Activate enrollments for this student
+      try {
+        await this.activateEnrollmentsForInvoice(updatedInvoice!);
+      } catch (error) {
+        this.logger.error(
+          'Error activating enrollments after payment:',
+          error,
+        );
+        // Don't fail payment processing if enrollment activation fails
+      }
+
       // Send payment confirmation email
       try {
         if (updatedInvoice) {
@@ -164,6 +180,57 @@ export class InvoicePaymentService {
       );
       throw error;
     }
+  }
+
+  /**
+   * Activate enrollments for an invoice after payment
+   */
+  async activateEnrollmentsForInvoice(invoice: Invoice): Promise<void> {
+    if (!invoice.studentId) {
+      this.logger.warn(
+        `Invoice ${invoice.id} has no studentId, skipping enrollment activation`,
+      );
+      return;
+    }
+
+    // Find enrollments with pending_payment status for this student
+    // We need to match by invoice description containing class name
+    const student = await this.studentsService.findById(invoice.studentId);
+    if (!student) {
+      this.logger.warn(
+        `Student ${invoice.studentId} not found for invoice ${invoice.id}`,
+      );
+      return;
+    }
+
+    // Extract class name from invoice description
+    // Format: "Course enrollment: {className}"
+    const classMatch = invoice.description?.match(/Course enrollment: (.+)/);
+    if (!classMatch) {
+      this.logger.warn(
+        `Could not extract class name from invoice ${invoice.id} description`,
+      );
+      return;
+    }
+
+    const className = classMatch[1].trim();
+
+    // Find class by name
+    const classEntity = await this.classesService.findByName(className);
+    if (!classEntity) {
+      this.logger.warn(`Class "${className}" not found for invoice ${invoice.id}`);
+      return;
+    }
+
+    // Activate enrollment
+    await this.accessControlService.activateEnrollment(
+      invoice.studentId,
+      classEntity.id,
+    );
+
+    this.logger.log(
+      `Activated enrollment for student ${invoice.studentId} in class ${classEntity.id} after payment`,
+    );
   }
 
   async processPaymentFailure(

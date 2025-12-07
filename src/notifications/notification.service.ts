@@ -29,9 +29,7 @@ export class NotificationService {
   }
 
   private getAppName(): string {
-    return (
-      this.configService.get('app.name', { infer: true }) || 'Gives Portal'
-    );
+    return this.configService.get('app.name', { infer: true }) || 'LMS Portal';
   }
 
   private getFrontendUrl(): string {
@@ -215,6 +213,70 @@ export class NotificationService {
         text2: 'Click the button below to reset your password:',
         text3: 'If you did not request this, please ignore this email.',
         text4: 'This link will expire in 24 hours for security reasons.',
+      },
+    });
+  }
+
+  async sendAccountCredentials(
+    data: NotificationData & {
+      userName: string;
+      email: string;
+      tempPassword: string;
+      isParent?: boolean;
+    },
+  ): Promise<void> {
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', {
+      infer: true,
+    });
+    const loginUrl = createUrl(frontendDomain, '/auth/login').toString();
+
+    await this.mailerService.sendMail({
+      to: data.to,
+      subject: `Your Account Credentials - ${this.getAppName()}`,
+      templatePath: this.getTemplatePath('account-credentials'),
+      context: {
+        app_name: this.getAppName(),
+        userName: data.userName,
+        email: data.email,
+        tempPassword: data.tempPassword,
+        loginUrl,
+        isParent: data.isParent || false,
+      },
+    });
+  }
+
+  async sendGuestCheckoutNotification(
+    data: NotificationData & {
+      studentName: string;
+      studentEmail: string;
+      checkoutId: string;
+      courses: Array<{ name: string }>;
+      invoices: Array<{ invoiceNumber: string; amount: number; currency: string }>;
+      total: number;
+      currency: string;
+    },
+  ): Promise<void> {
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', {
+      infer: true,
+    });
+    const loginUrl = createUrl(frontendDomain, '/auth/login').toString();
+    const dashboardUrl = createUrl(frontendDomain, '/dashboard').toString();
+
+    await this.mailerService.sendMail({
+      to: data.to,
+      subject: `Thank You for Your Order - ${this.getAppName()}`,
+      templatePath: this.getTemplatePath('guest-checkout'),
+      context: {
+        app_name: this.getAppName(),
+        studentName: data.studentName,
+        studentEmail: data.studentEmail,
+        checkoutId: data.checkoutId,
+        courses: data.courses,
+        invoices: data.invoices,
+        total: data.total,
+        currency: data.currency,
+        loginUrl,
+        dashboardUrl,
       },
     });
   }

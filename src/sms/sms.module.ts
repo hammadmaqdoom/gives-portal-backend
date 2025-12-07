@@ -7,10 +7,7 @@ import { SmsLogEntity } from './infrastructure/persistence/relational/entities/s
 import { SettingsModule } from '../settings/settings.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([SmsLogEntity]),
-    SettingsModule,
-  ],
+  imports: [TypeOrmModule.forFeature([SmsLogEntity]), SettingsModule],
   providers: [SmsService, WhatsAppService],
   controllers: [SmsController],
   exports: [SmsService, WhatsAppService],

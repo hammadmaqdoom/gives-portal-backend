@@ -1,4 +1,8 @@
+// Load polyfills first to fix Node.js v25 compatibility issues
+import './polyfills';
 import 'dotenv/config';
+import * as Sentry from '@sentry/node';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import {
   ClassSerializerInterceptor,
   ValidationPipe,
@@ -14,7 +18,40 @@ import { AllConfigType } from './config/config.type';
 import { ResolvePromisesInterceptor } from './utils/serializer.interceptor';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: true });
+  // Initialize Sentry before creating the app
+  const sentryDsn = process.env.SENTRY_DSN;
+  const sentryEnabled = process.env.SENTRY_ENABLED === 'true' || !!sentryDsn;
+
+  if (sentryEnabled && sentryDsn) {
+    Sentry.init({
+      dsn: sentryDsn,
+      environment:
+        process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development',
+      integrations: [nodeProfilingIntegration()],
+      tracesSampleRate: process.env.SENTRY_TRACES_SAMPLE_RATE
+        ? parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE)
+        : 0.1,
+      profilesSampleRate: process.env.SENTRY_PROFILES_SAMPLE_RATE
+        ? parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE)
+        : 0.1,
+    });
+  }
+
+  const app = await NestFactory.create(AppModule);
+  
+  // Enable CORS with proper configuration
+  // Note: When credentials: true, origin cannot be '*', must be specific or function
+  app.enableCors({
+    origin: (origin, callback) => {
+      // Allow all origins (for development)
+      // In production, replace with specific allowed origins
+      callback(null, true);
+    },
+    credentials: true, // Allow cookies to be sent
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-cart-session-id', 'x-custom-lang', 'Accept'],
+    exposedHeaders: ['Content-Type', 'Authorization'],
+  });
   (global as any).nestjsApp = app;
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
   const configService = app.get(ConfigService<AllConfigType>);

@@ -297,7 +297,7 @@ export class CreateSettingsDto {
   @MaxLength(100)
   smsProvider?: string;
 
-  @ApiPropertyOptional({ example: 'givesacademydev@gmail.com' })
+  @ApiPropertyOptional({ example: 'digitaro.co.global@gmail.com' })
   @IsOptional()
   @IsEmail()
   @MaxLength(255)
@@ -338,7 +338,9 @@ export class CreateSettingsDto {
   @MaxLength(255)
   whatsappDeviceId?: string;
 
-  @ApiPropertyOptional({ example: 'https://secure.h3techs.com/sms/api/send_whatsapp' })
+  @ApiPropertyOptional({
+    example: 'https://secure.h3techs.com/sms/api/send_whatsapp',
+  })
   @IsOptional()
   @IsUrl()
   @MaxLength(500)

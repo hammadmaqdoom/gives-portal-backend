@@ -26,17 +26,17 @@ export class FeeReminderLogEntity extends EntityRelationalHelper {
   invoiceId?: number;
 
   @Index()
-  @Column({ 
-    type: 'enum', 
+  @Column({
+    type: 'enum',
     enum: ['email', 'sms', 'whatsapp'],
   })
   reminderType: 'email' | 'sms' | 'whatsapp';
 
   @Index()
-  @Column({ 
-    type: 'enum', 
+  @Column({
+    type: 'enum',
     enum: ['pending', 'sent', 'failed'],
-    default: 'pending'
+    default: 'pending',
   })
   status: 'pending' | 'sent' | 'failed';
 
