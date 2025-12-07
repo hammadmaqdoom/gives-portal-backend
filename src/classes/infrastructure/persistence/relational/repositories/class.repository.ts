@@ -96,6 +96,13 @@ export class ClassesRelationalRepository implements ClassRepository {
       });
     }
 
+    // Support isPublicForSale filter
+    if ((filterOptions as any)?.isPublicForSale !== undefined) {
+      queryBuilder.andWhere('class.isPublicForSale = :isPublicForSale', {
+        isPublicForSale: (filterOptions as any).isPublicForSale,
+      });
+    }
+
     if (sortOptions?.length) {
       sortOptions.forEach((sortOption) => {
         queryBuilder.addOrderBy(

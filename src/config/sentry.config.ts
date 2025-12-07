@@ -5,7 +5,7 @@ import {
   IsOptional,
   IsString,
   IsNumber,
-  IsBoolean,
+  IsIn,
   Min,
   Max,
 } from 'class-validator';
@@ -19,7 +19,8 @@ class EnvironmentVariablesValidator {
   @IsOptional()
   SENTRY_ENVIRONMENT: string;
 
-  @IsBoolean()
+  @IsString()
+  @IsIn(['true', 'false'])
   @IsOptional()
   SENTRY_ENABLED: string;
 

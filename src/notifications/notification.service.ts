@@ -244,4 +244,40 @@ export class NotificationService {
       },
     });
   }
+
+  async sendGuestCheckoutNotification(
+    data: NotificationData & {
+      studentName: string;
+      studentEmail: string;
+      checkoutId: string;
+      courses: Array<{ name: string }>;
+      invoices: Array<{ invoiceNumber: string; amount: number; currency: string }>;
+      total: number;
+      currency: string;
+    },
+  ): Promise<void> {
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', {
+      infer: true,
+    });
+    const loginUrl = createUrl(frontendDomain, '/auth/login').toString();
+    const dashboardUrl = createUrl(frontendDomain, '/dashboard').toString();
+
+    await this.mailerService.sendMail({
+      to: data.to,
+      subject: `Thank You for Your Order - ${this.getAppName()}`,
+      templatePath: this.getTemplatePath('guest-checkout'),
+      context: {
+        app_name: this.getAppName(),
+        studentName: data.studentName,
+        studentEmail: data.studentEmail,
+        checkoutId: data.checkoutId,
+        courses: data.courses,
+        invoices: data.invoices,
+        total: data.total,
+        currency: data.currency,
+        loginUrl,
+        dashboardUrl,
+      },
+    });
+  }
 }

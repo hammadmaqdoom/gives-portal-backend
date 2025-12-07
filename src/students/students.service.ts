@@ -499,6 +499,117 @@ export class StudentsService {
     return this.enrollmentRepository.findEnrollmentHistoryByClassId(classId);
   }
 
+  async getAllEnrollments(options?: {
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: any[]; total: number; page: number; limit: number }> {
+    const page = options?.page || 1;
+    const limit = options?.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const [enrollments, total] = await Promise.all([
+      this.enrollmentRepository.findAll({
+        skip,
+        take: limit,
+        order: { enrollmentDate: 'DESC' },
+      }),
+      this.enrollmentRepository.count(),
+    ]);
+
+    return {
+      data: enrollments,
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async getEnrollmentStats(): Promise<{
+    total: number;
+    active: number;
+    dropped: number;
+    thisMonth: number;
+  }> {
+    const [total, active, dropped, thisMonth] = await Promise.all([
+      this.enrollmentRepository.count(),
+      this.enrollmentRepository.countByStatus('active'),
+      this.enrollmentRepository.countByStatus('dropped'),
+      this.enrollmentRepository.countThisMonth(),
+    ]);
+
+    return {
+      total,
+      active,
+      dropped,
+      thisMonth,
+    };
+  }
+
+  async bulkEnrollStudentInClasses(
+    studentId: number,
+    body: { classIds: number[]; status?: string; enrollmentDate?: string },
+  ): Promise<{ count: number; enrollments: any[] }> {
+    const student = await this.studentsRepository.findById(studentId);
+    if (!student) {
+      throw new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: {
+          studentId: 'studentNotExists',
+        },
+      });
+    }
+
+    const status = (body.status as any) || 'active';
+    const date = body.enrollmentDate
+      ? new Date(body.enrollmentDate)
+      : new Date();
+
+    const enrollments: any[] = [];
+    let created = 0;
+
+    for (const classId of body.classIds || []) {
+      try {
+        // Check if already enrolled
+        const exists = await this.enrollmentRepository.findByStudentAndClass(
+          studentId,
+          classId,
+        );
+        if (exists) {
+          continue; // Skip if already enrolled
+        }
+
+        const enrollment = await this.enrollmentRepository.create({
+          studentId,
+          classId,
+          enrollmentDate: date,
+          status,
+        });
+
+        enrollments.push(enrollment);
+        created++;
+
+        // Generate monthly invoice for the enrollment
+        try {
+          await this.generateMonthlyInvoice(studentId, classId);
+        } catch (error) {
+          console.error(`Error generating invoice for student ${studentId} in class ${classId}:`, error);
+        }
+
+        // Send enrollment notification email
+        try {
+          await this.sendEnrollmentNotification(studentId, classId);
+        } catch (error) {
+          console.error(`Error sending enrollment notification for student ${studentId} in class ${classId}:`, error);
+        }
+      } catch (error) {
+        console.error(`Error enrolling student ${studentId} in class ${classId}:`, error);
+        // Continue with other classes even if one fails
+      }
+    }
+
+    return { count: created, enrollments };
+  }
+
   async getStudentWithDetails(id: number): Promise<any> {
     const student = await this.studentsRepository.findById(id);
     if (!student) {
@@ -511,7 +622,7 @@ export class StudentsService {
     }
 
     const enrollments = await this.enrollmentRepository.findByStudentId(id);
-    const parents = await this.parentsService.getStudents(id);
+    const parents = await this.parentsService.findByStudentId(id);
 
     return {
       ...student,

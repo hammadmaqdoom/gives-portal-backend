@@ -57,7 +57,11 @@ export class ClassesService {
       schedules: createClassDto.schedules as any,
       subject: createClassDto.subject as any,
       teacher: createClassDto.teacher as any,
-    };
+      isPublicForSale: createClassDto.isPublicForSale,
+      thumbnailUrl: createClassDto.thumbnailUrl,
+      coverImageUrl: createClassDto.coverImageUrl,
+      features: createClassDto.features,
+    } as any;
 
     return this.classesRepository.create(classData);
   }
@@ -283,5 +287,40 @@ export class ClassesService {
       }
     }
     return { count: created };
+  }
+
+  /**
+   * Get price for a class based on currency
+   */
+  getPriceForCurrency(classEntity: Class, currency: string): number {
+    return currency === 'PKR' ? classEntity.feePKR : classEntity.feeUSD;
+  }
+
+  /**
+   * Find public classes for sale
+   */
+  async findPublicClassesForSale(
+    currency: string,
+    filterOptions?: FilterClassDto | null,
+    paginationOptions?: IPaginationOptions,
+  ): Promise<Class[]> {
+    // Add isPublicForSale filter
+    const filters: any = {
+      ...filterOptions,
+      isPublicForSale: true,
+    };
+
+    const classes = await this.classesRepository.findManyWithPagination({
+      filterOptions: filters,
+      sortOptions: null,
+      paginationOptions: paginationOptions || { page: 1, limit: 12 },
+    });
+
+    // Transform to include currency-aware price
+    return classes.map((cls) => ({
+      ...cls,
+      price: this.getPriceForCurrency(cls, currency),
+      currency,
+    })) as any;
   }
 }

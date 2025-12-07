@@ -1,3 +1,5 @@
+// Load polyfills first to fix Node.js v25 compatibility issues
+import './polyfills';
 import 'dotenv/config';
 import * as Sentry from '@sentry/node';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
@@ -35,7 +37,21 @@ async function bootstrap() {
     });
   }
 
-  const app = await NestFactory.create(AppModule, { cors: true });
+  const app = await NestFactory.create(AppModule);
+  
+  // Enable CORS with proper configuration
+  // Note: When credentials: true, origin cannot be '*', must be specific or function
+  app.enableCors({
+    origin: (origin, callback) => {
+      // Allow all origins (for development)
+      // In production, replace with specific allowed origins
+      callback(null, true);
+    },
+    credentials: true, // Allow cookies to be sent
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-cart-session-id', 'x-custom-lang', 'Accept'],
+    exposedHeaders: ['Content-Type', 'Authorization'],
+  });
   (global as any).nestjsApp = app;
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
   const configService = app.get(ConfigService<AllConfigType>);

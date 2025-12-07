@@ -25,6 +25,7 @@ import {
 } from '@nestjs/swagger';
 import { Response } from 'express';
 import { InvoicesService } from './invoices.service';
+import { InvoicePaymentService } from './invoice-payment.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { QueryInvoiceDto } from './dto/query-invoice.dto';
@@ -42,7 +43,10 @@ import { Invoice } from './domain/invoice';
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @ApiBearerAuth()
 export class InvoicesController {
-  constructor(private readonly invoicesService: InvoicesService) {}
+  constructor(
+    private readonly invoicesService: InvoicesService,
+    private readonly invoicePaymentService: InvoicePaymentService,
+  ) {}
 
   @Post()
   @Roles(RoleEnum.admin, RoleEnum.teacher)
@@ -220,6 +224,39 @@ export class InvoicesController {
       body.paymentMethod,
       body.transactionId,
     );
+  }
+
+  @Post(':id/approve-payment')
+  @Roles(RoleEnum.admin)
+  @ApiOperation({ summary: 'Approve bank transfer payment and activate enrollments' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Payment approved and enrollments activated successfully',
+    type: Invoice,
+  })
+  async approvePayment(@Param('id') id: string) {
+    const invoice = await this.invoicesService.findById(+id);
+    if (!invoice) {
+      throw new BadRequestException('Invoice not found');
+    }
+
+    // Mark invoice as paid
+    const updatedInvoice = await this.invoicesService.markAsPaid(
+      +id,
+      'bank_transfer',
+      undefined,
+    );
+
+    if (!updatedInvoice) {
+      throw new BadRequestException('Failed to update invoice');
+    }
+
+    // Activate enrollments
+    await this.invoicePaymentService.activateEnrollmentsForInvoice(
+      updatedInvoice,
+    );
+
+    return updatedInvoice;
   }
 
   @Patch(':id/upload-proof')

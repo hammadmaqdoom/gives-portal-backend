@@ -113,6 +113,25 @@ export class ClassesController {
     return this.classesService.update(+id, updateClassDto);
   }
 
+  @Patch(':id/public-sale')
+  @Roles(RoleEnum.admin)
+  @ApiParam({
+    name: 'id',
+    type: String,
+  })
+  @ApiOkResponse({
+    type: Class,
+    description: 'Toggle public sale status for a class',
+  })
+  async togglePublicSale(
+    @Param('id') id: string,
+    @Body() body: { isPublicForSale: boolean },
+  ): Promise<Class | null> {
+    return this.classesService.update(+id, {
+      isPublicForSale: body.isPublicForSale,
+    } as any);
+  }
+
   @Delete(':id')
   @Roles(RoleEnum.admin)
   @ApiParam({

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thank You for Your Order - {{app_name}}</title>
+</head>
+
+<body style="margin:0;font-family:arial">
+    <table style="border:0;width:100%">
+        <tr style="background:#eeeeee">
+            <td style="padding:20px;color:#808080;text-align:center;font-size:40px;font-weight:600">
+                {{app_name}}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:20px;color:#808080;font-size:16px;font-weight:100">
+                <h2 style="color:#333;margin-bottom:20px">Thank You, {{studentName}}!</h2>
+                <p>Your enrollment request has been received successfully. We're excited to have you join us!</p>
+                
+                <div style="background:#f5f5f5;padding:20px;border-radius:5px;margin:20px 0">
+                    <p style="margin:10px 0"><strong>Order ID:</strong> {{checkoutId}}</p>
+                    <p style="margin:10px 0"><strong>Email:</strong> {{studentEmail}}</p>
+                </div>
+
+                <h3 style="color:#333;margin-top:30px;margin-bottom:15px">Courses Enrolled:</h3>
+                <ul style="line-height:1.8;margin-bottom:20px">
+                    {{#each courses}}
+                    <li>{{this.name}}</li>
+                    {{/each}}
+                </ul>
+
+                {{#if invoices}}
+                <h3 style="color:#333;margin-top:30px;margin-bottom:15px">Invoices Generated:</h3>
+                <ul style="line-height:1.8;margin-bottom:20px">
+                    {{#each invoices}}
+                    <li>Invoice {{this.invoiceNumber}} - {{this.currency}}{{this.amount}}</li>
+                    {{/each}}
+                </ul>
+                {{/if}}
+
+                <div style="background:#e3f2fd;padding:20px;border-radius:5px;margin:20px 0;border-left:4px solid #2196f3">
+                    <p style="margin:0;font-weight:bold;color:#1976d2">Total Amount: {{currency}}{{total}}</p>
+                </div>
+
+                <h3 style="color:#333;margin-top:30px;margin-bottom:15px">Next Steps:</h3>
+                <ol style="line-height:1.8;margin-bottom:20px">
+                    <li><strong>Log in to your account</strong> - Use the login button below to access the portal</li>
+                    <li><strong>Upload bank statement proof</strong> - Navigate to your dashboard and upload your bank transfer proof</li>
+                    <li><strong>Wait for approval</strong> - Our team will review your payment proof and activate your course access</li>
+                </ol>
+
+                <div style="background:#fff3cd;padding:20px;border-radius:5px;margin:20px 0;border-left:4px solid #ffc107">
+                    <p style="margin:0;font-weight:bold;color:#856404">⚠️ Important:</p>
+                    <p style="margin:10px 0 0 0;color:#856404">Your course access will be activated after admin approval of your bank transfer proof. Please upload the proof as soon as possible.</p>
+                </div>
+
+                <p style="margin-top:30px">You can access the portal by clicking the button below:</p>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align:center;padding:20px">
+                <a href="{{loginUrl}}"
+                    style="display:inline-block;padding:15px 30px;background:#00838f;text-decoration:none;color:#ffffff;border-radius:5px;font-weight:bold;margin:5px">Login to Your Account</a>
+                <a href="{{dashboardUrl}}"
+                    style="display:inline-block;padding:15px 30px;background:#4caf50;text-decoration:none;color:#ffffff;border-radius:5px;font-weight:bold;margin:5px">Go to Dashboard</a>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:20px;color:#808080;font-size:14px">
+                <p><strong>What you can do after logging in:</strong></p>
+                <ul style="line-height:1.8">
+                    <li>Upload your bank transfer proof</li>
+                    <li>View your invoices and payment status</li>
+                    <li>Access course materials after approval</li>
+                    <li>View your enrollment details</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:20px;color:#808080;font-size:14px;text-align:center">
+                <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+                <p>Best regards,<br>The {{app_name}} Team</p>
+            </td>
+        </tr>
+    </table>
+</body>
+
+</html>
+

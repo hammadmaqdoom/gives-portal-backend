@@ -186,6 +186,49 @@ export class StudentsController {
     };
   }
 
+  // Enrollment Management Endpoints - Must be before :id routes
+  @Get('enrollments/all')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.admin, RoleEnum.user)
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'All enrollments retrieved successfully',
+  })
+  getAllEnrollments(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.studentsService.getAllEnrollments({
+      page: page ? +page : 1,
+      limit: limit ? +limit : 10,
+    });
+  }
+
+  @Get('enrollments/stats')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.admin, RoleEnum.user)
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Enrollment statistics retrieved successfully',
+  })
+  getEnrollmentStats() {
+    return this.studentsService.getEnrollmentStats();
+  }
+
+  @Get('classes/:classId/enrollment-history')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.admin, RoleEnum.user)
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Class enrollment history retrieved successfully',
+  })
+  getClassEnrollmentHistory(@Param('classId') classId: string) {
+    return this.studentsService.getClassEnrollmentHistory(+classId);
+  }
+
   @Get(':id')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -314,16 +357,20 @@ export class StudentsController {
     return this.studentsService.getEnrollmentHistory(+id);
   }
 
-  @Get('classes/:classId/enrollment-history')
+
+  @Post(':id/enrollments/bulk')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(RoleEnum.admin, RoleEnum.user)
   @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Class enrollment history retrieved successfully',
+    status: HttpStatus.CREATED,
+    description: 'Student enrolled in multiple classes successfully',
   })
-  getClassEnrollmentHistory(@Param('classId') classId: string) {
-    return this.studentsService.getClassEnrollmentHistory(+classId);
+  bulkEnrollStudentInClasses(
+    @Param('id') id: string,
+    @Body() body: { classIds: number[]; status?: string; enrollmentDate?: string },
+  ) {
+    return this.studentsService.bulkEnrollStudentInClasses(+id, body);
   }
 
   // Student-User Linking Endpoints

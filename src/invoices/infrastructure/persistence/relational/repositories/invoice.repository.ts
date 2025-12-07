@@ -28,7 +28,7 @@ export class InvoiceRepositoryImpl implements InvoiceRepository {
   async findById(id: Invoice['id']): Promise<Invoice | null> {
     const entity = await this.invoiceRepository.findOne({
       where: { id },
-      relations: ['student', 'parent'],
+      relations: ['student', 'parent', 'items'],
     });
 
     return entity ? InvoiceMapper.toDomain(entity) : null;
@@ -63,7 +63,7 @@ export class InvoiceRepositoryImpl implements InvoiceRepository {
   ): Promise<Invoice | null> {
     const entity = await this.invoiceRepository.findOne({
       where: { id },
-      relations: ['student', 'parent'],
+      relations: ['student', 'parent', 'items'],
     });
 
     if (!entity) {
@@ -87,7 +87,7 @@ export class InvoiceRepositoryImpl implements InvoiceRepository {
 
     const entities = await this.invoiceRepository.find({
       where: { student: { id: studentId } },
-      relations: ['student', 'parent'],
+      relations: ['student', 'parent', 'items'],
       order: { createdAt: 'DESC' },
     });
 
@@ -105,7 +105,7 @@ export class InvoiceRepositoryImpl implements InvoiceRepository {
   async findByParent(parentId: number): Promise<Invoice[]> {
     const entities = await this.invoiceRepository.find({
       where: { parent: { id: parentId } },
-      relations: ['student', 'parent'],
+      relations: ['student', 'parent', 'items'],
       order: { createdAt: 'DESC' },
     });
 
@@ -115,7 +115,7 @@ export class InvoiceRepositoryImpl implements InvoiceRepository {
   async findByStatus(status: string): Promise<Invoice[]> {
     const entities = await this.invoiceRepository.find({
       where: { status: status as any },
-      relations: ['student', 'parent'],
+      relations: ['student', 'parent', 'items'],
       order: { createdAt: 'DESC' },
     });
 
@@ -127,6 +127,7 @@ export class InvoiceRepositoryImpl implements InvoiceRepository {
       .createQueryBuilder('invoice')
       .leftJoinAndSelect('invoice.student', 'student')
       .leftJoinAndSelect('invoice.parent', 'parent')
+      .leftJoinAndSelect('invoice.items', 'items')
       .where('invoice.dueDate < :today', { today: new Date() })
       .andWhere('invoice.status IN (:...statuses)', {
         statuses: ['sent', 'draft'],

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { StudentClassEnrollmentEntity } from '../entities/student-class-enrollment.entity';
 import { StudentClassEnrollment } from '../../../../domain/student-class-enrollment';
 import { StudentClassEnrollmentMapper } from '../mappers/student-class-enrollment.mapper';
@@ -148,5 +148,53 @@ export class StudentClassEnrollmentRepository {
         deenrollmentDate: new Date(),
       },
     );
+  }
+
+  async findAll(options?: {
+    skip?: number;
+    take?: number;
+    order?: { [key: string]: 'ASC' | 'DESC' };
+  }): Promise<StudentClassEnrollment[]> {
+    const enrollments = await this.enrollmentRepository.find({
+      relations: ['student', 'class'],
+      skip: options?.skip,
+      take: options?.take,
+      order: options?.order || { enrollmentDate: 'DESC' },
+      where: {
+        deletedAt: IsNull(),
+      },
+    });
+
+    return enrollments.map((enrollment) =>
+      this.enrollmentMapper.toDomain(enrollment),
+    );
+  }
+
+  async count(): Promise<number> {
+    return this.enrollmentRepository.count({
+      where: {
+        deletedAt: IsNull(),
+      },
+    });
+  }
+
+  async countByStatus(status: string): Promise<number> {
+    return this.enrollmentRepository.count({
+      where: {
+        status: status as 'active' | 'inactive' | 'completed' | 'dropped',
+        deletedAt: IsNull(),
+      },
+    });
+  }
+
+  async countThisMonth(): Promise<number> {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    return this.enrollmentRepository
+      .createQueryBuilder('enrollment')
+      .where('enrollment.enrollmentDate >= :startOfMonth', { startOfMonth })
+      .andWhere('enrollment.deletedAt IS NULL')
+      .getCount();
   }
 }

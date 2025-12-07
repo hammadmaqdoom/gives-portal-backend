@@ -42,10 +42,10 @@ export class CreateInvoiceItemDto {
 }
 
 export class CreateInvoiceDto {
-  @ApiProperty({ example: 'INV-2024-001' })
-  @IsNotEmpty()
+  @ApiPropertyOptional({ example: 'INV-2024-001' })
+  @IsOptional()
   @IsString()
-  invoiceNumber: string;
+  invoiceNumber?: string;
 
   @ApiProperty({ example: 1 })
   @IsNotEmpty()

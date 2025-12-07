@@ -32,7 +32,11 @@ import { SmsModule } from './sms/sms.module';
 import { FeeReminderModule } from './fee-reminders/fee-reminder.module';
 import { InvoiceGenerationModule } from './invoice-generation/invoice-generation.module';
 import { SentryModule } from './sentry/sentry.module';
-import { PublicController } from './public/public.controller';
+import { CurrencyModule } from './currency/currency.module';
+import { PublicModule } from './public/public.module';
+import { CartModule } from './cart/cart.module';
+import { CheckoutModule } from './checkout/checkout.module';
+import { AccessControlModule } from './access-control/access-control.module';
 import { AppDataSource } from './database/data-source';
 import authConfig from './auth/config/auth.config';
 import { DataSource, DataSourceOptions } from 'typeorm';
@@ -94,7 +98,11 @@ import sentryConfig from './config/sentry.config';
     SmsModule,
     FeeReminderModule,
     InvoiceGenerationModule,
+    CurrencyModule,
+    PublicModule,
+    CartModule,
+    CheckoutModule,
+    AccessControlModule,
   ],
-  controllers: [PublicController],
 })
 export class AppModule {}
