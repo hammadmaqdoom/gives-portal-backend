@@ -9,6 +9,8 @@ import { SettingsService } from '../settings/settings.service';
 @Injectable()
 export class CurrencyService implements OnModuleInit {
   private readonly logger = new Logger(CurrencyService.name);
+  private readonly ipCache = new Map<string, { currency: string; timestamp: number }>();
+  private readonly CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
   constructor(
     @InjectRepository(CurrencyRateEntity)
@@ -156,5 +158,86 @@ export class CurrencyService implements OnModuleInit {
     const amountInBase = amount / getToBase(from);
     const converted = amountInBase * getToBase(to);
     return Number(converted.toFixed(2));
+  }
+
+  /**
+   * Detect currency based on IP geolocation
+   * Returns 'PKR' for Pakistan IPs, 'USD' for all others
+   */
+  async detectCurrencyFromIp(ip: string): Promise<string> {
+    // Clean IP address (remove port, handle IPv6)
+    const cleanIp = ip?.split(':').pop()?.split(',').shift()?.trim() || '';
+    
+    if (!cleanIp || cleanIp === '::1' || cleanIp === '127.0.0.1') {
+      // Localhost - default to USD
+      return 'USD';
+    }
+
+    // Check cache first
+    const cached = this.ipCache.get(cleanIp);
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      return cached.currency;
+    }
+
+    try {
+      // Use ip-api.com (free, no API key required for basic usage)
+      // Alternative: ipapi.co, ipgeolocation.io, etc.
+      const response = await fetch(
+        `http://ip-api.com/json/${cleanIp}?fields=status,countryCode`,
+        { signal: AbortSignal.timeout(3000) }, // 3 second timeout
+      );
+
+      if (!response.ok) {
+        this.logger.warn(`IP geolocation API returned ${response.status}`);
+        return this.cacheAndReturn(cleanIp, 'USD');
+      }
+
+      const data = await response.json();
+      
+      if (data.status === 'success' && data.countryCode === 'PK') {
+        return this.cacheAndReturn(cleanIp, 'PKR');
+      }
+
+      // Default to USD for all other countries or failures
+      return this.cacheAndReturn(cleanIp, 'USD');
+    } catch (error) {
+      this.logger.warn(`Failed to detect currency from IP ${cleanIp}:`, error);
+      // Fallback to USD on error
+      return this.cacheAndReturn(cleanIp, 'USD');
+    }
+  }
+
+  private cacheAndReturn(ip: string, currency: string): string {
+    this.ipCache.set(ip, { currency, timestamp: Date.now() });
+    // Clean old cache entries (keep last 1000 entries)
+    if (this.ipCache.size > 1000) {
+      const entries = Array.from(this.ipCache.entries());
+      entries.sort((a, b) => b[1].timestamp - a[1].timestamp);
+      this.ipCache.clear();
+      entries.slice(0, 1000).forEach(([key, value]) => {
+        this.ipCache.set(key, value);
+      });
+    }
+    return currency;
+  }
+
+  /**
+   * Extract client IP from request headers
+   */
+  extractClientIp(req: any): string {
+    // Check X-Forwarded-For header (for proxies/load balancers)
+    const forwarded = req.headers?.['x-forwarded-for'];
+    if (forwarded) {
+      return forwarded.split(',')[0].trim();
+    }
+
+    // Check X-Real-IP header
+    const realIp = req.headers?.['x-real-ip'];
+    if (realIp) {
+      return realIp.trim();
+    }
+
+    // Fallback to connection remote address
+    return req.ip || req.connection?.remoteAddress || '127.0.0.1';
   }
 }

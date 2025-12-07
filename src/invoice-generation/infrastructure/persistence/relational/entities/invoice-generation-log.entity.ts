@@ -27,17 +27,17 @@ export class InvoiceGenerationLogEntity extends EntityRelationalHelper {
   invoiceId?: number;
 
   @Index()
-  @Column({ 
-    type: 'enum', 
+  @Column({
+    type: 'enum',
     enum: ['monthly', 'quarterly', 'yearly', 'manual'],
   })
   generationType: 'monthly' | 'quarterly' | 'yearly' | 'manual';
 
   @Index()
-  @Column({ 
-    type: 'enum', 
+  @Column({
+    type: 'enum',
     enum: ['success', 'failed', 'skipped'],
-    default: 'success'
+    default: 'success',
   })
   status: 'success' | 'failed' | 'skipped';
 

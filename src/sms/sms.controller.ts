@@ -58,7 +58,11 @@ export class SmsController {
 
   @Get('status')
   @Roles(RoleEnum.admin, RoleEnum.user)
-  @ApiQuery({ name: 'messageId', required: true, description: 'SMS message ID' })
+  @ApiQuery({
+    name: 'messageId',
+    required: true,
+    description: 'SMS message ID',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'SMS status retrieved successfully',
@@ -79,8 +83,16 @@ export class SmsController {
 
   @Get('logs')
   @Roles(RoleEnum.admin, RoleEnum.user)
-  @ApiQuery({ name: 'limit', required: false, description: 'Number of logs to retrieve' })
-  @ApiQuery({ name: 'offset', required: false, description: 'Number of logs to skip' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of logs to retrieve',
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    description: 'Number of logs to skip',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'SMS logs retrieved successfully',
@@ -94,7 +106,11 @@ export class SmsController {
 
   @Get('logs/recipient')
   @Roles(RoleEnum.admin, RoleEnum.user)
-  @ApiQuery({ name: 'recipient', required: true, description: 'Phone number to get logs for' })
+  @ApiQuery({
+    name: 'recipient',
+    required: true,
+    description: 'Phone number to get logs for',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'SMS logs for recipient retrieved successfully',
@@ -142,8 +158,16 @@ export class SmsController {
 
   @Get('whatsapp/logs')
   @Roles(RoleEnum.admin, RoleEnum.user)
-  @ApiQuery({ name: 'limit', required: false, description: 'Number of logs to retrieve' })
-  @ApiQuery({ name: 'offset', required: false, description: 'Number of logs to skip' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of logs to retrieve',
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    description: 'Number of logs to skip',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'WhatsApp logs retrieved successfully',

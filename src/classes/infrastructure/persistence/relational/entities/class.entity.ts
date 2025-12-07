@@ -54,6 +54,18 @@ export class ClassEntity extends EntityRelationalHelper {
   @Column({ type: 'boolean', default: false, name: 'drip_content_enabled' })
   dripContentEnabled: boolean;
 
+  @Column({ type: 'boolean', default: false, name: 'is_public_for_sale' })
+  isPublicForSale: boolean;
+
+  @Column({ type: String, nullable: true, name: 'thumbnail_url' })
+  thumbnailUrl?: string | null;
+
+  @Column({ type: String, nullable: true, name: 'cover_image_url' })
+  coverImageUrl?: string | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  features?: any | null;
+
   @ManyToOne(() => SubjectEntity, {
     eager: true,
   })

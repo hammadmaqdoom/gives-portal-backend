@@ -1,4 +1,4 @@
-# NestJS Boilerplate Documentation
+# LMS Portal - Backend - Main
 
 ---
 
@@ -16,3 +16,4 @@
 - [Benchmarking](benchmarking.md)
 - [Automatic update of dependencies](automatic-update-dependencies.md)
 - [Translations](translations.md)
+

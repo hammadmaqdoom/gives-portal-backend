@@ -65,7 +65,16 @@ export class CreateAssignmentDto {
   markingCriteria?: string;
 
   @ApiProperty({
-    example: [{ id: 'uuid', filename: 'assignment.pdf', originalName: 'Assignment.pdf', url: 'https://...', size: 1024, mimeType: 'application/pdf' }],
+    example: [
+      {
+        id: 'uuid',
+        filename: 'assignment.pdf',
+        originalName: 'Assignment.pdf',
+        url: 'https://...',
+        size: 1024,
+        mimeType: 'application/pdf',
+      },
+    ],
     required: false,
     description: 'Array of file objects attached to the assignment',
   })

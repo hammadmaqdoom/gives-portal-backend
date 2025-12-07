@@ -18,7 +18,10 @@ import { UpdateAssignmentDto } from './dto/update-assignment.dto';
 export class AssignmentsService {
   constructor(private readonly assignmentsRepository: AssignmentRepository) {}
 
-  async create(createAssignmentDto: CreateAssignmentDto, user?: any): Promise<Assignment> {
+  async create(
+    createAssignmentDto: CreateAssignmentDto,
+    user?: any,
+  ): Promise<Assignment> {
     // Transform DTO to domain format
     const assignmentData: Partial<Assignment> = {
       title: createAssignmentDto.title,

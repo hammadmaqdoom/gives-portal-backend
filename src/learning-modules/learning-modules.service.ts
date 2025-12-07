@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { LearningModuleEntity } from './infrastructure/persistence/relational/entities/learning-module.entity';
 import { LearningModuleSectionEntity } from './infrastructure/persistence/relational/entities/learning-module-section.entity';
 import { ModuleCompletionEntity } from './infrastructure/persistence/relational/entities/module-completion.entity';
+import { AccessControlService } from '../access-control/access-control.service';
 
 @Injectable()
 export class LearningModulesService {
@@ -14,6 +15,8 @@ export class LearningModulesService {
     private readonly sectionRepo: Repository<LearningModuleSectionEntity>,
     @InjectRepository(ModuleCompletionEntity)
     private readonly completionRepo: Repository<ModuleCompletionEntity>,
+    @Inject(forwardRef(() => AccessControlService))
+    private readonly accessControlService: AccessControlService,
   ) {}
 
   async list({ classId }: { classId?: number }) {
@@ -172,6 +175,17 @@ export class LearningModulesService {
     classId: number,
     studentId: number,
   ): Promise<LearningModuleEntity[]> {
+    // Check payment status first
+    const accessStatus = await this.accessControlService.checkCourseAccess(
+      studentId,
+      classId,
+    );
+
+    if (!accessStatus.hasAccess) {
+      // Return empty array if payment not verified
+      return [];
+    }
+
     const allModules = await this.list({ classId });
     const completions = await this.getCompletedModules(studentId);
     const completedModuleIds = new Set(completions.map((c) => c.moduleId));

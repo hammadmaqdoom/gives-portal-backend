@@ -1,9 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { LearningModuleEntity } from './infrastructure/persistence/relational/entities/learning-module.entity';
 import { LearningModuleSectionEntity } from './infrastructure/persistence/relational/entities/learning-module-section.entity';
 import { ModuleCompletionEntity } from './infrastructure/persistence/relational/entities/module-completion.entity';
 import { LearningModulesService } from './learning-modules.service';
+import { AccessControlModule } from '../access-control/access-control.module';
 import {
   LearningModulesController,
   LearningModuleSectionsController,
@@ -19,6 +20,7 @@ import { ModuleCompletionRepository } from './infrastructure/persistence/relatio
       LearningModuleSectionEntity,
       ModuleCompletionEntity,
     ]),
+    forwardRef(() => AccessControlModule),
   ],
   controllers: [
     LearningModulesController,

@@ -119,7 +119,7 @@ export class Settings {
   @ApiProperty({ example: 'branded_sms_pakistan' })
   smsProvider?: string | null;
 
-  @ApiProperty({ example: 'givesacademydev@gmail.com' })
+  @ApiProperty({ example: 'digitaro.co.global@gmail.com' })
   smsApiEmail?: string | null;
 
   @ApiProperty({ example: '1005dbcac3c1899ff30f63bbc2443a573a' })

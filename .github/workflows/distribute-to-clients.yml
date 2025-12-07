@@ -1,0 +1,606 @@
+name: Distribute updates to client repos
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  fanout:
+    # Only run on main repository, not on client repos
+    # Skip if this is a client repo (silveracademy-backend, etc.)
+    # Only run if this is the main LMS Portal repository
+    if: |
+      !contains(github.repository, 'silveracademy') &&
+      !contains(github.repository, 'client-') &&
+      (contains(github.repository, 'lms-portal') || 
+       github.repository == 'hammadmaqdoom/LMS Portal - Main' ||
+       github.repository == 'hammadmaqdoom/lms-portal-backend')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.CLIENT_SYNC_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for proper syncing
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Convert clients.yml to JSON
+        id: clients_json
+        run: |
+          yq -o=json '.clients' clients.yml > clients.json
+          echo "json<<EOF" >> $GITHUB_OUTPUT
+          cat clients.json >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Process clients
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ env.GH_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const { execSync } = require('child_process');
+            
+            // Read clients.json (converted from YAML)
+            const clientsJson = fs.readFileSync('clients.json', 'utf8');
+            const clients = JSON.parse(clientsJson);
+            
+            const owner = context.repo.owner;  // e.g., "hammadmaqdoom"
+            const repo = context.repo.repo;   // e.g., "lms-portal-backend" (base backend repo)
+            const baseBranch = 'main';
+            const syncBranch = 'syncing';  // Fixed branch name for syncing
+            const defaultBranch = 'main';  // Always use main as default branch
+            
+            for (const c of clients) {
+              const targetOwner = c.org;
+              const targetRepo = c.repo;
+              const targetBranch = c.target_branch || 'staging';
+              const sentryDsn = c.sentry_dsn || '';
+              
+              try {
+                console.log(`\n📦 Processing ${targetOwner}/${targetRepo}...`);
+                if (sentryDsn) {
+                  console.log(`🔔 Sentry DSN configured for this client`);
+                }
+                
+                const tempDir = `/tmp/sync-${targetRepo}-${Date.now()}`;
+                
+                // Clone client repo
+                execSync(`git clone https://${process.env.GH_TOKEN}@github.com/${targetOwner}/${targetRepo}.git ${tempDir}`, {
+                  stdio: 'inherit',
+                  env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+                });
+                
+                process.chdir(tempDir);
+                
+                // Configure git
+                execSync('git config user.name "github-actions[bot]"', { stdio: 'inherit' });
+                execSync('git config user.email "github-actions[bot]@users.noreply.github.com"', { stdio: 'inherit' });
+                
+                // Check if repo is empty (no branches or no commits)
+                let isEmpty = false;
+                try {
+                  const branchOutput = execSync('git branch -a', { encoding: 'utf8' });
+                  const refsOutput = execSync('git show-ref', { encoding: 'utf8' });
+                  isEmpty = (branchOutput.trim().length === 0 || refsOutput.trim().length === 0);
+                } catch (e) {
+                  isEmpty = true; // If git commands fail, repo is likely empty
+                }
+                
+                if (isEmpty) {
+                  console.log('📦 Repo is empty, initializing with main and staging branches...');
+                  // Create initial commit on main
+                  execSync('git checkout -b main', { stdio: 'inherit' });
+                  execSync('git commit --allow-empty -m "Initial commit"', { stdio: 'inherit' });
+                  execSync(`git push origin main`, { stdio: 'inherit' });
+                  
+                  // Create staging branch from main
+                  execSync(`git checkout -b ${targetBranch}`, { stdio: 'inherit' });
+                  execSync(`git push origin ${targetBranch}`, { stdio: 'inherit' });
+                  
+                  console.log(`✅ Created ${defaultBranch} and ${targetBranch} branches`);
+                } else {
+                  // Repo has content - ensure main branch exists
+                  try {
+                    execSync(`git checkout ${defaultBranch}`, { stdio: 'inherit' });
+                  } catch (e) {
+                    // Main branch doesn't exist, create it from current branch or create new
+                    try {
+                      const currentBranch = execSync('git branch --show-current', { encoding: 'utf8' }).trim();
+                      if (currentBranch) {
+                        execSync(`git checkout -b ${defaultBranch}`, { stdio: 'inherit' });
+                      } else {
+                        execSync(`git checkout -b ${defaultBranch}`, { stdio: 'inherit' });
+                        execSync('git commit --allow-empty -m "Initial main branch"', { stdio: 'inherit' });
+                      }
+                    } catch (e) {
+                      execSync(`git checkout -b ${defaultBranch}`, { stdio: 'inherit' });
+                      execSync('git commit --allow-empty -m "Initial main branch"', { stdio: 'inherit' });
+                    }
+                  }
+                  
+                  // Ensure staging branch exists
+                  try {
+                    execSync(`git checkout ${targetBranch}`, { stdio: 'inherit' });
+                  } catch (e) {
+                    // Create staging branch from main
+                    execSync(`git checkout ${defaultBranch}`, { stdio: 'inherit' });
+                    execSync(`git checkout -b ${targetBranch}`, { stdio: 'inherit' });
+                  }
+                }
+                
+                // Add base repo as remote and fetch
+                try {
+                  execSync(`git remote add upstream https://${process.env.GH_TOKEN}@github.com/${owner}/${repo}.git`, { stdio: 'inherit' });
+                } catch (e) {
+                  execSync('git remote remove upstream', { stdio: 'inherit' });
+                  execSync(`git remote add upstream https://${process.env.GH_TOKEN}@github.com/${owner}/${repo}.git`, { stdio: 'inherit' });
+                }
+                
+                // Ensure main and staging branches are pushed to remote
+                if (isEmpty) {
+                  // Already pushed during initialization
+                  execSync(`git checkout ${defaultBranch}`, { stdio: 'inherit' });
+                } else {
+                  // Ensure branches are pushed
+                  execSync(`git checkout ${defaultBranch}`, { stdio: 'inherit' });
+                  try {
+                    execSync(`git push origin ${defaultBranch}`, { stdio: 'inherit' });
+                  } catch (e) {
+                    console.log('Main branch already exists remotely');
+                  }
+                  
+                  execSync(`git checkout ${targetBranch}`, { stdio: 'inherit' });
+                  try {
+                    execSync(`git push origin ${targetBranch}`, { stdio: 'inherit' });
+                  } catch (e) {
+                    console.log('Staging branch already exists remotely');
+                  }
+                }
+                
+                // Add base repo as remote and fetch
+                try {
+                  execSync(`git remote add upstream https://${process.env.GH_TOKEN}@github.com/${owner}/${repo}.git`, { stdio: 'inherit' });
+                } catch (e) {
+                  execSync('git remote remove upstream', { stdio: 'inherit' });
+                  execSync(`git remote add upstream https://${process.env.GH_TOKEN}@github.com/${owner}/${repo}.git`, { stdio: 'inherit' });
+                }
+                
+                execSync('git fetch upstream main', { stdio: 'inherit' });
+                
+                // Create or checkout syncing branch from main
+                execSync(`git checkout ${defaultBranch}`, { stdio: 'inherit' });
+                try {
+                  execSync(`git checkout -b ${syncBranch}`, { stdio: 'inherit' });
+                } catch (e) {
+                  execSync(`git checkout ${syncBranch}`, { stdio: 'inherit' });
+                  // If branch exists, reset it to match main to start fresh
+                  execSync(`git reset --hard ${defaultBranch}`, { stdio: 'inherit' });
+                }
+                
+                // Rebase syncing branch onto upstream/main to prioritize upstream code
+                // This will replace old code with new code from parent repo
+                // In rebase: -X ours means prefer upstream/main (the branch we're rebasing onto)
+                let hasUnmergedFiles = false;
+                let rebaseAborted = false;
+                try {
+                  execSync(`git rebase upstream/main -X ours`, { stdio: 'inherit' });
+                } catch (e) {
+                  console.log('Rebase had conflicts or issues, checking status...');
+                  
+                  // Check if we're still in a rebase
+                  let rebaseInProgress = false;
+                  try {
+                    const rebaseDir = execSync('git rev-parse --git-path rebase-merge', { encoding: 'utf8' }).trim();
+                    rebaseInProgress = require('fs').existsSync(rebaseDir);
+                    if (!rebaseInProgress) {
+                      const rebaseApplyDir = execSync('git rev-parse --git-path rebase-apply', { encoding: 'utf8' }).trim();
+                      rebaseInProgress = require('fs').existsSync(rebaseApplyDir);
+                    }
+                  } catch (rebaseCheckError) {
+                    // Could not check rebase status
+                  }
+                  
+                  if (rebaseInProgress) {
+                    // Check if we have unmerged files (conflicts)
+                    try {
+                      const unmerged = execSync('git ls-files -u', { encoding: 'utf8' }).trim();
+                      hasUnmergedFiles = unmerged.length > 0;
+                      
+                      if (hasUnmergedFiles) {
+                        console.log('⚠️  Rebase conflicts detected. Attempting to auto-resolve by preferring upstream code...');
+                        // For conflicts during rebase, prefer upstream code (ours = upstream/main in rebase context)
+                        // Handle modify/delete conflicts explicitly
+                        try {
+                          // Get list of conflicted files
+                          const conflictedFiles = execSync('git diff --name-only --diff-filter=U', { encoding: 'utf8' }).trim().split('\n').filter(f => f);
+                          const modifyDeleteFiles = execSync('git diff --name-only --diff-filter=UD', { encoding: 'utf8' }).trim().split('\n').filter(f => f);
+                          
+                          // For modify/delete conflicts, prefer upstream (keep the file)
+                          // For other conflicts, prefer upstream code
+                          execSync('git checkout --ours .', { stdio: 'inherit' });
+                          
+                          // Explicitly handle modify/delete: if upstream has it, keep it
+                          for (const file of modifyDeleteFiles) {
+                            try {
+                              // Check if file exists in upstream
+                              execSync(`git checkout --ours -- "${file}"`, { stdio: 'inherit' });
+                              execSync(`git add "${file}"`, { stdio: 'inherit' });
+                            } catch (fileError) {
+                              // If file doesn't exist in upstream, remove it
+                              try {
+                                execSync(`git rm "${file}"`, { stdio: 'inherit' });
+                              } catch (rmError) {
+                                // File might already be removed, continue
+                              }
+                            }
+                          }
+                          
+                          // Stage all resolved files
+                          execSync('git add -A', { stdio: 'inherit' });
+                          
+                          // Continue rebase with commit message
+                          execSync('git -c core.editor=true rebase --continue', { 
+                            stdio: 'inherit',
+                            env: { ...process.env, GIT_EDITOR: 'true' }
+                          });
+                          hasUnmergedFiles = false; // Conflicts resolved
+                          console.log('✅ Auto-resolved conflicts by preferring upstream code.');
+                        } catch (continueError) {
+                          console.log('⚠️  Could not auto-resolve all conflicts. Attempting alternative resolution...');
+                          // Try alternative: use theirs strategy for remaining conflicts
+                          try {
+                            execSync('git checkout --theirs .', { stdio: 'inherit' });
+                            execSync('git add -A', { stdio: 'inherit' });
+                            execSync('git -c core.editor=true rebase --continue', { 
+                              stdio: 'inherit',
+                              env: { ...process.env, GIT_EDITOR: 'true' }
+                            });
+                            hasUnmergedFiles = false;
+                            console.log('✅ Resolved conflicts using alternative strategy.');
+                          } catch (altError) {
+                            console.log('⚠️  Could not auto-resolve conflicts. Aborting rebase and using merge fallback.');
+                            // Abort rebase and use merge instead
+                            try {
+                              execSync('git rebase --abort', { stdio: 'inherit' });
+                              rebaseAborted = true;
+                            } catch (abortError) {
+                              // If abort fails, try to force clean up
+                              console.log('⚠️  Could not abort rebase cleanly. Attempting force cleanup...');
+                              try {
+                                execSync('git reset --hard HEAD', { stdio: 'inherit' });
+                                execSync('rm -rf .git/rebase-merge .git/rebase-apply', { stdio: 'inherit' });
+                                rebaseAborted = true;
+                              } catch (cleanupError) {
+                                console.error('⚠️  Could not clean up rebase state.');
+                                hasUnmergedFiles = true;
+                              }
+                            }
+                          }
+                        }
+                      } else {
+                        // No conflicts but rebase in progress, try to continue
+                        try {
+                          execSync('git -c core.editor=true rebase --continue', { 
+                            stdio: 'inherit',
+                            env: { ...process.env, GIT_EDITOR: 'true' }
+                          });
+                          hasUnmergedFiles = false;
+                        } catch (continueError) {
+                          console.log('⚠️  Could not continue rebase. Aborting and using merge fallback.');
+                          try {
+                            execSync('git rebase --abort', { stdio: 'inherit' });
+                            rebaseAborted = true;
+                          } catch (abortError) {
+                            hasUnmergedFiles = true;
+                          }
+                        }
+                      }
+                    } catch (statusError) {
+                      console.log('⚠️  Could not check conflict status. Aborting rebase and using merge fallback.');
+                      try {
+                        execSync('git rebase --abort', { stdio: 'inherit' });
+                        rebaseAborted = true;
+                      } catch (abortError) {
+                        // Ignore if not in rebase
+                      }
+                    }
+                  } else {
+                    // Rebase completed or not in progress
+                    hasUnmergedFiles = false;
+                  }
+                  
+                  // If rebase was aborted, use merge as fallback
+                  if (rebaseAborted) {
+                    console.log('🔄 Using merge strategy as fallback...');
+                    try {
+                      execSync(`git merge upstream/main --no-edit --allow-unrelated-histories -X theirs`, { stdio: 'inherit' });
+                      hasUnmergedFiles = false;
+                    } catch (mergeError) {
+                      const unmerged = execSync('git ls-files -u', { encoding: 'utf8' }).trim();
+                      hasUnmergedFiles = unmerged.length > 0;
+                      if (hasUnmergedFiles) {
+                        console.log('⚠️  Merge also has conflicts. Will create PR for manual resolution.');
+                      }
+                    }
+                  }
+                }
+                
+                // Inject Sentry DSN into .env file if provided
+                if (sentryDsn) {
+                  try {
+                    const envPath = '.env';
+                    let envContent = '';
+                    
+                    // Read existing .env if it exists
+                    if (fs.existsSync(envPath)) {
+                      envContent = fs.readFileSync(envPath, 'utf8');
+                    }
+                    
+                    // Update or add SENTRY_DSN
+                    if (envContent.includes('SENTRY_DSN=')) {
+                      // Replace existing SENTRY_DSN
+                      envContent = envContent.replace(
+                        /SENTRY_DSN=.*/g,
+                        `SENTRY_DSN=${sentryDsn}`
+                      );
+                    } else {
+                      // Append SENTRY_DSN if not present
+                      envContent += (envContent.endsWith('\n') ? '' : '\n') + `SENTRY_DSN=${sentryDsn}\n`;
+                    }
+                    
+                    // Ensure SENTRY_ENABLED is set
+                    if (!envContent.includes('SENTRY_ENABLED=')) {
+                      envContent += `SENTRY_ENABLED=true\n`;
+                    } else {
+                      envContent = envContent.replace(
+                        /SENTRY_ENABLED=.*/g,
+                        'SENTRY_ENABLED=true'
+                      );
+                    }
+                    
+                    // Write updated .env
+                    fs.writeFileSync(envPath, envContent);
+                    
+                    // Commit the .env update (only if we're not in a conflicted merge state)
+                    try {
+                      // Check if we're in a merge state with conflicts
+                      const hasUnmergedFiles = execSync('git ls-files -u', { encoding: 'utf8' }).trim().length > 0;
+                      if (!hasUnmergedFiles) {
+                        execSync('git add .env', { stdio: 'inherit' });
+                        execSync('git commit -m "chore: update Sentry DSN from upstream distribution"', { stdio: 'inherit' });
+                        console.log('✅ Updated .env with Sentry DSN');
+                      } else {
+                        console.log('ℹ️  Skipping .env commit due to merge conflicts');
+                      }
+                    } catch (commitError) {
+                      // If commit fails (no changes or already committed), that's okay
+                      console.log('ℹ️  .env update already committed or no changes');
+                    }
+                  } catch (envError) {
+                    console.warn(`⚠️  Failed to update .env with Sentry DSN: ${envError.message}`);
+                    // Continue even if .env update fails
+                  }
+                }
+                
+                // If we have conflicts, handle them appropriately
+                let shouldSkipSync = false;
+                if (hasUnmergedFiles) {
+                  // Check if we're still in a rebase
+                  let stillInRebase = false;
+                  try {
+                    const rebaseDir = execSync('git rev-parse --git-path rebase-merge', { encoding: 'utf8' }).trim();
+                    stillInRebase = require('fs').existsSync(rebaseDir);
+                    if (!stillInRebase) {
+                      const rebaseApplyDir = execSync('git rev-parse --git-path rebase-apply', { encoding: 'utf8' }).trim();
+                      stillInRebase = require('fs').existsSync(rebaseApplyDir);
+                    }
+                  } catch (e) {
+                    // Not in rebase
+                  }
+                  
+                  if (stillInRebase) {
+                    console.log('⚠️  Still in rebase with conflicts. Aborting rebase and using merge strategy...');
+                    try {
+                      execSync('git rebase --abort', { stdio: 'inherit' });
+                      // Now try merge instead
+                      try {
+                        execSync(`git merge upstream/main --no-edit --allow-unrelated-histories -X theirs`, { stdio: 'inherit' });
+                        hasUnmergedFiles = false;
+                        console.log('✅ Successfully merged using fallback strategy.');
+                      } catch (mergeError) {
+                        const unmerged = execSync('git ls-files -u', { encoding: 'utf8' }).trim();
+                        hasUnmergedFiles = unmerged.length > 0;
+                        if (hasUnmergedFiles) {
+                          console.log('⚠️  Merge also has conflicts. Committing conflicted state for PR review...');
+                          execSync('git add -A', { stdio: 'inherit' });
+                          execSync('git commit -m "chore: merge upstream with conflicts (requires manual resolution)"', { stdio: 'inherit' });
+                        }
+                      }
+                    } catch (abortError) {
+                      console.error('⚠️  Could not abort rebase. Attempting force cleanup...');
+                      try {
+                        execSync('git reset --hard HEAD', { stdio: 'inherit' });
+                        execSync('rm -rf .git/rebase-merge .git/rebase-apply', { stdio: 'inherit' });
+                        // Try merge as fallback
+                        try {
+                          execSync(`git merge upstream/main --no-edit --allow-unrelated-histories -X theirs`, { stdio: 'inherit' });
+                          hasUnmergedFiles = false;
+                        } catch (mergeError) {
+                          const unmerged = execSync('git ls-files -u', { encoding: 'utf8' }).trim();
+                          hasUnmergedFiles = unmerged.length > 0;
+                          if (hasUnmergedFiles) {
+                            execSync('git add -A', { stdio: 'inherit' });
+                            execSync('git commit -m "chore: merge upstream with conflicts (requires manual resolution)"', { stdio: 'inherit' });
+                          }
+                        }
+                      } catch (cleanupError) {
+                        console.error('⚠️  Could not clean up rebase state. Skipping sync for this repo.');
+                        shouldSkipSync = true;
+                      }
+                    }
+                  } else {
+                    // Not in rebase, just commit the conflicted state
+                    console.log('⚠️  Committing conflicted state for PR review...');
+                    try {
+                      // Ensure we're on the syncing branch
+                      execSync(`git checkout ${syncBranch}`, { stdio: 'inherit' });
+                      // Add all files including conflicted ones
+                      execSync('git add -A', { stdio: 'inherit' });
+                      execSync('git commit -m "chore: merge upstream with conflicts (requires manual resolution)"', { stdio: 'inherit' });
+                    } catch (commitError) {
+                      console.warn('⚠️  Could not commit conflicted state:', commitError.message);
+                      // If commit fails, try to abort any merge to clean up
+                      try {
+                        execSync('git merge --abort', { stdio: 'inherit' });
+                        console.log('Aborted merge due to commit failure. Skipping sync for this repo.');
+                        hasUnmergedFiles = false; // Reset flag since we aborted
+                        shouldSkipSync = true; // Skip the rest of the sync process for this repo
+                      } catch (abortError) {
+                        // If abort also fails, we're in a bad state - skip this repo
+                        console.error('⚠️  Could not abort merge. Skipping sync for this repo.');
+                        shouldSkipSync = true;
+                      }
+                    }
+                  }
+                }
+                
+                // Skip rest of sync if we had to abort
+                if (shouldSkipSync) {
+                  console.log('⏭️  Skipping sync due to merge issues.');
+                  // Cleanup will happen in the finally-like section at the end
+                } else {
+                
+                // Ensure we're on the syncing branch before pushing
+                try {
+                  const currentBranch = execSync('git branch --show-current', { encoding: 'utf8' }).trim();
+                  if (currentBranch !== syncBranch) {
+                    execSync(`git checkout ${syncBranch}`, { stdio: 'inherit' });
+                  }
+                } catch (e) {
+                  console.warn('Could not verify branch, attempting checkout...');
+                  execSync(`git checkout ${syncBranch}`, { stdio: 'inherit' });
+                }
+                
+                // Push sync branch
+                try {
+                  execSync(`git push origin ${syncBranch} --force`, { stdio: 'inherit' });
+                } catch (e) {
+                  console.error('Failed to push:', e.message);
+                  throw e;
+                }
+                
+                // Skip auto-merge if we have conflicts - go straight to PR creation
+                let autoMerged = false;
+                let syncHasUpdates = true;
+                
+                if (hasUnmergedFiles) {
+                  console.log('⚠️  Skipping auto-merge due to conflicts. Will create PR for manual resolution.');
+                  syncHasUpdates = true; // We have updates, just with conflicts
+                } else {
+                  try {
+                    const diff = execSync(`git rev-list ${targetBranch}..${syncBranch}`, { encoding: 'utf8' }).trim();
+                    syncHasUpdates = diff.length > 0;
+                  } catch (e) {
+                    syncHasUpdates = true;
+                  }
+                  
+                  if (syncHasUpdates) {
+                    try {
+                      console.log(`🔁 Attempting to auto-merge ${syncBranch} into ${targetBranch}`);
+                      execSync(`git checkout ${targetBranch}`, { stdio: 'inherit' });
+                      execSync(`git merge ${syncBranch} --no-edit`, { stdio: 'inherit' });
+                      execSync(`git push origin ${targetBranch}`, { stdio: 'inherit' });
+                      autoMerged = true;
+                      console.log(`✅ Auto-merged latest upstream changes into ${targetBranch}`);
+                    } catch (mergeError) {
+                      console.warn(`⚠️  Auto-merge failed for ${targetOwner}/${targetRepo}: ${mergeError.message}`);
+                      try {
+                        execSync('git merge --abort', { stdio: 'inherit' });
+                      } catch (abortError) {
+                        // Ignore if there was nothing to abort
+                      }
+                      execSync(`git checkout ${syncBranch}`, { stdio: 'inherit' });
+                    }
+                  } else {
+                    console.log('ℹ️  No new commits to merge; target branch already up to date.');
+                  }
+                }
+                
+                if (!autoMerged && syncHasUpdates) {
+                  // Create PR from syncing branch to staging branch
+                  try {
+                    const pr = await github.rest.pulls.create({
+                      owner: targetOwner,
+                      repo: targetRepo,
+                      title: `[Upstream Sync] ${owner}/${repo}@${context.sha.substring(0, 7)} → ${targetBranch}`,
+                      head: syncBranch,
+                      base: targetBranch,
+                      body: `## 🔄 Automated Upstream Sync\n\n` +
+                            `Auto-merge attempt failed; manual review required.\n\n` +
+                            `- **Source**: \`${owner}/${repo}@${context.sha.substring(0, 7)}\`\n` +
+                            `- **Target**: \`${targetBranch}\` branch\n` +
+                            `- **Base Commit**: ${context.sha}\n\n` +
+                            `Resolve conflicts (if any) and merge to keep client repo in sync.`,
+                      maintainer_can_modify: true
+                    });
+                    console.log(`✅ Opened PR #${pr.data.number}: ${pr.data.html_url}`);
+                  } catch (e) {
+                    if (e.status === 422) {
+                      if (/No commits between/.test(e.message)) {
+                        console.log(`ℹ️  No changes to sync - repos are already in sync`);
+                      } else if (/already exists/i.test(e.message)) {
+                        const existingPRs = await github.rest.pulls.list({
+                          owner: targetOwner,
+                          repo: targetRepo,
+                          state: 'open',
+                          head: `${targetOwner}:${syncBranch}`,
+                          base: targetBranch
+                        });
+                        if (existingPRs.data.length > 0) {
+                          console.log(`ℹ️  PR already exists: #${existingPRs.data[0].number}`);
+                        } else {
+                          const allPRs = await github.rest.pulls.list({
+                            owner: targetOwner,
+                            repo: targetRepo,
+                            state: 'open',
+                            base: targetBranch
+                          });
+                          console.log(`ℹ️  Found ${allPRs.data.length} open PR(s) to ${targetBranch}`);
+                        }
+                      } else {
+                        console.warn(`⚠️  PR creation issue: ${e.message}`);
+                      }
+                    } else {
+                      throw e;
+                    }
+                  }
+                } else if (autoMerged) {
+                  console.log(`🎉 ${targetOwner}/${targetRepo}:${targetBranch} is now in sync with upstream without manual intervention.`);
+                }
+                } // End of else block for shouldSkipSync
+                
+                // Cleanup
+                process.chdir('/');
+                execSync(`rm -rf ${tempDir}`, { stdio: 'inherit' });
+                
+              } catch (error) {
+                console.error(`❌ Error processing ${targetOwner}/${targetRepo}:`, error.message);
+                // Cleanup on error
+                try {
+                  process.chdir('/');
+                  execSync(`rm -rf /tmp/sync-${targetRepo}-*`, { stdio: 'inherit' });
+                } catch (e) {}
+                // Don't fail entire workflow
+              }
+            }
+
