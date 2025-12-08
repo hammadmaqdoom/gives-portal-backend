@@ -50,6 +50,17 @@ export class SettingsMapper {
     domainEntity.whatsappEnabled = raw.whatsappEnabled;
     domainEntity.whatsappDeviceId = raw.whatsappDeviceId;
     domainEntity.whatsappApiUrl = raw.whatsappApiUrl;
+    // File Storage Configuration
+    domainEntity.fileDriver = raw.fileDriver;
+    domainEntity.accessKeyId = raw.accessKeyId;
+    domainEntity.secretAccessKey = raw.secretAccessKey;
+    domainEntity.awsDefaultS3Bucket = raw.awsDefaultS3Bucket;
+    domainEntity.awsS3Region = raw.awsS3Region;
+    domainEntity.azureStorageAccountName = raw.azureStorageAccountName;
+    domainEntity.azureStorageAccountKey = raw.azureStorageAccountKey;
+    domainEntity.azureContainerName = raw.azureContainerName;
+    domainEntity.azureBlobSasExpirySeconds = raw.azureBlobSasExpirySeconds;
+    domainEntity.azureBlobPublicBaseUrl = raw.azureBlobPublicBaseUrl;
     domainEntity.createdAt = raw.createdAt;
     domainEntity.updatedAt = raw.updatedAt;
     return domainEntity;
@@ -110,6 +121,17 @@ export class SettingsMapper {
     persistenceEntity.whatsappEnabled = domainEntity.whatsappEnabled;
     persistenceEntity.whatsappDeviceId = domainEntity.whatsappDeviceId || null;
     persistenceEntity.whatsappApiUrl = domainEntity.whatsappApiUrl || null;
+    // File Storage Configuration
+    persistenceEntity.fileDriver = domainEntity.fileDriver || null;
+    persistenceEntity.accessKeyId = domainEntity.accessKeyId || null;
+    persistenceEntity.secretAccessKey = domainEntity.secretAccessKey || null;
+    persistenceEntity.awsDefaultS3Bucket = domainEntity.awsDefaultS3Bucket || null;
+    persistenceEntity.awsS3Region = domainEntity.awsS3Region || null;
+    persistenceEntity.azureStorageAccountName = domainEntity.azureStorageAccountName || null;
+    persistenceEntity.azureStorageAccountKey = domainEntity.azureStorageAccountKey || null;
+    persistenceEntity.azureContainerName = domainEntity.azureContainerName || null;
+    persistenceEntity.azureBlobSasExpirySeconds = domainEntity.azureBlobSasExpirySeconds || null;
+    persistenceEntity.azureBlobPublicBaseUrl = domainEntity.azureBlobPublicBaseUrl || null;
     persistenceEntity.createdAt = domainEntity.createdAt;
     persistenceEntity.updatedAt = domainEntity.updatedAt;
     return persistenceEntity;

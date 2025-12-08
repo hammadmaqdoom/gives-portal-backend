@@ -144,6 +144,39 @@ export class Settings {
   @ApiProperty({ example: 'https://secure.h3techs.com/sms/api/send_whatsapp' })
   whatsappApiUrl?: string | null;
 
+  // File Storage Configuration
+  @ApiProperty({ example: 'local' })
+  fileDriver?: string | null;
+
+  // AWS S3
+  @ApiProperty({ example: 'AKIA...' })
+  accessKeyId?: string | null;
+
+  @ApiProperty({ example: '********' })
+  secretAccessKey?: string | null;
+
+  @ApiProperty({ example: 'my-bucket-name' })
+  awsDefaultS3Bucket?: string | null;
+
+  @ApiProperty({ example: 'ap-south-1' })
+  awsS3Region?: string | null;
+
+  // Azure Blob (SAS)
+  @ApiProperty({ example: 'mystorage' })
+  azureStorageAccountName?: string | null;
+
+  @ApiProperty({ example: '********' })
+  azureStorageAccountKey?: string | null;
+
+  @ApiProperty({ example: 'container-name' })
+  azureContainerName?: string | null;
+
+  @ApiProperty({ example: 3600 })
+  azureBlobSasExpirySeconds?: number | null;
+
+  @ApiProperty({ example: 'https://cdn.example.com' })
+  azureBlobPublicBaseUrl?: string | null;
+
   @ApiProperty()
   createdAt: Date;
 
