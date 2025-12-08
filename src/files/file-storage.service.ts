@@ -85,6 +85,9 @@ export class FileStorageService {
           this.s3Bucket = bucket;
           this.s3Region = region;
         }
+      } else if (this.fileDriver === FileDriver.AZURE_BLOB_SAS) {
+        // Azure blob storage configuration is handled dynamically when needed
+        // No need to initialize client here as it's created on-demand
       }
     } catch {
       // ignore and use env-only config
@@ -431,8 +434,17 @@ export class FileStorageService {
   /**
    * Returns whether storage is local
    */
-  isLocal(): boolean {
+  async isLocal(): Promise<boolean> {
+    await this.ensureConfigLoaded();
     return this.fileDriver === FileDriver.LOCAL;
+  }
+
+  /**
+   * Get the current file driver
+   */
+  async getDriver(): Promise<FileDriver> {
+    await this.ensureConfigLoaded();
+    return this.fileDriver;
   }
 
   /**
