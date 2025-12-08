@@ -369,8 +369,8 @@ export class FilesController {
       console.log(`Serving file: ${file.filename} from path: ${file.path}`);
 
       // If using non-local storage (e.g., s3), stream via server to avoid CORS
-      const driver = this.configService.get<string>('file.driver');
-      if (driver && driver !== 'local') {
+      const isLocal = await this.fileStorageService.isLocal();
+      if (!isLocal) {
         try {
           const { stream, contentType, contentLength } =
             await this.fileStorageService.getObjectStream(file.path);
@@ -457,8 +457,8 @@ export class FilesController {
       }
 
       // If using non-local storage, return headers from storage
-      const driver = this.configService.get<string>('file.driver');
-      if (driver && driver !== 'local') {
+      const isLocal = await this.fileStorageService.isLocal();
+      if (!isLocal) {
         try {
           const { contentType, contentLength } =
             await this.fileStorageService.headObject(file.path);
@@ -745,8 +745,8 @@ export class FilesController {
     }
 
     // If using non-local storage, stream download via server
-    const driver = this.configService.get<string>('file.driver');
-    if (driver && driver !== 'local') {
+    const isLocal = await this.fileStorageService.isLocal();
+    if (!isLocal) {
       try {
         const { stream, contentType, contentLength } =
           await this.fileStorageService.getObjectStream(file.path);
