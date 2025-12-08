@@ -102,27 +102,36 @@ export class FilesS3PresignedService {
 
     let signedUrl: string;
     if (driver === FileDriver.AZURE_BLOB_SAS) {
-      const accountName =
-        storageConfig?.azureStorageAccountName ||
+      const accountName: string =
+        storageConfig?.azureStorageAccountName ??
         this.configService.getOrThrow('file.azureStorageAccountName', {
           infer: true,
         });
-      const accountKey =
-        storageConfig?.azureStorageAccountKey ||
+      const accountKey: string =
+        storageConfig?.azureStorageAccountKey ??
         this.configService.getOrThrow('file.azureStorageAccountKey', {
           infer: true,
         });
-      const containerName =
-        storageConfig?.azureContainerName ||
+      const containerName: string =
+        storageConfig?.azureContainerName ??
         this.configService.getOrThrow('file.azureContainerName', {
           infer: true,
         });
-      const expiresInSeconds =
-        storageConfig?.azureBlobSasExpirySeconds ||
+      const expiresInSeconds: number =
+        storageConfig?.azureBlobSasExpirySeconds ??
         this.configService.get('file.azureBlobSasExpirySeconds', {
           infer: true,
-        }) ||
+        }) ??
         3600;
+
+      if (!accountName || !accountKey || !containerName) {
+        throw new UnprocessableEntityException({
+          status: HttpStatus.UNPROCESSABLE_ENTITY,
+          errors: {
+            file: 'Azure storage configuration is incomplete',
+          },
+        });
+      }
 
       const sharedKeyCredential = new StorageSharedKeyCredential(
         accountName,
@@ -152,24 +161,34 @@ export class FilesS3PresignedService {
         signedUrl = `https://${accountName}.blob.core.windows.net/${containerName}/${key}?${sasToken}`;
       }
     } else {
-      const region =
-        storageConfig?.awsS3Region ||
-        this.configService.get('file.awsS3Region', { infer: true });
-      const accessKeyId =
-        storageConfig?.accessKeyId ||
+      const region: string =
+        storageConfig?.awsS3Region ??
+        this.configService.get('file.awsS3Region', { infer: true }) ??
+        '';
+      const accessKeyId: string =
+        storageConfig?.accessKeyId ??
         this.configService.getOrThrow('file.accessKeyId', {
           infer: true,
         });
-      const secretAccessKey =
-        storageConfig?.secretAccessKey ||
+      const secretAccessKey: string =
+        storageConfig?.secretAccessKey ??
         this.configService.getOrThrow('file.secretAccessKey', {
           infer: true,
         });
-      const bucket =
-        storageConfig?.awsDefaultS3Bucket ||
+      const bucket: string =
+        storageConfig?.awsDefaultS3Bucket ??
         this.configService.getOrThrow('file.awsDefaultS3Bucket', {
           infer: true,
         });
+
+      if (!region || !accessKeyId || !secretAccessKey || !bucket) {
+        throw new UnprocessableEntityException({
+          status: HttpStatus.UNPROCESSABLE_ENTITY,
+          errors: {
+            file: 'S3 storage configuration is incomplete',
+          },
+        });
+      }
 
       const s3 = new S3Client({
         region,
