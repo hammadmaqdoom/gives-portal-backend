@@ -5,97 +5,90 @@ export class CreateSettingsTable1700000000000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Check if table exists using TypeORM's built-in method
-    const tableExists = await queryRunner.hasTable('settings');
+    let tableExists = await queryRunner.hasTable('settings');
 
+    // Try to create table if it doesn't exist
     if (!tableExists) {
-      // Create table if it doesn't exist
-      await queryRunner.query(`
-        CREATE TABLE "settings" (
-          "id" SERIAL NOT NULL,
-          "appName" character varying(255) NOT NULL,
-          "appTitle" character varying(255) NOT NULL,
-          "metaDescription" text NOT NULL,
-          "logoNavbar" text,
-          "logoFavicon" text,
-          "defaultTimezone" character varying(100) NOT NULL DEFAULT 'Asia/Karachi',
-          "businessAddress" text,
-          "taxRegistrationLabel" character varying(255),
-          "taxRegistrationNumber" character varying(100),
-          "companyNumber" character varying(100),
-          "companyLegalName" character varying(255),
-          "defaultCurrency" character varying(3) DEFAULT 'PKR',
-          "bankName" character varying(255),
-          "bankAccountNumber" character varying(100),
-          "bankAccountTitle" character varying(100),
-          "bankAccountType" character varying(50),
-          "bankAccountCurrency" character varying(50),
-          "bankRoutingNumber" character varying(100),
-          "bankIban" character varying(100),
-          "bankSwiftCode" character varying(100),
-          "smtpHost" character varying(255),
-          "smtpPort" integer,
-          "smtpUser" character varying(255),
-          "smtpPassword" character varying(255),
-          "smtpFromEmail" character varying(255),
-          "smtpFromName" character varying(255),
-          "smtpSecure" boolean NOT NULL DEFAULT false,
-          "smtpIgnoreTls" boolean NOT NULL DEFAULT false,
-          "smtpRequireTls" boolean NOT NULL DEFAULT false,
-          "contactPhone" character varying(20),
-          "contactEmail" character varying(255),
-          "contactWebsite" character varying(255),
-          "socialFacebook" character varying(255),
-          "socialTwitter" character varying(255),
-          "socialLinkedin" character varying(255),
-          "socialInstagram" character varying(255),
-          "fileDriver" character varying(32) DEFAULT 'local',
-          "accessKeyId" character varying(255),
-          "secretAccessKey" character varying(255),
-          "awsDefaultS3Bucket" character varying(255),
-          "awsS3Region" character varying(100),
-          "azureStorageAccountName" character varying(255),
-          "azureStorageAccountKey" character varying(255),
-          "azureContainerName" character varying(255),
-          "azureBlobSasExpirySeconds" integer,
-          "azureBlobPublicBaseUrl" character varying(500),
-          "smsEnabled" boolean NOT NULL DEFAULT false,
-          "smsProvider" character varying(100),
-          "smsApiEmail" character varying(255),
-          "smsApiKey" character varying(255),
-          "smsMask" character varying(100),
-          "smsApiUrl" character varying(500),
-          "smsTestMode" boolean NOT NULL DEFAULT true,
-          "whatsappEnabled" boolean NOT NULL DEFAULT false,
-          "whatsappDeviceId" character varying(255),
-          "whatsappApiUrl" character varying(500),
-          "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
-          "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
-          CONSTRAINT "PK_settings" PRIMARY KEY ("id")
-        )
-      `);
-
-      // Insert default settings only if table was just created and no records exist
-      const existingCount = await queryRunner.query(
-        `SELECT COUNT(*) as count FROM "settings"`,
-      );
-      if (existingCount[0]?.count === '0' || !existingCount[0]) {
+      try {
         await queryRunner.query(`
-          INSERT INTO "settings" (
-            "appName", "appTitle", "metaDescription", "defaultTimezone",
-            "smtpSecure", "smtpIgnoreTls", "smtpRequireTls"
-          ) VALUES (
-            'LMS Portal',
-            'LMS Portal - Education Management System',
-            'Comprehensive education management system for schools and institutions',
-            'Asia/Karachi',
-            false,
-            false,
-            true
+          CREATE TABLE "settings" (
+            "id" SERIAL NOT NULL,
+            "appName" character varying(255) NOT NULL,
+            "appTitle" character varying(255) NOT NULL,
+            "metaDescription" text NOT NULL,
+            "logoNavbar" text,
+            "logoFavicon" text,
+            "defaultTimezone" character varying(100) NOT NULL DEFAULT 'Asia/Karachi',
+            "businessAddress" text,
+            "taxRegistrationLabel" character varying(255),
+            "taxRegistrationNumber" character varying(100),
+            "companyNumber" character varying(100),
+            "companyLegalName" character varying(255),
+            "defaultCurrency" character varying(3) DEFAULT 'PKR',
+            "bankName" character varying(255),
+            "bankAccountNumber" character varying(100),
+            "bankAccountTitle" character varying(100),
+            "bankAccountType" character varying(50),
+            "bankAccountCurrency" character varying(50),
+            "bankRoutingNumber" character varying(100),
+            "bankIban" character varying(100),
+            "bankSwiftCode" character varying(100),
+            "smtpHost" character varying(255),
+            "smtpPort" integer,
+            "smtpUser" character varying(255),
+            "smtpPassword" character varying(255),
+            "smtpFromEmail" character varying(255),
+            "smtpFromName" character varying(255),
+            "smtpSecure" boolean NOT NULL DEFAULT false,
+            "smtpIgnoreTls" boolean NOT NULL DEFAULT false,
+            "smtpRequireTls" boolean NOT NULL DEFAULT false,
+            "contactPhone" character varying(20),
+            "contactEmail" character varying(255),
+            "contactWebsite" character varying(255),
+            "socialFacebook" character varying(255),
+            "socialTwitter" character varying(255),
+            "socialLinkedin" character varying(255),
+            "socialInstagram" character varying(255),
+            "fileDriver" character varying(32) DEFAULT 'local',
+            "accessKeyId" character varying(255),
+            "secretAccessKey" character varying(255),
+            "awsDefaultS3Bucket" character varying(255),
+            "awsS3Region" character varying(100),
+            "azureStorageAccountName" character varying(255),
+            "azureStorageAccountKey" character varying(255),
+            "azureContainerName" character varying(255),
+            "azureBlobSasExpirySeconds" integer,
+            "azureBlobPublicBaseUrl" character varying(500),
+            "smsEnabled" boolean NOT NULL DEFAULT false,
+            "smsProvider" character varying(100),
+            "smsApiEmail" character varying(255),
+            "smsApiKey" character varying(255),
+            "smsMask" character varying(100),
+            "smsApiUrl" character varying(500),
+            "smsTestMode" boolean NOT NULL DEFAULT true,
+            "whatsappEnabled" boolean NOT NULL DEFAULT false,
+            "whatsappDeviceId" character varying(255),
+            "whatsappApiUrl" character varying(500),
+            "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+            "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+            CONSTRAINT "PK_settings" PRIMARY KEY ("id")
           )
         `);
+        tableExists = true; // Table was successfully created
+      } catch (error: any) {
+        // If table already exists (error code 42P07), that's okay - continue
+        if (error?.code === '42P07') {
+          // Table already exists, update flag and continue
+          tableExists = true;
+        } else {
+          // Re-throw other errors
+          throw error;
+        }
       }
-    } else {
-      // Table exists, check for missing columns and add them
+    }
+
+    // If table exists (either existed before or was just created), ensure all columns exist
+    if (tableExists) {
       // Get existing columns using SQL query
       const existingColumnsResult = await queryRunner.query(`
         SELECT column_name 
