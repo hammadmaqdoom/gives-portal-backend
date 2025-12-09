@@ -4,9 +4,15 @@ export class CreateSettingsTable1700000000000 implements MigrationInterface {
   name = 'CreateSettingsTable1700000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Check if table exists
-    const table = await queryRunner.getTable('settings');
-    const tableExists = !!table;
+    // Check if table exists using SQL query
+    const tableCheck = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'settings'
+      )
+    `);
+    const tableExists = tableCheck[0]?.exists === true;
 
     if (!tableExists) {
       // Create table if it doesn't exist
@@ -97,7 +103,14 @@ export class CreateSettingsTable1700000000000 implements MigrationInterface {
       }
     } else {
       // Table exists, check for missing columns and add them
-      const existingColumns = table.columns.map((col) => col.name);
+      // Get existing columns using SQL query
+      const existingColumnsResult = await queryRunner.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'settings'
+      `);
+      const existingColumns = existingColumnsResult.map((row: any) => row.column_name);
 
       // Helper function to check and add column
       const addColumnIfMissing = async (
@@ -105,9 +118,16 @@ export class CreateSettingsTable1700000000000 implements MigrationInterface {
         columnDefinition: string,
       ) => {
         if (!existingColumns.includes(columnName)) {
-          await queryRunner.query(
-            `ALTER TABLE "settings" ADD COLUMN ${columnDefinition}`,
-          );
+          try {
+            await queryRunner.query(
+              `ALTER TABLE "settings" ADD COLUMN ${columnDefinition}`,
+            );
+          } catch (error: any) {
+            // Ignore error if column already exists (race condition)
+            if (error?.code !== '42701') {
+              throw error;
+            }
+          }
         }
       };
 
