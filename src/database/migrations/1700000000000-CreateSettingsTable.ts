@@ -4,15 +4,8 @@ export class CreateSettingsTable1700000000000 implements MigrationInterface {
   name = 'CreateSettingsTable1700000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Check if table exists using SQL query
-    const tableCheck = await queryRunner.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'settings'
-      )
-    `);
-    const tableExists = tableCheck[0]?.exists === true;
+    // Check if table exists using TypeORM's built-in method
+    const tableExists = await queryRunner.hasTable('settings');
 
     if (!tableExists) {
       // Create table if it doesn't exist
