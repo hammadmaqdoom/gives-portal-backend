@@ -47,10 +47,10 @@ COPY --from=builder /app/src/mail/mail-templates ./src/mail/mail-templates
 # Create necessary directories and set permissions
 RUN mkdir -p src/mail/mail-templates && chown -R nestjs:nodejs src
 
-# Install wait-for-it script (used by startup checks)
-RUN curl -fsSL https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh -o /usr/local/bin/wait-for-it \
-  && chmod +x /usr/local/bin/wait-for-it \
-  && ln -s /usr/local/bin/wait-for-it ./wait-for-it.sh
+# Copy wait-for-it script (embedded in repository for reliability)
+COPY scripts/wait-for-it.sh /usr/local/bin/wait-for-it
+RUN chmod +x /usr/local/bin/wait-for-it && \
+    ln -s /usr/local/bin/wait-for-it ./wait-for-it.sh
 
 # Create uploads directory
 RUN mkdir -p uploads && chown -R nestjs:nodejs uploads
