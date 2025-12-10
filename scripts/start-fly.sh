@@ -2,7 +2,9 @@
 set -e
 
 # PostgreSQL configuration
-PGDATA=${PGDATA:-/var/lib/postgresql/data}
+# Use subdirectory to avoid lost+found issue with mount points
+PGDATA_MOUNT=${PGDATA_MOUNT:-/var/lib/postgresql/data}
+PGDATA="${PGDATA_MOUNT}/pgdata"
 PGUSER=${DATABASE_USERNAME:-postgres}
 PGPASSWORD=${DATABASE_PASSWORD:-postgres}
 PGDB=${DATABASE_NAME:-lms}

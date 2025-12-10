@@ -4,20 +4,20 @@
 # Application Configuration
 NODE_ENV=production
 APP_PORT=3000
-APP_NAME="LMS API"
+APP_NAME="Lumus App"
 API_PREFIX=api
 APP_FALLBACK_LANGUAGE=en
 APP_HEADER_LANGUAGE=x-custom-lang
-FRONTEND_DOMAIN=https://your-frontend-domain.com
-BACKEND_DOMAIN=https://your-backend-domain.fly.dev
+FRONTEND_DOMAIN=https://demo.getlumus.co
+BACKEND_DOMAIN=https://api-demo.getlumus.co
 
 # Database Configuration (PostgreSQL running in same container)
 DATABASE_TYPE=postgres
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
 DATABASE_USERNAME=postgres
-DATABASE_PASSWORD=your-secure-password-here
-DATABASE_NAME=lms
+DATABASE_PASSWORD=lZ9gXN9E1FlJ5QTB4525o7R
+DATABASE_NAME=lmsportaldemo
 DATABASE_SYNCHRONIZE=false
 DATABASE_MAX_CONNECTIONS=20
 DATABASE_SSL_ENABLED=false
@@ -28,7 +28,7 @@ REDIS_ENABLED=false
 
 # File Storage Configuration
 # For demo, you can use "local" driver or configure S3/Azure
-FILE_DRIVER=local
+FILE_DRIVER=s3
 # If using S3:
 # FILE_DRIVER=s3
 # ACCESS_KEY_ID=your-access-key
@@ -70,10 +70,10 @@ APPLE_APP_AUDIENCE=
 # Zoom OAuth (Optional for demo)
 ZOOM_OAUTH_CLIENT_ID=
 ZOOM_OAUTH_CLIENT_SECRET=
-ZOOM_OAUTH_REDIRECT_URI=https://your-backend-domain.fly.dev/api/v1/zoom/oauth/callback
+ZOOM_OAUTH_REDIRECT_URI=https://api-demo.getlumus.co/api/v1/zoom/oauth/callback
 
 # Sentry Error Tracking (Optional for demo)
-SENTRY_DSN=
+SENTRY_DSN=https://0dcbc6a4936c9df00068d26ae2ff2d55@o4510283075551232.ingest.us.sentry.io/4510510332510208
 SENTRY_ENABLED=false
 SENTRY_ENVIRONMENT=production
 SENTRY_TRACES_SAMPLE_RATE=0.1
