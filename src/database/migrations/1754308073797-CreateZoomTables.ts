@@ -6,12 +6,20 @@ export class CreateZoomTables1754308073797 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Create zoom_meetings_status_enum first
     await queryRunner.query(`
-      CREATE TYPE "public"."zoom_meetings_status_enum" AS ENUM('scheduled', 'active', 'ended', 'cancelled')
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE t.typname = 'zoom_meetings_status_enum' AND n.nspname = 'public'
+        ) THEN
+          CREATE TYPE "public"."zoom_meetings_status_enum" AS ENUM('scheduled', 'active', 'ended', 'cancelled');
+        END IF;
+      END $$;
     `);
 
     // Create zoom_credentials table
     await queryRunner.query(`
-      CREATE TABLE "zoom_credentials" (
+      CREATE TABLE IF NOT EXISTS "zoom_credentials" (
         "id" SERIAL NOT NULL,
         "teacher_id" integer NOT NULL,
         "zoom_api_key" text NOT NULL,
@@ -27,7 +35,7 @@ export class CreateZoomTables1754308073797 implements MigrationInterface {
 
     // Create zoom_meetings table
     await queryRunner.query(`
-      CREATE TABLE "zoom_meetings" (
+      CREATE TABLE IF NOT EXISTS "zoom_meetings" (
         "id" SERIAL NOT NULL,
         "class_id" integer NOT NULL,
         "teacher_id" integer NOT NULL,
@@ -50,85 +58,97 @@ export class CreateZoomTables1754308073797 implements MigrationInterface {
 
     // Add foreign key constraints
     await queryRunner.query(`
-      ALTER TABLE "zoom_credentials" 
-      ADD CONSTRAINT "FK_zoom_credentials_teacher_id" 
-      FOREIGN KEY ("teacher_id") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE NO ACTION
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_zoom_credentials_teacher_id') THEN
+          ALTER TABLE "zoom_credentials" 
+          ADD CONSTRAINT "FK_zoom_credentials_teacher_id" 
+          FOREIGN KEY ("teacher_id") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+        END IF;
+      END $$;
     `);
 
     await queryRunner.query(`
-      ALTER TABLE "zoom_meetings" 
-      ADD CONSTRAINT "FK_zoom_meetings_class_id" 
-      FOREIGN KEY ("class_id") REFERENCES "class"("id") ON DELETE CASCADE ON UPDATE NO ACTION
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_zoom_meetings_class_id') THEN
+          ALTER TABLE "zoom_meetings" 
+          ADD CONSTRAINT "FK_zoom_meetings_class_id" 
+          FOREIGN KEY ("class_id") REFERENCES "class"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+        END IF;
+      END $$;
     `);
 
     await queryRunner.query(`
-      ALTER TABLE "zoom_meetings" 
-      ADD CONSTRAINT "FK_zoom_meetings_teacher_id" 
-      FOREIGN KEY ("teacher_id") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE NO ACTION
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_zoom_meetings_teacher_id') THEN
+          ALTER TABLE "zoom_meetings" 
+          ADD CONSTRAINT "FK_zoom_meetings_teacher_id" 
+          FOREIGN KEY ("teacher_id") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+        END IF;
+      END $$;
     `);
 
     // Create indexes for better performance
     await queryRunner.query(`
-      CREATE INDEX "IDX_zoom_credentials_teacher_id" ON "zoom_credentials" ("teacher_id")
+      CREATE INDEX IF NOT EXISTS "IDX_zoom_credentials_teacher_id" ON "zoom_credentials" ("teacher_id")
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_zoom_meetings_class_id" ON "zoom_meetings" ("class_id")
+      CREATE INDEX IF NOT EXISTS "IDX_zoom_meetings_class_id" ON "zoom_meetings" ("class_id")
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_zoom_meetings_teacher_id" ON "zoom_meetings" ("teacher_id")
+      CREATE INDEX IF NOT EXISTS "IDX_zoom_meetings_teacher_id" ON "zoom_meetings" ("teacher_id")
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_zoom_meetings_status" ON "zoom_meetings" ("status")
+      CREATE INDEX IF NOT EXISTS "IDX_zoom_meetings_status" ON "zoom_meetings" ("status")
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_zoom_meetings_start_time" ON "zoom_meetings" ("start_time")
+      CREATE INDEX IF NOT EXISTS "IDX_zoom_meetings_start_time" ON "zoom_meetings" ("start_time")
     `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop foreign key constraints
     await queryRunner.query(`
-      ALTER TABLE "zoom_meetings" DROP CONSTRAINT "FK_zoom_meetings_teacher_id"
+      ALTER TABLE "zoom_meetings" DROP CONSTRAINT IF EXISTS "FK_zoom_meetings_teacher_id"
     `);
 
     await queryRunner.query(`
-      ALTER TABLE "zoom_meetings" DROP CONSTRAINT "FK_zoom_meetings_class_id"
+      ALTER TABLE "zoom_meetings" DROP CONSTRAINT IF EXISTS "FK_zoom_meetings_class_id"
     `);
 
     await queryRunner.query(`
-      ALTER TABLE "zoom_credentials" DROP CONSTRAINT "FK_zoom_credentials_teacher_id"
+      ALTER TABLE "zoom_credentials" DROP CONSTRAINT IF EXISTS "FK_zoom_credentials_teacher_id"
     `);
 
     // Drop indexes
     await queryRunner.query(`
-      DROP INDEX "IDX_zoom_meetings_start_time"
+      DROP INDEX IF EXISTS "IDX_zoom_meetings_start_time"
     `);
 
     await queryRunner.query(`
-      DROP INDEX "IDX_zoom_meetings_status"
+      DROP INDEX IF EXISTS "IDX_zoom_meetings_status"
     `);
 
     await queryRunner.query(`
-      DROP INDEX "IDX_zoom_meetings_teacher_id"
+      DROP INDEX IF EXISTS "IDX_zoom_meetings_teacher_id"
     `);
 
     await queryRunner.query(`
-      DROP INDEX "IDX_zoom_meetings_class_id"
+      DROP INDEX IF EXISTS "IDX_zoom_meetings_class_id"
     `);
 
     await queryRunner.query(`
-      DROP INDEX "IDX_zoom_credentials_teacher_id"
+      DROP INDEX IF EXISTS "IDX_zoom_credentials_teacher_id"
     `);
 
     // Drop tables
-    await queryRunner.query(`DROP TABLE "zoom_meetings"`);
-    await queryRunner.query(`DROP TABLE "zoom_credentials"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "zoom_meetings"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "zoom_credentials"`);
 
     // Drop enum
-    await queryRunner.query(`DROP TYPE "public"."zoom_meetings_status_enum"`);
+    await queryRunner.query(`DROP TYPE IF EXISTS "public"."zoom_meetings_status_enum"`);
   }
 }
