@@ -1,0 +1,56 @@
+# Fly.io configuration for LMS Backend Demo
+# App name will be set during `fly launch` or can be set manually
+app = "lms-backend-demo"
+primary_region = "iad"  # Change to your preferred region
+
+[build]
+  dockerfile = "Dockerfile.fly"
+
+[env]
+  NODE_ENV = "production"
+  DATABASE_HOST = "localhost"
+  DATABASE_PORT = "5432"
+  DATABASE_TYPE = "postgres"
+  REDIS_ENABLED = "false"
+
+# VM configuration - 1 shared CPU, 1GB RAM
+[vm]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 1024
+
+# Persistent volume for PostgreSQL data
+[[mounts]]
+  source = "postgres_data"
+  destination = "/var/lib/postgresql/data"
+
+# HTTP service configuration
+[[services]]
+  internal_port = 3000
+  protocol = "tcp"
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+  # Health check
+  [[services.http_checks]]
+    interval = "30s"
+    timeout = "3s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/api/v1"
+    protocol = "http"
+
