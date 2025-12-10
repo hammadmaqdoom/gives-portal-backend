@@ -8,7 +8,7 @@ export class CreatePaymentGatewayTables1754308080007
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Create payment_gateway table
     await queryRunner.query(`
-      CREATE TABLE "payment_gateway" (
+      CREATE TABLE IF NOT EXISTS "payment_gateway" (
         "id" SERIAL PRIMARY KEY,
         "name" varchar(100) NOT NULL UNIQUE,
         "displayName" varchar(255) NOT NULL,
@@ -35,7 +35,7 @@ export class CreatePaymentGatewayTables1754308080007
 
     // Create payment_gateway_credentials table
     await queryRunner.query(`
-      CREATE TABLE "payment_gateway_credentials" (
+      CREATE TABLE IF NOT EXISTS "payment_gateway_credentials" (
         "id" SERIAL PRIMARY KEY,
         "gatewayId" integer NOT NULL,
         "environment" varchar(20) NOT NULL DEFAULT 'sandbox',
@@ -52,7 +52,7 @@ export class CreatePaymentGatewayTables1754308080007
 
     // Create payment_transaction table
     await queryRunner.query(`
-      CREATE TABLE "payment_transaction" (
+      CREATE TABLE IF NOT EXISTS "payment_transaction" (
         "id" SERIAL PRIMARY KEY,
         "transactionId" varchar(255) NOT NULL UNIQUE,
         "gatewayTransactionId" varchar(255),
@@ -78,80 +78,100 @@ export class CreatePaymentGatewayTables1754308080007
 
     // Create indexes
     await queryRunner.query(
-      `CREATE INDEX "IDX_payment_gateway_name" ON "payment_gateway" ("name")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_payment_gateway_name" ON "payment_gateway" ("name")`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_payment_gateway_active" ON "payment_gateway" ("isActive")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_payment_gateway_active" ON "payment_gateway" ("isActive")`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_payment_gateway_default" ON "payment_gateway" ("isDefault")`,
-    );
-
-    await queryRunner.query(
-      `CREATE INDEX "IDX_payment_gateway_credentials_gateway" ON "payment_gateway_credentials" ("gatewayId")`,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "IDX_payment_gateway_credentials_environment" ON "payment_gateway_credentials" ("environment")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_payment_gateway_default" ON "payment_gateway" ("isDefault")`,
     );
 
     await queryRunner.query(
-      `CREATE INDEX "IDX_payment_transaction_id" ON "payment_transaction" ("transactionId")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_payment_gateway_credentials_gateway" ON "payment_gateway_credentials" ("gatewayId")`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_payment_transaction_gateway_id" ON "payment_transaction" ("gatewayTransactionId")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_payment_gateway_credentials_environment" ON "payment_gateway_credentials" ("environment")`,
+    );
+
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_payment_transaction_id" ON "payment_transaction" ("transactionId")`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_payment_transaction_gateway" ON "payment_transaction" ("gatewayId")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_payment_transaction_gateway_id" ON "payment_transaction" ("gatewayTransactionId")`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_payment_transaction_invoice" ON "payment_transaction" ("invoiceId")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_payment_transaction_gateway" ON "payment_transaction" ("gatewayId")`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_payment_transaction_student" ON "payment_transaction" ("studentId")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_payment_transaction_invoice" ON "payment_transaction" ("invoiceId")`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_payment_transaction_status" ON "payment_transaction" ("status")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_payment_transaction_student" ON "payment_transaction" ("studentId")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_payment_transaction_status" ON "payment_transaction" ("status")`,
     );
 
     // Add foreign key constraints
     await queryRunner.query(`
-      ALTER TABLE "payment_gateway_credentials" 
-      ADD CONSTRAINT "FK_payment_gateway_credentials_gateway" 
-      FOREIGN KEY ("gatewayId") 
-      REFERENCES "payment_gateway"("id") 
-      ON DELETE CASCADE
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_payment_gateway_credentials_gateway') THEN
+          ALTER TABLE "payment_gateway_credentials" 
+          ADD CONSTRAINT "FK_payment_gateway_credentials_gateway" 
+          FOREIGN KEY ("gatewayId") 
+          REFERENCES "payment_gateway"("id") 
+          ON DELETE CASCADE;
+        END IF;
+      END $$;
     `);
 
     await queryRunner.query(`
-      ALTER TABLE "payment_transaction" 
-      ADD CONSTRAINT "FK_payment_transaction_gateway" 
-      FOREIGN KEY ("gatewayId") 
-      REFERENCES "payment_gateway"("id") 
-      ON DELETE RESTRICT
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_payment_transaction_gateway') THEN
+          ALTER TABLE "payment_transaction" 
+          ADD CONSTRAINT "FK_payment_transaction_gateway" 
+          FOREIGN KEY ("gatewayId") 
+          REFERENCES "payment_gateway"("id") 
+          ON DELETE RESTRICT;
+        END IF;
+      END $$;
     `);
 
     await queryRunner.query(`
-      ALTER TABLE "payment_transaction" 
-      ADD CONSTRAINT "FK_payment_transaction_invoice" 
-      FOREIGN KEY ("invoiceId") 
-      REFERENCES "invoice"("id") 
-      ON DELETE SET NULL
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_payment_transaction_invoice') THEN
+          ALTER TABLE "payment_transaction" 
+          ADD CONSTRAINT "FK_payment_transaction_invoice" 
+          FOREIGN KEY ("invoiceId") 
+          REFERENCES "invoice"("id") 
+          ON DELETE SET NULL;
+        END IF;
+      END $$;
     `);
 
     await queryRunner.query(`
-      ALTER TABLE "payment_transaction" 
-      ADD CONSTRAINT "FK_payment_transaction_student" 
-      FOREIGN KEY ("studentId") 
-      REFERENCES "student"("id") 
-      ON DELETE CASCADE
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_payment_transaction_student') THEN
+          ALTER TABLE "payment_transaction" 
+          ADD CONSTRAINT "FK_payment_transaction_student" 
+          FOREIGN KEY ("studentId") 
+          REFERENCES "student"("id") 
+          ON DELETE CASCADE;
+        END IF;
+      END $$;
     `);
 
     await queryRunner.query(`
-      ALTER TABLE "payment_transaction" 
-      ADD CONSTRAINT "FK_payment_transaction_parent" 
-      FOREIGN KEY ("parentId") 
-      REFERENCES "parent"("id") 
-      ON DELETE SET NULL
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_payment_transaction_parent') THEN
+          ALTER TABLE "payment_transaction" 
+          ADD CONSTRAINT "FK_payment_transaction_parent" 
+          FOREIGN KEY ("parentId") 
+          REFERENCES "parent"("id") 
+          ON DELETE SET NULL;
+        END IF;
+      END $$;
     `);
 
     // Insert default payment gateways
@@ -222,24 +242,24 @@ export class CreatePaymentGatewayTables1754308080007
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop foreign key constraints
     await queryRunner.query(
-      `ALTER TABLE "payment_transaction" DROP CONSTRAINT "FK_payment_transaction_parent"`,
+      `ALTER TABLE "payment_transaction" DROP CONSTRAINT IF EXISTS "FK_payment_transaction_parent"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "payment_transaction" DROP CONSTRAINT "FK_payment_transaction_student"`,
+      `ALTER TABLE "payment_transaction" DROP CONSTRAINT IF EXISTS "FK_payment_transaction_student"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "payment_transaction" DROP CONSTRAINT "FK_payment_transaction_invoice"`,
+      `ALTER TABLE "payment_transaction" DROP CONSTRAINT IF EXISTS "FK_payment_transaction_invoice"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "payment_transaction" DROP CONSTRAINT "FK_payment_transaction_gateway"`,
+      `ALTER TABLE "payment_transaction" DROP CONSTRAINT IF EXISTS "FK_payment_transaction_gateway"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "payment_gateway_credentials" DROP CONSTRAINT "FK_payment_gateway_credentials_gateway"`,
+      `ALTER TABLE "payment_gateway_credentials" DROP CONSTRAINT IF EXISTS "FK_payment_gateway_credentials_gateway"`,
     );
 
     // Drop tables
-    await queryRunner.query(`DROP TABLE "payment_transaction"`);
-    await queryRunner.query(`DROP TABLE "payment_gateway_credentials"`);
-    await queryRunner.query(`DROP TABLE "payment_gateway"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "payment_transaction"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "payment_gateway_credentials"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "payment_gateway"`);
   }
 }
