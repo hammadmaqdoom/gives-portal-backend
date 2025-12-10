@@ -1,0 +1,84 @@
+# Environment variables for Fly.io demo deployment
+# Set these using: fly secrets set KEY=value
+
+# Application Configuration
+NODE_ENV=production
+APP_PORT=3000
+APP_NAME="LMS API"
+API_PREFIX=api
+APP_FALLBACK_LANGUAGE=en
+APP_HEADER_LANGUAGE=x-custom-lang
+FRONTEND_DOMAIN=https://your-frontend-domain.com
+BACKEND_DOMAIN=https://your-backend-domain.fly.dev
+
+# Database Configuration (PostgreSQL running in same container)
+DATABASE_TYPE=postgres
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_USERNAME=postgres
+DATABASE_PASSWORD=your-secure-password-here
+DATABASE_NAME=lms
+DATABASE_SYNCHRONIZE=false
+DATABASE_MAX_CONNECTIONS=20
+DATABASE_SSL_ENABLED=false
+DATABASE_REJECT_UNAUTHORIZED=false
+
+# Redis Configuration (Disabled for demo)
+REDIS_ENABLED=false
+
+# File Storage Configuration
+# For demo, you can use "local" driver or configure S3/Azure
+FILE_DRIVER=local
+# If using S3:
+# FILE_DRIVER=s3
+# ACCESS_KEY_ID=your-access-key
+# SECRET_ACCESS_KEY=your-secret-key
+# AWS_S3_REGION=us-east-1
+# AWS_DEFAULT_S3_BUCKET=your-bucket-name
+
+# Mail Configuration (Optional for demo)
+MAIL_HOST=email-smtp.ap-south-1.amazonaws.com
+MAIL_PORT=465
+MAIL_USER=your-mail-user
+MAIL_PASSWORD=your-mail-password
+MAIL_IGNORE_TLS=true
+MAIL_SECURE=false
+MAIL_REQUIRE_TLS=false
+MAIL_DEFAULT_EMAIL=info@example.com
+MAIL_DEFAULT_NAME=API
+
+# Authentication Configuration
+AUTH_JWT_SECRET=your-super-secret-jwt-key-change-this
+AUTH_JWT_TOKEN_EXPIRES_IN=15m
+AUTH_REFRESH_SECRET=your-super-secret-refresh-key-change-this
+AUTH_REFRESH_TOKEN_EXPIRES_IN=3650d
+AUTH_FORGOT_SECRET=your-super-secret-forgot-key-change-this
+AUTH_FORGOT_TOKEN_EXPIRES_IN=30m
+AUTH_CONFIRM_EMAIL_SECRET=your-super-secret-confirm-email-key-change-this
+AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN=1d
+
+# Payment Gateway Encryption Key (32+ characters for AES-256-GCM)
+ENCRYPTION_KEY=your-super-secret-encryption-key-32-chars-minimum
+
+# OAuth Configuration (Optional for demo)
+FACEBOOK_APP_ID=
+FACEBOOK_APP_SECRET=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+APPLE_APP_AUDIENCE=
+
+# Zoom OAuth (Optional for demo)
+ZOOM_OAUTH_CLIENT_ID=
+ZOOM_OAUTH_CLIENT_SECRET=
+ZOOM_OAUTH_REDIRECT_URI=https://your-backend-domain.fly.dev/api/v1/zoom/oauth/callback
+
+# Sentry Error Tracking (Optional for demo)
+SENTRY_DSN=
+SENTRY_ENABLED=false
+SENTRY_ENVIRONMENT=production
+SENTRY_TRACES_SAMPLE_RATE=0.1
+SENTRY_PROFILES_SAMPLE_RATE=0.1
+
+# Open Exchange Rates (Optional for demo)
+OPENEXCHANGERATES_APP_ID=
+
