@@ -5,7 +5,7 @@ export class CreateInvoiceTable1754308080006 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-      CREATE TABLE "invoice" (
+      CREATE TABLE IF NOT EXISTS "invoice" (
         "id" SERIAL PRIMARY KEY,
         "invoiceNumber" varchar NOT NULL UNIQUE,
         "studentId" integer NOT NULL,
@@ -28,54 +28,62 @@ export class CreateInvoiceTable1754308080006 implements MigrationInterface {
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_invoice_invoiceNumber" ON "invoice" ("invoiceNumber")
+      CREATE INDEX IF NOT EXISTS "IDX_invoice_invoiceNumber" ON "invoice" ("invoiceNumber")
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_invoice_studentId" ON "invoice" ("studentId")
+      CREATE INDEX IF NOT EXISTS "IDX_invoice_studentId" ON "invoice" ("studentId")
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_invoice_parentId" ON "invoice" ("parentId")
+      CREATE INDEX IF NOT EXISTS "IDX_invoice_parentId" ON "invoice" ("parentId")
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_invoice_status" ON "invoice" ("status")
+      CREATE INDEX IF NOT EXISTS "IDX_invoice_status" ON "invoice" ("status")
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_invoice_dueDate" ON "invoice" ("dueDate")
+      CREATE INDEX IF NOT EXISTS "IDX_invoice_dueDate" ON "invoice" ("dueDate")
     `);
 
     await queryRunner.query(`
-      ALTER TABLE "invoice" 
-      ADD CONSTRAINT "FK_invoice_student" 
-      FOREIGN KEY ("studentId") 
-      REFERENCES "student"("id") 
-      ON DELETE CASCADE
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_invoice_student') THEN
+          ALTER TABLE "invoice" 
+          ADD CONSTRAINT "FK_invoice_student" 
+          FOREIGN KEY ("studentId") 
+          REFERENCES "student"("id") 
+          ON DELETE CASCADE;
+        END IF;
+      END $$;
     `);
 
     await queryRunner.query(`
-      ALTER TABLE "invoice" 
-      ADD CONSTRAINT "FK_invoice_parent" 
-      FOREIGN KEY ("parentId") 
-      REFERENCES "parent"("id") 
-      ON DELETE SET NULL
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_invoice_parent') THEN
+          ALTER TABLE "invoice" 
+          ADD CONSTRAINT "FK_invoice_parent" 
+          FOREIGN KEY ("parentId") 
+          REFERENCES "parent"("id") 
+          ON DELETE SET NULL;
+        END IF;
+      END $$;
     `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE "invoice" DROP CONSTRAINT "FK_invoice_parent"`,
+      `ALTER TABLE "invoice" DROP CONSTRAINT IF EXISTS "FK_invoice_parent"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "invoice" DROP CONSTRAINT "FK_invoice_student"`,
+      `ALTER TABLE "invoice" DROP CONSTRAINT IF EXISTS "FK_invoice_student"`,
     );
-    await queryRunner.query(`DROP INDEX "IDX_invoice_dueDate"`);
-    await queryRunner.query(`DROP INDEX "IDX_invoice_status"`);
-    await queryRunner.query(`DROP INDEX "IDX_invoice_parentId"`);
-    await queryRunner.query(`DROP INDEX "IDX_invoice_studentId"`);
-    await queryRunner.query(`DROP INDEX "IDX_invoice_invoiceNumber"`);
-    await queryRunner.query(`DROP TABLE "invoice"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_invoice_dueDate"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_invoice_status"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_invoice_parentId"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_invoice_studentId"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_invoice_invoiceNumber"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "invoice"`);
   }
 }

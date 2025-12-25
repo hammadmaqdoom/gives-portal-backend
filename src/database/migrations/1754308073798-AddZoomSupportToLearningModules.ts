@@ -9,32 +9,38 @@ export class AddZoomSupportToLearningModules1754308073798
     // Add Zoom meeting support to learning modules
     await queryRunner.query(`
       ALTER TABLE "learning_module" 
-      ADD COLUMN "is_pinned" boolean NOT NULL DEFAULT false,
-      ADD COLUMN "zoom_meeting_id" integer,
-      ADD COLUMN "zoom_meeting_url" text,
-      ADD COLUMN "zoom_meeting_password" text,
-      ADD COLUMN "zoom_meeting_start_time" TIMESTAMP,
-      ADD COLUMN "zoom_meeting_duration" integer
+      ADD COLUMN IF NOT EXISTS "is_pinned" boolean NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS "zoom_meeting_id" integer,
+      ADD COLUMN IF NOT EXISTS "zoom_meeting_url" text,
+      ADD COLUMN IF NOT EXISTS "zoom_meeting_password" text,
+      ADD COLUMN IF NOT EXISTS "zoom_meeting_start_time" TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS "zoom_meeting_duration" integer
     `);
 
     // Add foreign key constraint for zoom_meeting_id
     await queryRunner.query(`
-      ALTER TABLE "learning_module" 
-      ADD CONSTRAINT "FK_learning_module_zoom_meeting" 
-      FOREIGN KEY ("zoom_meeting_id") 
-      REFERENCES "zoom_meetings"("id") 
-      ON DELETE SET NULL
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'FK_learning_module_zoom_meeting'
+        ) THEN
+          ALTER TABLE "learning_module" 
+          ADD CONSTRAINT "FK_learning_module_zoom_meeting" 
+          FOREIGN KEY ("zoom_meeting_id") 
+          REFERENCES "zoom_meetings"("id") 
+          ON DELETE SET NULL;
+        END IF;
+      END $$;
     `);
 
     // Create index for pinned modules
     await queryRunner.query(`
-      CREATE INDEX "IDX_learning_module_is_pinned" 
+      CREATE INDEX IF NOT EXISTS "IDX_learning_module_is_pinned" 
       ON "learning_module" ("is_pinned")
     `);
 
     // Create index for zoom meeting
     await queryRunner.query(`
-      CREATE INDEX "IDX_learning_module_zoom_meeting" 
+      CREATE INDEX IF NOT EXISTS "IDX_learning_module_zoom_meeting" 
       ON "learning_module" ("zoom_meeting_id")
     `);
   }
