@@ -345,4 +345,23 @@ export class CreateSettingsDto {
   @IsUrl()
   @MaxLength(500)
   whatsappApiUrl?: string;
+
+  // Theme Configuration
+  @ApiPropertyOptional({
+    example: 'brand',
+    description: 'Theme color preset: default, brand, cyan, purple, blue, orange, red, custom',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  themeColorPreset?: string;
+
+  @ApiPropertyOptional({
+    example: '#00C7AB',
+    description: 'Custom theme color in hex format (only used when themeColorPreset is "custom")',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(7)
+  themeCustomColor?: string;
 }
