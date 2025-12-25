@@ -6,7 +6,7 @@ export class AddInvoiceItemsOnly1757159231198 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Create the invoice_item table
     await queryRunner.query(
-      `CREATE TABLE "invoice_item" (
+      `CREATE TABLE IF NOT EXISTS "invoice_item" (
         "id" SERIAL NOT NULL, 
         "description" text NOT NULL, 
         "quantity" integer NOT NULL DEFAULT '1', 
@@ -20,9 +20,17 @@ export class AddInvoiceItemsOnly1757159231198 implements MigrationInterface {
     );
 
     // Add foreign key constraint to invoice table
-    await queryRunner.query(
-      `ALTER TABLE "invoice_item" ADD CONSTRAINT "FK_553d5aac210d22fdca5c8d48ead" FOREIGN KEY ("invoiceId") REFERENCES "invoice"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
-    );
+    await queryRunner.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'FK_553d5aac210d22fdca5c8d48ead'
+        ) THEN
+          ALTER TABLE "invoice_item" 
+          ADD CONSTRAINT "FK_553d5aac210d22fdca5c8d48ead" 
+          FOREIGN KEY ("invoiceId") REFERENCES "invoice"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+        END IF;
+      END $$;
+    `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

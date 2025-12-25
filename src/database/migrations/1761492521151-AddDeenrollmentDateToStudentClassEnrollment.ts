@@ -8,7 +8,7 @@ export class AddDeenrollmentDateToStudentClassEnrollment1761492521151
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Add deenrollment date column to student class enrollment table
     await queryRunner.query(
-      `ALTER TABLE "student_class_enrollment" ADD "deenrollmentDate" TIMESTAMP`,
+      `ALTER TABLE "student_class_enrollment" ADD COLUMN IF NOT EXISTS "deenrollmentDate" TIMESTAMP`,
     );
   }
 
