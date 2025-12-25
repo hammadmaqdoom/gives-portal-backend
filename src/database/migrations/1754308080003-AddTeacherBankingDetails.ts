@@ -8,31 +8,31 @@ export class AddTeacherBankingDetails1754308080003
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       ALTER TABLE "teacher"
-      ADD COLUMN "payoutMethod" varchar
+      ADD COLUMN IF NOT EXISTS "payoutMethod" varchar
     `);
     await queryRunner.query(`
       ALTER TABLE "teacher"
-      ADD COLUMN "bankName" varchar
+      ADD COLUMN IF NOT EXISTS "bankName" varchar
     `);
     await queryRunner.query(`
       ALTER TABLE "teacher"
-      ADD COLUMN "accountNumber" varchar
+      ADD COLUMN IF NOT EXISTS "accountNumber" varchar
     `);
     await queryRunner.query(`
       ALTER TABLE "teacher"
-      ADD COLUMN "bankCode" varchar
+      ADD COLUMN IF NOT EXISTS "bankCode" varchar
     `);
     await queryRunner.query(`
       ALTER TABLE "teacher"
-      ADD COLUMN "iban" varchar
+      ADD COLUMN IF NOT EXISTS "iban" varchar
     `);
     await queryRunner.query(`
       ALTER TABLE "teacher"
-      ADD COLUMN "accountHolderName" varchar
+      ADD COLUMN IF NOT EXISTS "accountHolderName" varchar
     `);
     await queryRunner.query(`
       ALTER TABLE "teacher"
-      ADD COLUMN "bankBranch" varchar
+      ADD COLUMN IF NOT EXISTS "bankBranch" varchar
     `);
   }
 

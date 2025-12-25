@@ -1,12 +1,13 @@
 import { registerAs } from '@nestjs/config';
 
-import { IsEnum, IsString, ValidateIf } from 'class-validator';
+import { IsEnum, IsOptional, IsString, ValidateIf } from 'class-validator';
 import validateConfig from '../../utils/validate-config';
 import { FileDriver, FileConfig } from './file-config.type';
 
 class EnvironmentVariablesValidator {
+  @IsOptional()
   @IsEnum(FileDriver)
-  FILE_DRIVER: FileDriver;
+  FILE_DRIVER?: FileDriver;
 
   @ValidateIf((envValues) =>
     [FileDriver.S3, FileDriver.S3_PRESIGNED].includes(envValues.FILE_DRIVER),
