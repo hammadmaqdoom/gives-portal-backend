@@ -11,7 +11,14 @@ import {
   HttpStatus,
   HttpCode,
   SerializeOptions,
+  ClassSerializerInterceptor,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { UpdateTeacherDto } from './dto/update-teacher.dto';
 import {
@@ -20,6 +27,10 @@ import {
   ApiOkResponse,
   ApiParam,
   ApiTags,
+  ApiOperation,
+  ApiConsumes,
+  ApiBody,
+  ApiResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../roles/roles.decorator';
 import { RoleEnum } from '../roles/roles.enum';
@@ -34,10 +45,8 @@ import { Teacher } from './domain/teacher';
 import { TeachersService } from './teachers.service';
 import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
+import { BulkTeachersResultDto } from './dto/bulk-teachers-response.dto';
 
-@ApiBearerAuth()
-@Roles(RoleEnum.admin)
-@UseGuards(AuthGuard('jwt'), RolesGuard)
 @ApiTags('Teachers')
 @Controller({
   path: 'teachers',
@@ -46,6 +55,19 @@ import { infinityPagination } from '../utils/infinity-pagination';
 export class TeachersController {
   constructor(private readonly teachersService: TeachersService) {}
 
+  // Public endpoint - no authentication required
+  @Get('public')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({
+    type: [Teacher],
+  })
+  findPublicTeachers(): Promise<Teacher[]> {
+    return this.teachersService.findPublicTeachers();
+  }
+
+  @ApiBearerAuth()
+  @Roles(RoleEnum.admin)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   create(
@@ -54,6 +76,9 @@ export class TeachersController {
     return this.teachersService.create(createTeacherDto);
   }
 
+  @ApiBearerAuth()
+  @Roles(RoleEnum.admin)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Post(':id/reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiParam({
@@ -67,6 +92,9 @@ export class TeachersController {
     return this.teachersService.resetPassword(+id);
   }
 
+  @ApiBearerAuth()
+  @Roles(RoleEnum.admin)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get(':id/check-user-account')
   @ApiParam({
     name: 'id',
@@ -81,6 +109,9 @@ export class TeachersController {
     return this.teachersService.checkTeacherUserAccount(+id);
   }
 
+  @ApiBearerAuth()
+  @Roles(RoleEnum.admin)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get()
   @ApiOkResponse({
     type: InfinityPaginationResponseDto,
@@ -106,6 +137,9 @@ export class TeachersController {
     return infinityPagination(data, { page, limit });
   }
 
+  @ApiBearerAuth()
+  @Roles(RoleEnum.admin)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get(':id')
   @ApiParam({
     name: 'id',
@@ -121,6 +155,9 @@ export class TeachersController {
     return this.teachersService.findById(+id);
   }
 
+  @ApiBearerAuth()
+  @Roles(RoleEnum.admin)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Patch(':id')
   @ApiParam({
     name: 'id',
@@ -143,6 +180,9 @@ export class TeachersController {
     return this.teachersService.update(+id, updateTeacherDto);
   }
 
+  @ApiBearerAuth()
+  @Roles(RoleEnum.admin)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Delete(':id')
   @ApiParam({
     name: 'id',
@@ -151,5 +191,50 @@ export class TeachersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id') id: string): Promise<void> {
     return this.teachersService.remove(+id);
+  }
+
+  @Post('bulk-create')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.admin)
+  @ApiOperation({
+    summary: 'Bulk create teachers from Excel/CSV file',
+    description:
+      'Upload an Excel or CSV file with teacher details to bulk create teachers. User accounts will be created for teachers with email addresses.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description:
+            'Excel (.xlsx, .xls) or CSV file with teacher data (Name, Email, Phone, Commission %, Subjects Allowed, etc.)',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Bulk creation processed successfully',
+    type: BulkTeachersResultDto,
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  async bulkCreate(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }), // 10MB
+          new FileTypeValidator({
+            fileType: /\.(xlsx|xls|csv)$/i,
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+  ): Promise<BulkTeachersResultDto> {
+    return this.teachersService.bulkCreateFromFile(file);
   }
 }

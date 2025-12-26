@@ -1,0 +1,91 @@
+# Multi-stage build for Fly.io deployment with PostgreSQL
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies (skip prepare script for production)
+RUN npm ci --only=production --ignore-scripts && npm cache clean --force
+
+# Install NestJS CLI for building
+RUN npm install -g @nestjs/cli
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN npm run build
+
+# Production stage with PostgreSQL
+FROM node:20-slim AS production
+
+WORKDIR /app
+
+# Install PostgreSQL and required tools
+RUN apt-get update && \
+    apt-get install -y \
+    postgresql-15 \
+    postgresql-client-15 \
+    curl \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -g 1001 nodejs && \
+    useradd -r -u 1001 -g nodejs nestjs
+
+# Create PostgreSQL data directory and set permissions
+RUN mkdir -p /var/lib/postgresql/data && \
+    chown -R postgres:postgres /var/lib/postgresql/data
+
+# Copy package files
+COPY package*.json ./
+
+# Install only production dependencies (skip prepare script for production)
+RUN npm ci --only=production --ignore-scripts && npm cache clean --force
+
+# Create crypto polyfill script
+RUN echo 'const crypto = require("crypto"); global.crypto = crypto; require("./dist/main.js");' > start.js
+
+# Copy built application from builder stage
+COPY --from=builder /app/dist ./dist
+
+# Copy mail templates (needed at runtime)
+COPY --from=builder /app/src/mail/mail-templates ./src/mail/mail-templates
+
+# Copy PostgreSQL configuration
+COPY postgresql-fly.conf /etc/postgresql/15/main/postgresql.conf
+
+# Copy initialization and startup scripts
+COPY scripts/init-postgres-fly.sh /usr/local/bin/init-postgres-fly.sh
+COPY scripts/start-fly.sh /usr/local/bin/start-fly.sh
+
+# Make scripts executable
+RUN chmod +x /usr/local/bin/init-postgres-fly.sh && \
+    chmod +x /usr/local/bin/start-fly.sh
+
+# Configure sudo for nestjs user to run PostgreSQL commands
+RUN echo "nestjs ALL=(postgres) NOPASSWD: /usr/lib/postgresql/15/bin/pg_ctl, /usr/bin/pg_isready, /usr/lib/postgresql/15/bin/postgres, /usr/lib/postgresql/15/bin/initdb, /usr/bin/psql" >> /etc/sudoers.d/nestjs
+
+# Create necessary directories and set permissions
+RUN mkdir -p src/mail/mail-templates && \
+    chown -R nestjs:nodejs src && \
+    chown -R nestjs:nodejs /app
+
+# Create uploads directory
+RUN mkdir -p uploads && chown -R nestjs:nodejs uploads
+
+# Expose port
+EXPOSE 3000
+
+# Health check (use root endpoint since /api/v1/health doesn't exist)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+  CMD curl -sf http://localhost:${PORT:-3000}/api/v1 || exit 1
+
+# Run as root to allow PostgreSQL operations, scripts will handle user switching
+# Fly.io provides security at the VM level, so running as root in container is acceptable
+# Start both PostgreSQL and NestJS application
+CMD ["/usr/local/bin/start-fly.sh"]
+
