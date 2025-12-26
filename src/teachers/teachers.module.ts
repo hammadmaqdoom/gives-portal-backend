@@ -6,6 +6,8 @@ import { TeacherCommissionService } from './teacher-commission.service';
 import { RelationalTeacherPersistenceModule } from './infrastructure/persistence/relational/relational-persistence.module';
 import { RelationalTeacherCommissionPersistenceModule } from './infrastructure/persistence/relational/relational-teacher-commission-persistence.module';
 import { UsersModule } from '../users/users.module';
+import { NotificationModule } from '../notifications/notification.module';
+import { SubjectsModule } from '../subjects/subjects.module';
 
 const infrastructurePersistenceModule = RelationalTeacherPersistenceModule;
 const commissionPersistenceModule =
@@ -16,6 +18,8 @@ const commissionPersistenceModule =
     infrastructurePersistenceModule,
     commissionPersistenceModule,
     UsersModule,
+    NotificationModule,
+    SubjectsModule,
   ],
   controllers: [TeachersController, TeacherCommissionController],
   providers: [TeachersService, TeacherCommissionService],
