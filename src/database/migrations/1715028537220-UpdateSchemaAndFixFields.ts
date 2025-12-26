@@ -51,16 +51,32 @@ export class UpdateSchemaAndFixFields1715028537220
 
     // Create proper enums
     await queryRunner.query(`
-      CREATE TYPE "public"."payment_status_enum" AS ENUM('paid', 'unpaid', 'partial', 'overdue')
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE t.typname = 'payment_status_enum' AND n.nspname = 'public'
+        ) THEN
+          CREATE TYPE "public"."payment_status_enum" AS ENUM('paid', 'unpaid', 'partial', 'overdue');
+        END IF;
+      END $$;
     `);
 
     await queryRunner.query(`
-      CREATE TYPE "public"."payment_method_enum" AS ENUM('cash', 'bank_transfer', 'credit_card', 'debit_card', 'check', 'online')
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE t.typname = 'payment_method_enum' AND n.nspname = 'public'
+        ) THEN
+          CREATE TYPE "public"."payment_method_enum" AS ENUM('cash', 'bank_transfer', 'credit_card', 'debit_card', 'check', 'online');
+        END IF;
+      END $$;
     `);
 
     // Create performance table with proper structure
     await queryRunner.query(`
-      CREATE TABLE "performance" (
+      CREATE TABLE IF NOT EXISTS "performance" (
         "id" SERIAL NOT NULL,
         "score" integer NOT NULL,
         "comments" character varying,
@@ -78,7 +94,7 @@ export class UpdateSchemaAndFixFields1715028537220
 
     // Create fee table with proper structure
     await queryRunner.query(`
-      CREATE TABLE "fee" (
+      CREATE TABLE IF NOT EXISTS "fee" (
         "id" SERIAL NOT NULL,
         "amount" decimal(10,2) NOT NULL,
         "status" "public"."payment_status_enum" NOT NULL,
@@ -129,50 +145,66 @@ export class UpdateSchemaAndFixFields1715028537220
 
     // Create indexes for performance table
     await queryRunner.query(`
-      CREATE INDEX "IDX_performance_student" ON "performance" ("studentId")
+      CREATE INDEX IF NOT EXISTS "IDX_performance_student" ON "performance" ("studentId")
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_performance_assignment" ON "performance" ("assignmentId")
+      CREATE INDEX IF NOT EXISTS "IDX_performance_assignment" ON "performance" ("assignmentId")
     `);
 
     // Create indexes for fee table
     await queryRunner.query(`
-      CREATE INDEX "IDX_fee_student" ON "fee" ("studentId")
+      CREATE INDEX IF NOT EXISTS "IDX_fee_student" ON "fee" ("studentId")
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_fee_class" ON "fee" ("classId")
+      CREATE INDEX IF NOT EXISTS "IDX_fee_class" ON "fee" ("classId")
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_fee_dueDate" ON "fee" ("dueDate")
+      CREATE INDEX IF NOT EXISTS "IDX_fee_dueDate" ON "fee" ("dueDate")
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_fee_status" ON "fee" ("status")
+      CREATE INDEX IF NOT EXISTS "IDX_fee_status" ON "fee" ("status")
     `);
 
     // Add foreign key constraints for performance table
     await queryRunner.query(`
-      ALTER TABLE "performance" ADD CONSTRAINT "FK_performance_student" 
-      FOREIGN KEY ("studentId") REFERENCES "student"("id") ON DELETE NO ACTION ON UPDATE NO ACTION
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_performance_student') THEN
+          ALTER TABLE "performance" ADD CONSTRAINT "FK_performance_student" 
+          FOREIGN KEY ("studentId") REFERENCES "student"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+        END IF;
+      END $$;
     `);
 
     await queryRunner.query(`
-      ALTER TABLE "performance" ADD CONSTRAINT "FK_performance_assignment" 
-      FOREIGN KEY ("assignmentId") REFERENCES "assignment"("id") ON DELETE NO ACTION ON UPDATE NO ACTION
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_performance_assignment') THEN
+          ALTER TABLE "performance" ADD CONSTRAINT "FK_performance_assignment" 
+          FOREIGN KEY ("assignmentId") REFERENCES "assignment"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+        END IF;
+      END $$;
     `);
 
     // Add foreign key constraints for fee table
     await queryRunner.query(`
-      ALTER TABLE "fee" ADD CONSTRAINT "FK_fee_student" 
-      FOREIGN KEY ("studentId") REFERENCES "student"("id") ON DELETE NO ACTION ON UPDATE NO ACTION
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_fee_student') THEN
+          ALTER TABLE "fee" ADD CONSTRAINT "FK_fee_student" 
+          FOREIGN KEY ("studentId") REFERENCES "student"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+        END IF;
+      END $$;
     `);
 
     await queryRunner.query(`
-      ALTER TABLE "fee" ADD CONSTRAINT "FK_fee_class" 
-      FOREIGN KEY ("classId") REFERENCES "class"("id") ON DELETE NO ACTION ON UPDATE NO ACTION
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_fee_class') THEN
+          ALTER TABLE "fee" ADD CONSTRAINT "FK_fee_class" 
+          FOREIGN KEY ("classId") REFERENCES "class"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+        END IF;
+      END $$;
     `);
 
     // Add missing indexes for existing tables

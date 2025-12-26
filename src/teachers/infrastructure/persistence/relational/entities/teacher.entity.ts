@@ -4,10 +4,13 @@ import {
   DeleteDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { EntityRelationalHelper } from '../../../../../utils/relational-entity-helper';
+import { FileEntity } from '../../../../../files/infrastructure/persistence/relational/entities/file.entity';
 
 @Entity({
   name: 'teacher',
@@ -52,6 +55,21 @@ export class TeacherEntity extends EntityRelationalHelper {
 
   @Column({ type: String, nullable: true })
   bankBranch?: string | null;
+
+  @OneToOne(() => FileEntity, {
+    eager: true,
+  })
+  @JoinColumn()
+  photo?: FileEntity | null;
+
+  @Column({ type: 'text', nullable: true })
+  bio?: string | null;
+
+  @Column({ type: 'boolean', default: false })
+  showOnPublicSite: boolean;
+
+  @Column({ type: 'integer', default: 0 })
+  displayOrder: number;
 
   @CreateDateColumn()
   createdAt: Date;

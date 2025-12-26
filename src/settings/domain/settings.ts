@@ -177,6 +177,13 @@ export class Settings {
   @ApiProperty({ example: 'https://cdn.example.com' })
   azureBlobPublicBaseUrl?: string | null;
 
+  // Theme Configuration
+  @ApiProperty({ example: 'brand' })
+  themeColorPreset?: string | null;
+
+  @ApiProperty({ example: '#00C7AB' })
+  themeCustomColor?: string | null;
+
   @ApiProperty()
   createdAt: Date;
 

@@ -21,6 +21,7 @@ jobs:
        github.repository == 'hammadmaqdoom/LMS Portal - Main' ||
        github.repository == 'hammadmaqdoom/lms-portal-backend')
     runs-on: ubuntu-latest
+    timeout-minutes: 5  # Prevent infinite runs - timeout after 5 mins
     env:
       GH_TOKEN: ${{ secrets.CLIENT_SYNC_TOKEN }}
     steps:
@@ -177,6 +178,21 @@ jobs:
                 
                 execSync('git fetch upstream main', { stdio: 'inherit' });
                 
+                // Check commit count before deciding strategy
+                let commitCount = 0;
+                let upstreamCommitCount = 0;
+                try {
+                  const localCommits = execSync(`git rev-list --count ${defaultBranch}`, { encoding: 'utf8' }).trim();
+                  commitCount = parseInt(localCommits) || 0;
+                  const upstreamCommits = execSync(`git rev-list --count upstream/main`, { encoding: 'utf8' }).trim();
+                  upstreamCommitCount = parseInt(upstreamCommits) || 0;
+                  const diffCount = execSync(`git rev-list --count ${defaultBranch}..upstream/main`, { encoding: 'utf8' }).trim();
+                  const diffCommits = parseInt(diffCount) || 0;
+                  console.log(`📊 History stats: Local=${commitCount}, Upstream=${upstreamCommitCount}, Diff=${diffCommits}`);
+                } catch (e) {
+                  console.log('⚠️  Could not determine commit count, proceeding with default strategy');
+                }
+                
                 // Create or checkout syncing branch from main
                 execSync(`git checkout ${defaultBranch}`, { stdio: 'inherit' });
                 try {
@@ -187,30 +203,52 @@ jobs:
                   execSync(`git reset --hard ${defaultBranch}`, { stdio: 'inherit' });
                 }
                 
-                // Rebase syncing branch onto upstream/main to prioritize upstream code
-                // This will replace old code with new code from parent repo
-                // In rebase: -X ours means prefer upstream/main (the branch we're rebasing onto)
+                // For large histories (>1000 commits), use merge instead of rebase to avoid timeouts
+                // Rebase is O(n) where n is number of commits, merge is O(1)
                 let hasUnmergedFiles = false;
                 let rebaseAborted = false;
-                try {
-                  execSync(`git rebase upstream/main -X ours`, { stdio: 'inherit' });
-                } catch (e) {
-                  console.log('Rebase had conflicts or issues, checking status...');
-                  
-                  // Check if we're still in a rebase
-                  let rebaseInProgress = false;
+                const useMergeStrategy = commitCount > 1000 || upstreamCommitCount > 1000;
+                
+                if (useMergeStrategy) {
+                  console.log(`📊 Large history detected (${commitCount} local, ${upstreamCommitCount} upstream commits). Using merge strategy instead of rebase for performance.`);
                   try {
-                    const rebaseDir = execSync('git rev-parse --git-path rebase-merge', { encoding: 'utf8' }).trim();
-                    rebaseInProgress = require('fs').existsSync(rebaseDir);
-                    if (!rebaseInProgress) {
-                      const rebaseApplyDir = execSync('git rev-parse --git-path rebase-apply', { encoding: 'utf8' }).trim();
-                      rebaseInProgress = require('fs').existsSync(rebaseApplyDir);
+                    execSync(`git merge upstream/main --no-edit --allow-unrelated-histories -X theirs`, { stdio: 'inherit' });
+                    hasUnmergedFiles = false;
+                    console.log('✅ Successfully merged upstream changes.');
+                  } catch (mergeError) {
+                    console.log('⚠️  Merge had conflicts or issues, checking status...');
+                    try {
+                      const unmerged = execSync('git ls-files -u', { encoding: 'utf8' }).trim();
+                      hasUnmergedFiles = unmerged.length > 0;
+                      if (hasUnmergedFiles) {
+                        console.log('⚠️  Merge conflicts detected. Will create PR for manual resolution.');
+                      }
+                    } catch (statusError) {
+                      hasUnmergedFiles = false;
                     }
-                  } catch (rebaseCheckError) {
-                    // Could not check rebase status
                   }
-                  
-                  if (rebaseInProgress) {
+                } else {
+                  // Use rebase for smaller histories
+                  console.log(`🔄 Using rebase strategy for smaller history (${commitCount} commits)...`);
+                  try {
+                    execSync(`git rebase upstream/main -X ours`, { stdio: 'inherit' });
+                  } catch (e) {
+                    console.log('Rebase had conflicts or issues, checking status...');
+                    
+                    // Check if we're still in a rebase
+                    let rebaseInProgress = false;
+                    try {
+                      const rebaseDir = execSync('git rev-parse --git-path rebase-merge', { encoding: 'utf8' }).trim();
+                      rebaseInProgress = require('fs').existsSync(rebaseDir);
+                      if (!rebaseInProgress) {
+                        const rebaseApplyDir = execSync('git rev-parse --git-path rebase-apply', { encoding: 'utf8' }).trim();
+                        rebaseInProgress = require('fs').existsSync(rebaseApplyDir);
+                      }
+                    } catch (rebaseCheckError) {
+                      // Could not check rebase status
+                    }
+                    
+                    if (rebaseInProgress) {
                     // Check if we have unmerged files (conflicts)
                     try {
                       const unmerged = execSync('git ls-files -u', { encoding: 'utf8' }).trim();
@@ -314,22 +352,23 @@ jobs:
                         // Ignore if not in rebase
                       }
                     }
-                  } else {
-                    // Rebase completed or not in progress
-                    hasUnmergedFiles = false;
-                  }
-                  
-                  // If rebase was aborted, use merge as fallback
-                  if (rebaseAborted) {
-                    console.log('🔄 Using merge strategy as fallback...');
-                    try {
-                      execSync(`git merge upstream/main --no-edit --allow-unrelated-histories -X theirs`, { stdio: 'inherit' });
+                    } else {
+                      // Rebase completed or not in progress
                       hasUnmergedFiles = false;
-                    } catch (mergeError) {
-                      const unmerged = execSync('git ls-files -u', { encoding: 'utf8' }).trim();
-                      hasUnmergedFiles = unmerged.length > 0;
-                      if (hasUnmergedFiles) {
-                        console.log('⚠️  Merge also has conflicts. Will create PR for manual resolution.');
+                    }
+                    
+                    // If rebase was aborted, use merge as fallback
+                    if (rebaseAborted) {
+                      console.log('🔄 Using merge strategy as fallback...');
+                      try {
+                        execSync(`git merge upstream/main --no-edit --allow-unrelated-histories -X theirs`, { stdio: 'inherit' });
+                        hasUnmergedFiles = false;
+                      } catch (mergeError) {
+                        const unmerged = execSync('git ls-files -u', { encoding: 'utf8' }).trim();
+                        hasUnmergedFiles = unmerged.length > 0;
+                        if (hasUnmergedFiles) {
+                          console.log('⚠️  Merge also has conflicts. Will create PR for manual resolution.');
+                        }
                       }
                     }
                   }
