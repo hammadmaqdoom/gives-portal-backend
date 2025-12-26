@@ -28,4 +28,6 @@ export abstract class TeacherRepository {
   ): Promise<Teacher | null>;
 
   abstract remove(id: Teacher['id']): Promise<void>;
+
+  abstract findPublicTeachers(): Promise<Teacher[]>;
 }

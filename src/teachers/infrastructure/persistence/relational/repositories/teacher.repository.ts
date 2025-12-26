@@ -122,4 +122,12 @@ export class TeachersRelationalRepository implements TeacherRepository {
   async remove(id: Teacher['id']): Promise<void> {
     await this.teachersRepository.softDelete(id);
   }
+
+  async findPublicTeachers(): Promise<Teacher[]> {
+    const teachers = await this.teachersRepository.find({
+      where: { showOnPublicSite: true },
+      order: { displayOrder: 'ASC', name: 'ASC' },
+    });
+    return teachers.map((teacher) => this.teacherMapper.toDomain(teacher));
+  }
 }

@@ -11,7 +11,13 @@ import {
   HttpStatus,
   HttpCode,
   SerializeOptions,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
 import {
@@ -20,6 +26,10 @@ import {
   ApiOkResponse,
   ApiParam,
   ApiTags,
+  ApiOperation,
+  ApiConsumes,
+  ApiBody,
+  ApiResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../roles/roles.decorator';
 import { RoleEnum } from '../roles/roles.enum';
@@ -34,6 +44,7 @@ import { Class } from './domain/class';
 import { ClassesService } from './classes.service';
 import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
+import { BulkClassesResultDto } from './dto/bulk-classes-response.dto';
 
 @ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -175,5 +186,50 @@ export class ClassesController {
     body: { studentIds: number[]; status?: string; enrollmentDate?: string },
   ): Promise<{ count: number }> {
     return this.classesService.bulkEnroll(+classId, body);
+  }
+
+  @Post('bulk-create')
+  @Roles(RoleEnum.admin)
+  @ApiOperation({
+    summary: 'Bulk create classes from Excel/CSV file',
+    description:
+      'Upload an Excel or CSV file with class details to bulk create classes',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description:
+            'Excel (.xlsx, .xls) or CSV file with class data (Name, Batch/Term, Subject ID, Teacher ID, Fees, etc.)',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Bulk creation processed successfully',
+    type: BulkClassesResultDto,
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  async bulkCreate(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }), // 10MB
+          new FileTypeValidator({
+            // Accept CSV, XLS, and XLSX MIME types
+            fileType:
+              /(text\/csv|application\/csv|application\/vnd\.ms-excel|application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet)/,
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+  ): Promise<BulkClassesResultDto> {
+    return this.classesService.bulkCreateFromFile(file);
   }
 }
