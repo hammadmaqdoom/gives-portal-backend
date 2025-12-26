@@ -6,8 +6,8 @@ export class AddAssignmentFields1754308073793 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       ALTER TABLE "assignment" 
-      ADD COLUMN "markingCriteria" text,
-      ADD COLUMN "attachments" text[]
+      ADD COLUMN IF NOT EXISTS "markingCriteria" text,
+      ADD COLUMN IF NOT EXISTS "attachments" text[]
     `);
   }
 

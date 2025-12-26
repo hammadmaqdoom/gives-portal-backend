@@ -11,4 +11,19 @@ export class CreateSubjectDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @ApiProperty({ example: '9709', required: false })
+  @IsOptional()
+  @IsString()
+  syllabusCode?: string;
+
+  @ApiProperty({ example: 'AS Level', required: false })
+  @IsOptional()
+  @IsString()
+  level?: string;
+
+  @ApiProperty({ example: 'https://www.cambridgeinternational.org/9709', required: false })
+  @IsOptional()
+  @IsString()
+  officialLink?: string;
 }

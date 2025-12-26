@@ -2,7 +2,9 @@ import {
   HttpStatus,
   Injectable,
   UnprocessableEntityException,
+  BadRequestException,
 } from '@nestjs/common';
+import * as XLSX from 'xlsx';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { NullableType } from '../utils/types/nullable.type';
 import { FilterTeacherDto, SortTeacherDto } from './dto/query-teacher.dto';
@@ -14,12 +16,17 @@ import { UsersService } from '../users/users.service';
 import { RoleEnum } from '../roles/roles.enum';
 import { StatusEnum } from '../statuses/statuses.enum';
 import { randomStringGenerator } from '../utils/random-string-generator';
+import { NotificationService } from '../notifications/notification.service';
+import { SubjectsService } from '../subjects/subjects.service';
+import { FileType } from '../files/domain/file';
 
 @Injectable()
 export class TeachersService {
   constructor(
     private readonly teachersRepository: TeacherRepository,
     private readonly usersService: UsersService,
+    private readonly notificationService: NotificationService,
+    private readonly subjectsService: SubjectsService,
   ) {}
 
   async create(
@@ -53,8 +60,18 @@ export class TeachersService {
       }
     }
 
+    // Transform photo from string ID to FileType format
+    const teacherData: Partial<Teacher> = {
+      ...createTeacherDto,
+      photo: createTeacherDto.photo
+        ? ({ id: createTeacherDto.photo } as FileType)
+        : createTeacherDto.photo === null
+        ? null
+        : undefined,
+    };
+
     // Create teacher first
-    const teacher = await this.teachersRepository.create(createTeacherDto);
+    const teacher = await this.teachersRepository.create(teacherData);
 
     // Only create user account if teacher has an email
     let user: any = null;
@@ -165,10 +182,20 @@ export class TeachersService {
       }
     }
 
+    // Transform photo from string ID to FileType format
+    const teacherData: Partial<Teacher> = {
+      ...updateTeacherDto,
+      photo: updateTeacherDto.photo
+        ? ({ id: updateTeacherDto.photo } as FileType)
+        : updateTeacherDto.photo === null
+        ? null
+        : undefined,
+    };
+
     // Update teacher record
     const updatedTeacher = await this.teachersRepository.update(
       id,
-      updateTeacherDto,
+      teacherData,
     );
 
     // Handle user account creation/update
@@ -308,5 +335,390 @@ export class TeachersService {
 
     const user = await this.usersService.findByEmail(teacher.email);
     return { teacher, user, hasUserAccount: !!user };
+  }
+
+  async findPublicTeachers(): Promise<Teacher[]> {
+    return this.teachersRepository.findPublicTeachers();
+  }
+
+  async bulkCreateFromFile(file: Express.Multer.File): Promise<{
+    totalRows: number;
+    successful: number;
+    failed: number;
+    results: Array<{
+      row: number;
+      teacherName: string;
+      status: 'success' | 'error' | 'skipped';
+      message: string;
+      teacherId?: number;
+      tempPassword?: string;
+    }>;
+  }> {
+    // Parse the file
+    let rows: any[] = [];
+
+    try {
+      if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+        const workbook = XLSX.read(file.buffer, {
+          type: 'buffer',
+          cellDates: true,
+          cellNF: false,
+          cellText: false,
+        });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(worksheet, {
+          defval: '',
+          raw: false,
+        });
+      } else if (
+        file.mimetype ===
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        file.mimetype === 'application/vnd.ms-excel' ||
+        file.originalname.endsWith('.xlsx') ||
+        file.originalname.endsWith('.xls')
+      ) {
+        const workbook = XLSX.read(file.buffer, {
+          type: 'buffer',
+          cellDates: true,
+          cellNF: false,
+          cellText: false,
+        });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(worksheet, {
+          defval: '',
+          raw: false,
+        });
+      } else {
+        throw new BadRequestException(
+          'Invalid file type. Please upload a CSV or Excel file.',
+        );
+      }
+    } catch (error: any) {
+      throw new BadRequestException(
+        `Failed to parse file: ${error.message || 'Unknown error'}`,
+      );
+    }
+
+    if (!rows || rows.length === 0) {
+      throw new BadRequestException('File is empty or contains no data');
+    }
+
+    const results: Array<{
+      row: number;
+      teacherName: string;
+      status: 'success' | 'error' | 'skipped';
+      message: string;
+      teacherId?: number;
+      tempPassword?: string;
+    }> = [];
+
+    let successful = 0;
+    let failed = 0;
+
+    // Process each row
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNumber = i + 2; // +2 because Excel rows start at 1 and we have header
+
+      try {
+        // Extract and normalize data
+        const name =
+          row['Name'] ||
+          row['name'] ||
+          row['Teacher Name'] ||
+          row['TeacherName'] ||
+          '';
+        const email =
+          row['Email'] ||
+          row['email'] ||
+          row['Teacher Email'] ||
+          row['TeacherEmail'] ||
+          '';
+        const phone =
+          row['Phone'] ||
+          row['phone'] ||
+          row['Teacher Phone'] ||
+          row['TeacherPhone'] ||
+          row['Contact'] ||
+          '';
+        const commissionPercentageStr =
+          row['Commission %'] ||
+          row['Commission%'] ||
+          row['commission_percentage'] ||
+          row['Commission'] ||
+          '';
+        const subjectsAllowedStr =
+          row['Subjects Allowed'] ||
+          row['SubjectsAllowed'] ||
+          row['subjects_allowed'] ||
+          row['Subjects'] ||
+          '';
+        const payoutMethod =
+          row['Payout Method'] ||
+          row['PayoutMethod'] ||
+          row['payout_method'] ||
+          '';
+        const bankName =
+          row['Bank Name'] ||
+          row['BankName'] ||
+          row['bank_name'] ||
+          '';
+        const accountNumber =
+          row['Account Number'] ||
+          row['AccountNumber'] ||
+          row['account_number'] ||
+          '';
+        const bankCode =
+          row['Bank Code'] ||
+          row['BankCode'] ||
+          row['bank_code'] ||
+          '';
+        const iban =
+          row['IBAN'] ||
+          row['iban'] ||
+          '';
+        const accountHolderName =
+          row['Account Holder Name'] ||
+          row['AccountHolderName'] ||
+          row['account_holder_name'] ||
+          '';
+        const bankBranch =
+          row['Bank Branch'] ||
+          row['BankBranch'] ||
+          row['bank_branch'] ||
+          '';
+        const bio =
+          row['Bio'] ||
+          row['bio'] ||
+          row['Biography'] ||
+          '';
+        const showOnPublicSiteStr =
+          row['Show On Public Site'] ||
+          row['ShowOnPublicSite'] ||
+          row['show_on_public_site'] ||
+          row['Public'] ||
+          '';
+        const displayOrderStr =
+          row['Display Order'] ||
+          row['DisplayOrder'] ||
+          row['display_order'] ||
+          row['Order'] ||
+          '0';
+
+        // Validation
+        if (!name || name.trim() === '') {
+          results.push({
+            row: rowNumber,
+            teacherName: name || 'Unknown',
+            status: 'error',
+            message: 'Name is required',
+          });
+          failed++;
+          continue;
+        }
+
+        if (!commissionPercentageStr || commissionPercentageStr.trim() === '') {
+          results.push({
+            row: rowNumber,
+            teacherName: name.trim(),
+            status: 'error',
+            message: 'Commission % is required',
+          });
+          failed++;
+          continue;
+        }
+
+        const commissionPercentage = parseFloat(commissionPercentageStr);
+        if (isNaN(commissionPercentage) || commissionPercentage < 0 || commissionPercentage > 100) {
+          results.push({
+            row: rowNumber,
+            teacherName: name.trim(),
+            status: 'error',
+            message: 'Commission % must be a number between 0 and 100',
+          });
+          failed++;
+          continue;
+        }
+
+        if (!subjectsAllowedStr || subjectsAllowedStr.trim() === '') {
+          results.push({
+            row: rowNumber,
+            teacherName: name.trim(),
+            status: 'error',
+            message: 'Subjects Allowed is required (comma-separated subject IDs)',
+          });
+          failed++;
+          continue;
+        }
+
+        // Parse subjects allowed
+        const subjectIds = subjectsAllowedStr
+          .split(',')
+          .map((id: string) => parseInt(id.trim(), 10))
+          .filter((id: number) => !isNaN(id));
+
+        if (subjectIds.length === 0) {
+          results.push({
+            row: rowNumber,
+            teacherName: name.trim(),
+            status: 'error',
+            message: 'Invalid Subjects Allowed format. Must be comma-separated numbers.',
+          });
+          failed++;
+          continue;
+        }
+
+        // Validate subject IDs exist
+        const invalidSubjectIds: number[] = [];
+        for (const subjectId of subjectIds) {
+          const subject = await this.subjectsService.findById(subjectId);
+          if (!subject) {
+            invalidSubjectIds.push(subjectId);
+          }
+        }
+
+        if (invalidSubjectIds.length > 0) {
+          results.push({
+            row: rowNumber,
+            teacherName: name.trim(),
+            status: 'error',
+            message: `Invalid subject IDs: ${invalidSubjectIds.join(', ')}`,
+          });
+          failed++;
+          continue;
+        }
+
+        // Check if teacher already exists (by email or phone)
+        if (email && email.trim()) {
+          const existingTeacher = await this.teachersRepository.findByEmail(
+            email.trim(),
+          );
+          if (existingTeacher) {
+            results.push({
+              row: rowNumber,
+              teacherName: name.trim(),
+              status: 'skipped',
+              message: 'Teacher with this email already exists',
+              teacherId: existingTeacher.id,
+            });
+            failed++;
+            continue;
+          }
+        }
+
+        if (phone && phone.trim()) {
+          const existingTeacher = await this.teachersRepository.findByPhone(
+            phone.trim(),
+          );
+          if (existingTeacher) {
+            results.push({
+              row: rowNumber,
+              teacherName: name.trim(),
+              status: 'skipped',
+              message: 'Teacher with this phone already exists',
+              teacherId: existingTeacher.id,
+            });
+            failed++;
+            continue;
+          }
+        }
+
+        // Parse boolean and number fields
+        const showOnPublicSite = showOnPublicSiteStr.toLowerCase() === 'true';
+        const displayOrder = parseInt(displayOrderStr, 10) || 0;
+
+        // Validate payout method if provided
+        if (payoutMethod && payoutMethod.trim()) {
+          const validPayoutMethods = ['bank_transfer', 'cash', 'check', 'online'];
+          if (!validPayoutMethods.includes(payoutMethod.trim())) {
+            results.push({
+              row: rowNumber,
+              teacherName: name.trim(),
+              status: 'error',
+              message: `Invalid payout method. Must be one of: ${validPayoutMethods.join(', ')}`,
+            });
+            failed++;
+            continue;
+          }
+        }
+
+        // Create teacher
+        const createTeacherDto: CreateTeacherDto = {
+          name: name.trim(),
+          email: email?.trim() || undefined,
+          phone: phone?.trim() || undefined,
+          commissionPercentage,
+          subjectsAllowed: subjectIds,
+          payoutMethod: payoutMethod?.trim() || undefined,
+          bankName: bankName?.trim() || undefined,
+          accountNumber: accountNumber?.trim() || undefined,
+          bankCode: bankCode?.trim() || undefined,
+          iban: iban?.trim() || undefined,
+          accountHolderName: accountHolderName?.trim() || undefined,
+          bankBranch: bankBranch?.trim() || undefined,
+          bio: bio?.trim() || undefined,
+          showOnPublicSite,
+          displayOrder,
+        };
+
+        const createResult = await this.create(createTeacherDto);
+
+        // Send account credentials email if email and password are available
+        if (email && email.trim() && createResult.tempPassword) {
+          try {
+            await this.notificationService.sendAccountCredentials({
+              to: email.trim(),
+              userName: name.trim(),
+              email: email.trim(),
+              tempPassword: createResult.tempPassword,
+              isParent: false,
+            });
+          } catch (emailError) {
+            console.error(
+              `Error sending account credentials email to teacher ${email}:`,
+              emailError,
+            );
+            // Don't fail the creation if email fails
+          }
+        }
+
+        results.push({
+          row: rowNumber,
+          teacherName: createResult.teacher.name,
+          status: 'success',
+          message: 'Teacher created successfully',
+          teacherId: createResult.teacher.id,
+          tempPassword: createResult.tempPassword || undefined,
+        });
+        successful++;
+      } catch (error: any) {
+        const teacherName =
+          row['Name'] ||
+          row['name'] ||
+          row['Teacher Name'] ||
+          row['TeacherName'] ||
+          'Unknown';
+
+        results.push({
+          row: rowNumber,
+          teacherName,
+          status: 'error',
+          message:
+            error.message ||
+            error.response?.message ||
+            'Failed to create teacher',
+        });
+        failed++;
+      }
+    }
+
+    return {
+      totalRows: rows.length,
+      successful,
+      failed,
+      results,
+    };
   }
 }

@@ -8,7 +8,7 @@ export class CreateStudentClassEnrollment1715028537221
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Create student_class_enrollment table
     await queryRunner.query(
-      `CREATE TABLE "student_class_enrollment" (
+      `CREATE TABLE IF NOT EXISTS "student_class_enrollment" (
         "id" SERIAL NOT NULL,
         "studentId" integer NOT NULL,
         "classId" integer NOT NULL,
@@ -23,24 +23,32 @@ export class CreateStudentClassEnrollment1715028537221
     );
 
     // Add foreign key constraints for enrollment table
-    await queryRunner.query(
-      `ALTER TABLE "student_class_enrollment" ADD CONSTRAINT "FK_enrollment_student" 
-       FOREIGN KEY ("studentId") REFERENCES "student"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "student_class_enrollment" ADD CONSTRAINT "FK_enrollment_class" 
-       FOREIGN KEY ("classId") REFERENCES "class"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
-    );
+    await queryRunner.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_enrollment_student') THEN
+          ALTER TABLE "student_class_enrollment" ADD CONSTRAINT "FK_enrollment_student" 
+          FOREIGN KEY ("studentId") REFERENCES "student"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+        END IF;
+      END $$;
+    `);
+    await queryRunner.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_enrollment_class') THEN
+          ALTER TABLE "student_class_enrollment" ADD CONSTRAINT "FK_enrollment_class" 
+          FOREIGN KEY ("classId") REFERENCES "class"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+        END IF;
+      END $$;
+    `);
 
     // Create indexes for enrollment table
     await queryRunner.query(
-      `CREATE INDEX "IDX_enrollment_student_id" ON "student_class_enrollment" ("studentId")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_enrollment_student_id" ON "student_class_enrollment" ("studentId")`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_enrollment_class_id" ON "student_class_enrollment" ("classId")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_enrollment_class_id" ON "student_class_enrollment" ("classId")`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_enrollment_status" ON "student_class_enrollment" ("status")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_enrollment_status" ON "student_class_enrollment" ("status")`,
     );
 
     // Migrate existing data from student.classId to enrollment table
@@ -53,9 +61,9 @@ export class CreateStudentClassEnrollment1715028537221
 
     // Remove the classId column from student table
     await queryRunner.query(
-      `ALTER TABLE "student" DROP CONSTRAINT "FK_student_class"`,
+      `ALTER TABLE "student" DROP CONSTRAINT IF EXISTS "FK_student_class"`,
     );
-    await queryRunner.query(`ALTER TABLE "student" DROP COLUMN "classId"`);
+    await queryRunner.query(`ALTER TABLE "student" DROP COLUMN IF EXISTS "classId"`);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
@@ -80,19 +88,19 @@ export class CreateStudentClassEnrollment1715028537221
     );
 
     // Drop indexes for enrollment table
-    await queryRunner.query(`DROP INDEX "IDX_enrollment_status"`);
-    await queryRunner.query(`DROP INDEX "IDX_enrollment_class_id"`);
-    await queryRunner.query(`DROP INDEX "IDX_enrollment_student_id"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_enrollment_status"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_enrollment_class_id"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_enrollment_student_id"`);
 
     // Drop foreign key constraints for enrollment table
     await queryRunner.query(
-      `ALTER TABLE "student_class_enrollment" DROP CONSTRAINT "FK_enrollment_class"`,
+      `ALTER TABLE "student_class_enrollment" DROP CONSTRAINT IF EXISTS "FK_enrollment_class"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "student_class_enrollment" DROP CONSTRAINT "FK_enrollment_student"`,
+      `ALTER TABLE "student_class_enrollment" DROP CONSTRAINT IF EXISTS "FK_enrollment_student"`,
     );
 
     // Drop the enrollment table
-    await queryRunner.query(`DROP TABLE "student_class_enrollment"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "student_class_enrollment"`);
   }
 }
