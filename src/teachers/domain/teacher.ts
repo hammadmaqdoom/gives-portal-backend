@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { FileType } from '../../files/domain/file';
+import { FileType, File } from '../../files/domain/file';
 
 export class Teacher {
   @ApiProperty({ example: 1 })
@@ -47,7 +47,7 @@ export class Teacher {
   @ApiProperty({ example: 'Main Branch, Karachi' })
   bankBranch?: string | null;
 
-  @ApiProperty({ type: () => FileType, required: false })
+  @ApiProperty({ type: () => File, required: false })
   photo?: FileType | null;
 
   @ApiProperty({
