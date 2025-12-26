@@ -45,6 +45,7 @@ import { SubjectsService } from './subjects.service';
 import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
 import { BulkSubjectsResultDto } from './dto/bulk-subjects-response.dto';
+import { BulkCreateSubjectsDto } from './dto/bulk-create-subjects.dto';
 
 @ApiTags('Subjects')
 @Controller({
@@ -166,45 +167,18 @@ export class SubjectsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(RoleEnum.admin)
   @ApiOperation({
-    summary: 'Bulk create subjects from Excel/CSV file',
+    summary: 'Bulk create subjects from JSON data',
     description:
-      'Upload an Excel or CSV file with subject details to bulk create subjects',
-  })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
-          description:
-            'Excel (.xlsx, .xls) or CSV file with subject data (Name, Description, Syllabus Code, Level, Official Link)',
-        },
-      },
-    },
+      'Send an array of subject objects to bulk create subjects',
   })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Bulk creation processed successfully',
     type: BulkSubjectsResultDto,
   })
-  @UseInterceptors(FileInterceptor('file'))
   async bulkCreate(
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }), // 10MB
-          new FileTypeValidator({
-            // Accept CSV, XLS, and XLSX MIME types (with optional parameters like charset)
-            fileType:
-              /^(text\/csv|application\/csv|application\/vnd\.ms-excel|application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet)(;|$)/i,
-          }),
-        ],
-      }),
-    )
-    file: Express.Multer.File,
+    @Body() bulkCreateDto: BulkCreateSubjectsDto,
   ): Promise<BulkSubjectsResultDto> {
-    return this.subjectsService.bulkCreateFromFile(file);
+    return this.subjectsService.bulkCreateFromData(bulkCreateDto.subjects);
   }
 }
