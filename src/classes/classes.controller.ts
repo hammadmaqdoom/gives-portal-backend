@@ -221,7 +221,9 @@ export class ClassesController {
         validators: [
           new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }), // 10MB
           new FileTypeValidator({
-            fileType: /\.(xlsx|xls|csv)$/i,
+            // Accept CSV, XLS, and XLSX MIME types
+            fileType:
+              /(text\/csv|application\/csv|application\/vnd\.ms-excel|application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet)/,
           }),
         ],
       }),
