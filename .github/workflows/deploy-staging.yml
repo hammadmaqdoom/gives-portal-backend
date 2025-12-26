@@ -1,8 +1,6 @@
 name: Deploy Backend (staging)
 
 on:
-  push:
-    branches: [ "staging" ]
   workflow_dispatch:
     inputs:
       update_type:

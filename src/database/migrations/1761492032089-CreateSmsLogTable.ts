@@ -20,36 +20,36 @@ export class CreateSmsLogTable1761492032089 implements MigrationInterface {
 
     // Add SMS configuration columns to settings table
     await queryRunner.query(
-      `ALTER TABLE "settings" ADD "smsEnabled" boolean NOT NULL DEFAULT false`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "smsEnabled" boolean NOT NULL DEFAULT false`,
     );
     await queryRunner.query(
-      `ALTER TABLE "settings" ADD "smsProvider" character varying(100)`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "smsProvider" character varying(100)`,
     );
     await queryRunner.query(
-      `ALTER TABLE "settings" ADD "smsApiEmail" character varying(255)`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "smsApiEmail" character varying(255)`,
     );
     await queryRunner.query(
-      `ALTER TABLE "settings" ADD "smsApiKey" character varying(255)`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "smsApiKey" character varying(255)`,
     );
     await queryRunner.query(
-      `ALTER TABLE "settings" ADD "smsMask" character varying(100)`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "smsMask" character varying(100)`,
     );
     await queryRunner.query(
-      `ALTER TABLE "settings" ADD "smsApiUrl" character varying(500)`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "smsApiUrl" character varying(500)`,
     );
     await queryRunner.query(
-      `ALTER TABLE "settings" ADD "smsTestMode" boolean NOT NULL DEFAULT true`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "smsTestMode" boolean NOT NULL DEFAULT true`,
     );
 
     // Add WhatsApp configuration columns to settings table
     await queryRunner.query(
-      `ALTER TABLE "settings" ADD "whatsappEnabled" boolean NOT NULL DEFAULT false`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "whatsappEnabled" boolean NOT NULL DEFAULT false`,
     );
     await queryRunner.query(
-      `ALTER TABLE "settings" ADD "whatsappDeviceId" character varying(255)`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "whatsappDeviceId" character varying(255)`,
     );
     await queryRunner.query(
-      `ALTER TABLE "settings" ADD "whatsappApiUrl" character varying(500)`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "whatsappApiUrl" character varying(500)`,
     );
   }
 

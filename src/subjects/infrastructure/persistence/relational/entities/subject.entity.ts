@@ -23,6 +23,15 @@ export class SubjectEntity extends EntityRelationalHelper {
   @Column({ type: String, nullable: true })
   description?: string | null;
 
+  @Column({ type: String, nullable: true })
+  syllabusCode?: string | null;
+
+  @Column({ type: String, nullable: true })
+  level?: string | null;
+
+  @Column({ type: String, nullable: true })
+  officialLink?: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

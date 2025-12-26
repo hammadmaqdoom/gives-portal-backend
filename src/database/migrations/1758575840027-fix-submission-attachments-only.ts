@@ -8,9 +8,9 @@ export class FixSubmissionAttachmentsOnly1758575840027
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Change submission attachments column from text array to text
     await queryRunner.query(
-      `ALTER TABLE "submission" DROP COLUMN "attachments"`,
+      `ALTER TABLE "submission" DROP COLUMN IF EXISTS "attachments"`,
     );
-    await queryRunner.query(`ALTER TABLE "submission" ADD "attachments" text`);
+    await queryRunner.query(`ALTER TABLE "submission" ADD COLUMN IF NOT EXISTS "attachments" text`);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
