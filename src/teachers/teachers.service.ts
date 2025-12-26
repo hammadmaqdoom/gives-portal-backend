@@ -18,6 +18,7 @@ import { StatusEnum } from '../statuses/statuses.enum';
 import { randomStringGenerator } from '../utils/random-string-generator';
 import { NotificationService } from '../notifications/notification.service';
 import { SubjectsService } from '../subjects/subjects.service';
+import { FileType } from '../files/domain/file';
 
 @Injectable()
 export class TeachersService {
@@ -59,8 +60,18 @@ export class TeachersService {
       }
     }
 
+    // Transform photo from string ID to FileType format
+    const teacherData: Partial<Teacher> = {
+      ...createTeacherDto,
+      photo: createTeacherDto.photo
+        ? ({ id: createTeacherDto.photo } as FileType)
+        : createTeacherDto.photo === null
+        ? null
+        : undefined,
+    };
+
     // Create teacher first
-    const teacher = await this.teachersRepository.create(createTeacherDto);
+    const teacher = await this.teachersRepository.create(teacherData);
 
     // Only create user account if teacher has an email
     let user: any = null;
@@ -171,10 +182,20 @@ export class TeachersService {
       }
     }
 
+    // Transform photo from string ID to FileType format
+    const teacherData: Partial<Teacher> = {
+      ...updateTeacherDto,
+      photo: updateTeacherDto.photo
+        ? ({ id: updateTeacherDto.photo } as FileType)
+        : updateTeacherDto.photo === null
+        ? null
+        : undefined,
+    };
+
     // Update teacher record
     const updatedTeacher = await this.teachersRepository.update(
       id,
-      updateTeacherDto,
+      teacherData,
     );
 
     // Handle user account creation/update
