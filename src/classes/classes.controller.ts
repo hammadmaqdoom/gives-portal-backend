@@ -45,6 +45,7 @@ import { ClassesService } from './classes.service';
 import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
 import { BulkClassesResultDto } from './dto/bulk-classes-response.dto';
+import { BulkCreateClassesDto } from './dto/bulk-create-classes.dto';
 
 @ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -191,45 +192,18 @@ export class ClassesController {
   @Post('bulk-create')
   @Roles(RoleEnum.admin)
   @ApiOperation({
-    summary: 'Bulk create classes from Excel/CSV file',
+    summary: 'Bulk create classes from JSON data',
     description:
-      'Upload an Excel or CSV file with class details to bulk create classes',
-  })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
-          description:
-            'Excel (.xlsx, .xls) or CSV file with class data (Name, Batch/Term, Subject ID, Teacher ID, Fees, etc.)',
-        },
-      },
-    },
+      'Send an array of class objects to bulk create classes',
   })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Bulk creation processed successfully',
     type: BulkClassesResultDto,
   })
-  @UseInterceptors(FileInterceptor('file'))
   async bulkCreate(
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }), // 10MB
-          new FileTypeValidator({
-            // Accept CSV, XLS, and XLSX MIME types (with optional parameters like charset)
-            fileType:
-              /^(text\/csv|application\/csv|application\/vnd\.ms-excel|application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet)(;|$)/i,
-          }),
-        ],
-      }),
-    )
-    file: Express.Multer.File,
+    @Body() bulkCreateDto: BulkCreateClassesDto,
   ): Promise<BulkClassesResultDto> {
-    return this.classesService.bulkCreateFromFile(file);
+    return this.classesService.bulkCreateFromData(bulkCreateDto.classes);
   }
 }

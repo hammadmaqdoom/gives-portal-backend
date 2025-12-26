@@ -113,6 +113,114 @@ export class SubjectsService {
     }
   }
 
+  async bulkCreateFromData(subjects: Array<{
+    name: string;
+    description?: string;
+    syllabusCode?: string;
+    level?: string;
+    officialLink?: string;
+  }>): Promise<{
+    totalRows: number;
+    successful: number;
+    failed: number;
+    results: Array<{
+      row: number;
+      name: string;
+      status: 'success' | 'error' | 'skipped';
+      message: string;
+      subjectId?: number;
+    }>;
+  }> {
+    if (!subjects || subjects.length === 0) {
+      throw new BadRequestException('No subjects provided');
+    }
+
+    const results: Array<{
+      row: number;
+      name: string;
+      status: 'success' | 'error' | 'skipped';
+      message: string;
+      subjectId?: number;
+    }> = [];
+
+    let successful = 0;
+    let failed = 0;
+
+    // Process each subject
+    for (let i = 0; i < subjects.length; i++) {
+      const subjectData = subjects[i];
+      const rowNumber = i + 1;
+
+      try {
+        // Validation
+        if (!subjectData.name || subjectData.name.trim() === '') {
+          results.push({
+            row: rowNumber,
+            name: subjectData.name || 'Unknown',
+            status: 'error',
+            message: 'Name is required',
+          });
+          failed++;
+          continue;
+        }
+
+        // Check if subject already exists
+        const existingSubject = await this.subjectsRepository.findByName(
+          subjectData.name.trim(),
+        );
+        if (existingSubject) {
+          results.push({
+            row: rowNumber,
+            name: subjectData.name.trim(),
+            status: 'skipped',
+            message: 'Subject with this name already exists',
+            subjectId: existingSubject.id,
+          });
+          failed++;
+          continue;
+        }
+
+        // Create subject
+        const createSubjectDto: CreateSubjectDto = {
+          name: subjectData.name.trim(),
+          description: subjectData.description?.trim() || undefined,
+          syllabusCode: subjectData.syllabusCode?.trim() || undefined,
+          level: subjectData.level?.trim() || undefined,
+          officialLink: subjectData.officialLink?.trim() || undefined,
+        };
+
+        const subject = await this.create(createSubjectDto);
+
+        results.push({
+          row: rowNumber,
+          name: subject.name,
+          status: 'success',
+          message: 'Subject created successfully',
+          subjectId: subject.id,
+        });
+        successful++;
+      } catch (error: any) {
+        results.push({
+          row: rowNumber,
+          name: subjectData.name || 'Unknown',
+          status: 'error',
+          message:
+            error.message ||
+            error.response?.message ||
+            'Failed to create subject',
+        });
+        failed++;
+      }
+    }
+
+    return {
+      totalRows: subjects.length,
+      successful,
+      failed,
+      results,
+    };
+  }
+
   async bulkCreateFromFile(file: Express.Multer.File): Promise<{
     totalRows: number;
     successful: number;
@@ -176,128 +284,40 @@ export class SubjectsService {
       throw new BadRequestException('File is empty or contains no data');
     }
 
-    const results: Array<{
-      row: number;
-      name: string;
-      status: 'success' | 'error' | 'skipped';
-      message: string;
-      subjectId?: number;
-    }> = [];
+    // Convert parsed rows to subject data format
+    const subjects = rows.map((row: any) => ({
+      name:
+        row['Name'] ||
+        row['name'] ||
+        row['Subject Name'] ||
+        row['SubjectName'] ||
+        '',
+      description:
+        row['Description'] ||
+        row['description'] ||
+        row['Desc'] ||
+        undefined,
+      syllabusCode:
+        row['Syllabus Code'] ||
+        row['SyllabusCode'] ||
+        row['syllabus_code'] ||
+        row['Syllabus'] ||
+        undefined,
+      level:
+        row['Level'] ||
+        row['level'] ||
+        row['Educational Level'] ||
+        row['EducationalLevel'] ||
+        undefined,
+      officialLink:
+        row['Official Link'] ||
+        row['OfficialLink'] ||
+        row['official_link'] ||
+        row['Link'] ||
+        row['URL'] ||
+        undefined,
+    }));
 
-    let successful = 0;
-    let failed = 0;
-
-    // Process each row
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const rowNumber = i + 2; // +2 because Excel rows start at 1 and we have header
-
-      try {
-        // Extract and normalize data
-        const name =
-          row['Name'] ||
-          row['name'] ||
-          row['Subject Name'] ||
-          row['SubjectName'] ||
-          '';
-        const description =
-          row['Description'] ||
-          row['description'] ||
-          row['Desc'] ||
-          '';
-        const syllabusCode =
-          row['Syllabus Code'] ||
-          row['SyllabusCode'] ||
-          row['syllabus_code'] ||
-          row['Syllabus'] ||
-          '';
-        const level =
-          row['Level'] ||
-          row['level'] ||
-          row['Educational Level'] ||
-          row['EducationalLevel'] ||
-          '';
-        const officialLink =
-          row['Official Link'] ||
-          row['OfficialLink'] ||
-          row['official_link'] ||
-          row['Link'] ||
-          row['URL'] ||
-          '';
-
-        // Validation
-        if (!name || name.trim() === '') {
-          results.push({
-            row: rowNumber,
-            name: name || 'Unknown',
-            status: 'error',
-            message: 'Name is required',
-          });
-          failed++;
-          continue;
-        }
-
-        // Check if subject already exists
-        const existingSubject = await this.subjectsRepository.findByName(
-          name.trim(),
-        );
-        if (existingSubject) {
-          results.push({
-            row: rowNumber,
-            name: name.trim(),
-            status: 'skipped',
-            message: 'Subject with this name already exists',
-            subjectId: existingSubject.id,
-          });
-          failed++;
-          continue;
-        }
-
-        // Create subject
-        const createSubjectDto: CreateSubjectDto = {
-          name: name.trim(),
-          description: description?.trim() || undefined,
-          syllabusCode: syllabusCode?.trim() || undefined,
-          level: level?.trim() || undefined,
-          officialLink: officialLink?.trim() || undefined,
-        };
-
-        const subject = await this.create(createSubjectDto);
-
-        results.push({
-          row: rowNumber,
-          name: subject.name,
-          status: 'success',
-          message: 'Subject created successfully',
-          subjectId: subject.id,
-        });
-        successful++;
-      } catch (error: any) {
-        const subjectName =
-          row['Name'] ||
-          row['name'] ||
-          row['Subject Name'] ||
-          row['SubjectName'] ||
-          'Unknown';
-
-        results.push({
-          row: rowNumber,
-          name: subjectName,
-          status: 'error',
-          message:
-            error.message ||
-            error.response?.message ||
-            'Failed to create subject',
-        });
-        failed++;
-      }
-    }
-
-    return {
-      totalRows: rows.length,
-      successful,
-      failed,
-      results,
-    };
+    return this.bulkCreateFromData(subjects);
   }
 }
