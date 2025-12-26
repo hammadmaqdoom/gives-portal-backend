@@ -61,6 +61,8 @@ export class SettingsMapper {
     domainEntity.azureContainerName = raw.azureContainerName;
     domainEntity.azureBlobSasExpirySeconds = raw.azureBlobSasExpirySeconds;
     domainEntity.azureBlobPublicBaseUrl = raw.azureBlobPublicBaseUrl;
+    domainEntity.themeColorPreset = raw.themeColorPreset;
+    domainEntity.themeCustomColor = raw.themeCustomColor;
     domainEntity.createdAt = raw.createdAt;
     domainEntity.updatedAt = raw.updatedAt;
     return domainEntity;
@@ -132,6 +134,8 @@ export class SettingsMapper {
     persistenceEntity.azureContainerName = domainEntity.azureContainerName || null;
     persistenceEntity.azureBlobSasExpirySeconds = domainEntity.azureBlobSasExpirySeconds || null;
     persistenceEntity.azureBlobPublicBaseUrl = domainEntity.azureBlobPublicBaseUrl || null;
+    persistenceEntity.themeColorPreset = domainEntity.themeColorPreset || null;
+    persistenceEntity.themeCustomColor = domainEntity.themeCustomColor || null;
     persistenceEntity.createdAt = domainEntity.createdAt;
     persistenceEntity.updatedAt = domainEntity.updatedAt;
     return persistenceEntity;

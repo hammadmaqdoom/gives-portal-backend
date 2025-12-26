@@ -194,6 +194,13 @@ export class SettingsEntity extends EntityRelationalHelper {
   @Column({ type: 'varchar', length: 500, nullable: true })
   whatsappApiUrl: string | null;
 
+  // Theme Configuration
+  @Column({ type: 'varchar', length: 50, nullable: true, default: 'brand' })
+  themeColorPreset: string | null; // 'default' | 'brand' | 'cyan' | 'purple' | 'blue' | 'orange' | 'red' | 'custom'
+
+  @Column({ type: 'varchar', length: 7, nullable: true })
+  themeCustomColor: string | null; // Hex color code (e.g., #00C7AB)
+
   @CreateDateColumn()
   createdAt: Date;
 

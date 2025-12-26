@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { FileType } from '../../files/domain/file';
 
 export class Teacher {
   @ApiProperty({ example: 1 })
@@ -45,6 +46,28 @@ export class Teacher {
 
   @ApiProperty({ example: 'Main Branch, Karachi' })
   bankBranch?: string | null;
+
+  @ApiProperty({ type: () => FileType, required: false })
+  photo?: FileType | null;
+
+  @ApiProperty({
+    example:
+      'Experienced educator with over 10 years of teaching mathematics and physics.',
+    required: false,
+  })
+  bio?: string | null;
+
+  @ApiProperty({
+    example: false,
+    description: 'Whether this teacher should be shown on the public website',
+  })
+  showOnPublicSite: boolean;
+
+  @ApiProperty({
+    example: 0,
+    description: 'Display order for public website (lower numbers appear first)',
+  })
+  displayOrder: number;
 
   @ApiProperty({ example: '2024-01-01T00:00:00.000Z' })
   createdAt: Date;

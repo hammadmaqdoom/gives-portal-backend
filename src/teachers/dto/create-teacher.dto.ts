@@ -8,6 +8,7 @@ import {
   Min,
   Max,
   IsArray,
+  IsBoolean,
 } from 'class-validator';
 
 export class CreateTeacherDto {
@@ -80,4 +81,40 @@ export class CreateTeacherDto {
   @IsOptional()
   @IsString()
   bankBranch?: string;
+
+  @ApiProperty({
+    example: 'uuid-of-photo-file',
+    description: 'File ID for the teacher photo',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  photo?: string | null;
+
+  @ApiProperty({
+    example:
+      'Experienced educator with over 10 years of teaching mathematics and physics.',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  bio?: string;
+
+  @ApiProperty({
+    example: false,
+    description: 'Whether this teacher should be shown on the public website',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  showOnPublicSite?: boolean;
+
+  @ApiProperty({
+    example: 0,
+    description: 'Display order for public website',
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  displayOrder?: number;
 }
