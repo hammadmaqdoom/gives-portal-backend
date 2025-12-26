@@ -196,9 +196,9 @@ export class SubjectsController {
         validators: [
           new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }), // 10MB
           new FileTypeValidator({
-            // Accept CSV, XLS, and XLSX MIME types
+            // Accept CSV, XLS, and XLSX MIME types (with optional parameters like charset)
             fileType:
-              /(text\/csv|application\/csv|application\/vnd\.ms-excel|application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet)/,
+              /^(text\/csv|application\/csv|application\/vnd\.ms-excel|application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet)(;|$)/i,
           }),
         ],
       }),
