@@ -2,7 +2,9 @@ import {
   HttpStatus,
   Injectable,
   UnprocessableEntityException,
+  BadRequestException,
 } from '@nestjs/common';
+import * as XLSX from 'xlsx';
 import { CreateClassDto } from './dto/create-class.dto';
 import { NullableType } from '../utils/types/nullable.type';
 import { FilterClassDto, SortClassDto } from './dto/query-class.dto';
@@ -16,6 +18,8 @@ import { Repository } from 'typeorm';
 import { LearningModuleEntity } from '../learning-modules/infrastructure/persistence/relational/entities/learning-module.entity';
 import { LearningModuleSectionEntity } from '../learning-modules/infrastructure/persistence/relational/entities/learning-module-section.entity';
 import { AssignmentEntity } from '../assignments/infrastructure/persistence/relational/entities/assignment.entity';
+import { SubjectsService } from '../subjects/subjects.service';
+import { TeachersService } from '../teachers/teachers.service';
 
 @Injectable()
 export class ClassesService {
@@ -28,6 +32,8 @@ export class ClassesService {
     private readonly sectionRepo: Repository<LearningModuleSectionEntity>,
     @InjectRepository(AssignmentEntity)
     private readonly assignmentRepo: Repository<AssignmentEntity>,
+    private readonly subjectsService: SubjectsService,
+    private readonly teachersService: TeachersService,
   ) {}
 
   async create(createClassDto: CreateClassDto): Promise<Class> {
@@ -60,6 +66,8 @@ export class ClassesService {
       isPublicForSale: createClassDto.isPublicForSale,
       thumbnailUrl: createClassDto.thumbnailUrl,
       coverImageUrl: createClassDto.coverImageUrl,
+      thumbnailFileId: createClassDto.thumbnailFileId,
+      coverImageFileId: createClassDto.coverImageFileId,
       features: createClassDto.features,
     } as any;
 
@@ -322,5 +330,699 @@ export class ClassesService {
       price: this.getPriceForCurrency(cls, currency),
       currency,
     })) as any;
+  }
+
+  async bulkCreateFromData(classes: Array<{
+    name: string;
+    batchTerm: string;
+    subjectId: number;
+    teacherId: number;
+    feeUSD: number;
+    feePKR: number;
+    classMode: 'virtual' | 'in-person';
+    weekdays?: string[];
+    timing?: string;
+    timezone?: string;
+    courseOutline?: string;
+    isPublicForSale?: boolean;
+    thumbnailUrl?: string;
+    coverImageUrl?: string;
+  }>): Promise<{
+    totalRows: number;
+    successful: number;
+    failed: number;
+    results: Array<{
+      row: number;
+      className: string;
+      status: 'success' | 'error' | 'skipped';
+      message: string;
+      classId?: number;
+    }>;
+  }> {
+    if (!classes || classes.length === 0) {
+      throw new BadRequestException('No classes provided');
+    }
+
+    const results: Array<{
+      row: number;
+      className: string;
+      status: 'success' | 'error' | 'skipped';
+      message: string;
+      classId?: number;
+    }> = [];
+
+    let successful = 0;
+    let failed = 0;
+
+    // Process each class
+    for (let i = 0; i < classes.length; i++) {
+      const classData = classes[i];
+      const rowNumber = i + 1;
+
+      try {
+        // Validation
+        if (!classData.name || classData.name.trim() === '') {
+          results.push({
+            row: rowNumber,
+            className: classData.name || 'Unknown',
+            status: 'error',
+            message: 'Name is required',
+          });
+          failed++;
+          continue;
+        }
+
+        if (!classData.batchTerm || classData.batchTerm.trim() === '') {
+          results.push({
+            row: rowNumber,
+            className: classData.name.trim(),
+            status: 'error',
+            message: 'Batch/Term is required',
+          });
+          failed++;
+          continue;
+        }
+
+        if (!classData.subjectId || isNaN(classData.subjectId)) {
+          results.push({
+            row: rowNumber,
+            className: classData.name.trim(),
+            status: 'error',
+            message: 'Valid Subject ID is required',
+          });
+          failed++;
+          continue;
+        }
+
+        if (!classData.teacherId || isNaN(classData.teacherId)) {
+          results.push({
+            row: rowNumber,
+            className: classData.name.trim(),
+            status: 'error',
+            message: 'Valid Teacher ID is required',
+          });
+          failed++;
+          continue;
+        }
+
+        if (classData.feeUSD === undefined || isNaN(classData.feeUSD) || classData.feeUSD < 0) {
+          results.push({
+            row: rowNumber,
+            className: classData.name.trim(),
+            status: 'error',
+            message: 'Fee USD must be a valid positive number',
+          });
+          failed++;
+          continue;
+        }
+
+        if (classData.feePKR === undefined || isNaN(classData.feePKR) || classData.feePKR < 0) {
+          results.push({
+            row: rowNumber,
+            className: classData.name.trim(),
+            status: 'error',
+            message: 'Fee PKR must be a valid positive number',
+          });
+          failed++;
+          continue;
+        }
+
+        if (!classData.classMode || (classData.classMode !== 'virtual' && classData.classMode !== 'in-person')) {
+          results.push({
+            row: rowNumber,
+            className: classData.name.trim(),
+            status: 'error',
+            message: 'Class Mode must be either "virtual" or "in-person"',
+          });
+          failed++;
+          continue;
+        }
+
+        // Check if class already exists
+        const existingClass = await this.classesRepository.findByName(
+          classData.name.trim(),
+        );
+        if (existingClass) {
+          results.push({
+            row: rowNumber,
+            className: classData.name.trim(),
+            status: 'skipped',
+            message: 'Class with this name already exists',
+            classId: existingClass.id,
+          });
+          failed++;
+          continue;
+        }
+
+        // Create class
+        const createClassDto: CreateClassDto = {
+          name: classData.name.trim(),
+          batchTerm: classData.batchTerm.trim(),
+          subject: { id: classData.subjectId },
+          teacher: { id: classData.teacherId },
+          feeUSD: classData.feeUSD,
+          feePKR: classData.feePKR,
+          classMode: classData.classMode,
+          weekdays: classData.weekdays,
+          timing: classData.timing?.trim() || undefined,
+          timezone: classData.timezone?.trim() || undefined,
+          courseOutline: classData.courseOutline?.trim() || undefined,
+          isPublicForSale: classData.isPublicForSale,
+          thumbnailUrl: classData.thumbnailUrl?.trim() || undefined,
+          coverImageUrl: classData.coverImageUrl?.trim() || undefined,
+        };
+
+        const createdClass = await this.create(createClassDto);
+
+        results.push({
+          row: rowNumber,
+          className: createdClass.name,
+          status: 'success',
+          message: 'Class created successfully',
+          classId: createdClass.id,
+        });
+        successful++;
+      } catch (error: any) {
+        results.push({
+          row: rowNumber,
+          className: classData.name || 'Unknown',
+          status: 'error',
+          message:
+            error.message ||
+            error.response?.message ||
+            'Failed to create class',
+        });
+        failed++;
+      }
+    }
+
+    return {
+      totalRows: classes.length,
+      successful,
+      failed,
+      results,
+    };
+  }
+
+  async bulkCreateFromFile(file: Express.Multer.File): Promise<{
+    totalRows: number;
+    successful: number;
+    failed: number;
+    results: Array<{
+      row: number;
+      className: string;
+      status: 'success' | 'error' | 'skipped';
+      message: string;
+      classId?: number;
+    }>;
+  }> {
+    // Parse the file
+    let rows: any[] = [];
+
+    try {
+      if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+        const workbook = XLSX.read(file.buffer, {
+          type: 'buffer',
+          cellDates: true,
+          cellNF: false,
+          cellText: false,
+        });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(worksheet, {
+          defval: '',
+          raw: false,
+        });
+      } else if (
+        file.mimetype ===
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        file.mimetype === 'application/vnd.ms-excel' ||
+        file.originalname.endsWith('.xlsx') ||
+        file.originalname.endsWith('.xls')
+      ) {
+        const workbook = XLSX.read(file.buffer, {
+          type: 'buffer',
+          cellDates: true,
+          cellNF: false,
+          cellText: false,
+        });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(worksheet, {
+          defval: '',
+          raw: false,
+        });
+      } else {
+        throw new BadRequestException(
+          'Invalid file type. Please upload a CSV or Excel file.',
+        );
+      }
+    } catch (error: any) {
+      throw new BadRequestException(
+        `Failed to parse file: ${error.message || 'Unknown error'}`,
+      );
+    }
+
+    if (!rows || rows.length === 0) {
+      throw new BadRequestException('File is empty or contains no data');
+    }
+
+    // Convert parsed rows to class data format
+    const classes = rows.map((row: any) => {
+      const feeUSDStr = row['Fee USD'] || row['FeeUSD'] || row['fee_usd'] || '';
+      const feePKRStr = row['Fee PKR'] || row['FeePKR'] || row['fee_pkr'] || '';
+      const subjectIdStr = row['Subject ID'] || row['SubjectID'] || row['subject_id'] || row['Subject'] || '';
+      const teacherIdStr = row['Teacher ID'] || row['TeacherID'] || row['teacher_id'] || row['Teacher'] || '';
+      const weekdays = row['Weekdays'] || row['weekdays'] || row['Days'] || '';
+      const isPublicForSaleStr = row['Is Public For Sale'] || row['IsPublicForSale'] || row['is_public_for_sale'] || row['Public'] || 'false';
+
+      return {
+        name: row['Name'] || row['name'] || row['Class Name'] || row['ClassName'] || '',
+        batchTerm: row['Batch/Term'] || row['BatchTerm'] || row['batch_term'] || row['Batch'] || '',
+        subjectId: parseInt(subjectIdStr.trim(), 10),
+        teacherId: parseInt(teacherIdStr.trim(), 10),
+        feeUSD: parseFloat(feeUSDStr.trim()),
+        feePKR: parseFloat(feePKRStr.trim()),
+        classMode: (row['Class Mode'] || row['ClassMode'] || row['class_mode'] || row['Mode'] || '').trim() as 'virtual' | 'in-person',
+        weekdays: weekdays ? weekdays.split(';').map((d: string) => d.trim()).filter((d: string) => d) : undefined,
+        timing: row['Timing'] || row['timing'] || row['Time'] || undefined,
+        timezone: row['Timezone'] || row['timezone'] || row['Time Zone'] || undefined,
+        courseOutline: row['Course Outline'] || row['CourseOutline'] || row['course_outline'] || row['Outline'] || undefined,
+        isPublicForSale: isPublicForSaleStr.toLowerCase() === 'true',
+        thumbnailUrl: row['Thumbnail URL'] || row['ThumbnailURL'] || row['thumbnail_url'] || row['Thumbnail'] || undefined,
+        coverImageUrl: row['Cover Image URL'] || row['CoverImageURL'] || row['cover_image_url'] || row['Cover Image'] || undefined,
+      };
+    });
+
+    return this.bulkCreateFromData(classes);
+  }
+
+  // This method is kept for backward compatibility but now uses bulkCreateFromData
+  // The actual implementation was moved above - this is just a placeholder comment
+  // If you see this, the legacy method was already removed
+  async _removedLegacyMethod(file: Express.Multer.File): Promise<{
+    totalRows: number;
+    successful: number;
+    failed: number;
+    results: Array<{
+      row: number;
+      className: string;
+      status: 'success' | 'error' | 'skipped';
+      message: string;
+      classId?: number;
+    }>;
+  }> {
+    // Parse the file
+    let rows: any[] = [];
+
+    try {
+      if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+        const workbook = XLSX.read(file.buffer, {
+          type: 'buffer',
+          cellDates: true,
+          cellNF: false,
+          cellText: false,
+        });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(worksheet, {
+          defval: '',
+          raw: false,
+        });
+      } else if (
+        file.mimetype ===
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        file.mimetype === 'application/vnd.ms-excel' ||
+        file.originalname.endsWith('.xlsx') ||
+        file.originalname.endsWith('.xls')
+      ) {
+        const workbook = XLSX.read(file.buffer, {
+          type: 'buffer',
+          cellDates: true,
+          cellNF: false,
+          cellText: false,
+        });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(worksheet, {
+          defval: '',
+          raw: false,
+        });
+      } else {
+        throw new BadRequestException(
+          'Invalid file type. Please upload a CSV or Excel file.',
+        );
+      }
+    } catch (error: any) {
+      throw new BadRequestException(
+        `Failed to parse file: ${error.message || 'Unknown error'}`,
+      );
+    }
+
+    if (!rows || rows.length === 0) {
+      throw new BadRequestException('File is empty or contains no data');
+    }
+
+    const results: Array<{
+      row: number;
+      className: string;
+      status: 'success' | 'error' | 'skipped';
+      message: string;
+      classId?: number;
+    }> = [];
+
+    let successful = 0;
+    let failed = 0;
+
+    // Process each row
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNumber = i + 2; // +2 because Excel rows start at 1 and we have header
+
+      try {
+        // Extract and normalize data
+        const name =
+          row['Name'] ||
+          row['name'] ||
+          row['Class Name'] ||
+          row['ClassName'] ||
+          '';
+        const batchTerm =
+          row['Batch/Term'] ||
+          row['Batch/Term'] ||
+          row['BatchTerm'] ||
+          row['batch_term'] ||
+          row['Batch'] ||
+          '';
+        const subjectIdStr =
+          row['Subject ID'] ||
+          row['SubjectID'] ||
+          row['subject_id'] ||
+          row['Subject'] ||
+          '';
+        const teacherIdStr =
+          row['Teacher ID'] ||
+          row['TeacherID'] ||
+          row['teacher_id'] ||
+          row['Teacher'] ||
+          '';
+        const feeUSDStr =
+          row['Fee USD'] ||
+          row['FeeUSD'] ||
+          row['fee_usd'] ||
+          row['Fee USD'] ||
+          '';
+        const feePKRStr =
+          row['Fee PKR'] ||
+          row['FeePKR'] ||
+          row['fee_pkr'] ||
+          row['Fee PKR'] ||
+          '';
+        const classMode =
+          row['Class Mode'] ||
+          row['ClassMode'] ||
+          row['class_mode'] ||
+          row['Mode'] ||
+          '';
+        const weekdays =
+          row['Weekdays'] ||
+          row['weekdays'] ||
+          row['Days'] ||
+          '';
+        const timing =
+          row['Timing'] ||
+          row['timing'] ||
+          row['Time'] ||
+          '';
+        const timezone =
+          row['Timezone'] ||
+          row['timezone'] ||
+          row['Time Zone'] ||
+          '';
+        const courseOutline =
+          row['Course Outline'] ||
+          row['CourseOutline'] ||
+          row['course_outline'] ||
+          row['Outline'] ||
+          '';
+        const isPublicForSaleStr =
+          row['Is Public For Sale'] ||
+          row['IsPublicForSale'] ||
+          row['is_public_for_sale'] ||
+          row['Public'] ||
+          'false';
+        const thumbnailUrl =
+          row['Thumbnail URL'] ||
+          row['ThumbnailURL'] ||
+          row['thumbnail_url'] ||
+          row['Thumbnail'] ||
+          '';
+        const coverImageUrl =
+          row['Cover Image URL'] ||
+          row['CoverImageURL'] ||
+          row['cover_image_url'] ||
+          row['Cover Image'] ||
+          '';
+
+        // Validation
+        if (!name || name.trim() === '') {
+          results.push({
+            row: rowNumber,
+            className: name || 'Unknown',
+            status: 'error',
+            message: 'Name is required',
+          });
+          failed++;
+          continue;
+        }
+
+        if (!batchTerm || batchTerm.trim() === '') {
+          results.push({
+            row: rowNumber,
+            className: name.trim(),
+            status: 'error',
+            message: 'Batch/Term is required',
+          });
+          failed++;
+          continue;
+        }
+
+        if (!subjectIdStr || subjectIdStr.trim() === '') {
+          results.push({
+            row: rowNumber,
+            className: name.trim(),
+            status: 'error',
+            message: 'Subject ID is required',
+          });
+          failed++;
+          continue;
+        }
+
+        const subjectId = parseInt(subjectIdStr.trim(), 10);
+        if (isNaN(subjectId)) {
+          results.push({
+            row: rowNumber,
+            className: name.trim(),
+            status: 'error',
+            message: 'Subject ID must be a valid number',
+          });
+          failed++;
+          continue;
+        }
+
+        // Validate subject exists
+        const subject = await this.subjectsService.findById(subjectId);
+        if (!subject) {
+          results.push({
+            row: rowNumber,
+            className: name.trim(),
+            status: 'error',
+            message: `Subject with ID ${subjectId} does not exist`,
+          });
+          failed++;
+          continue;
+        }
+
+        if (!teacherIdStr || teacherIdStr.trim() === '') {
+          results.push({
+            row: rowNumber,
+            className: name.trim(),
+            status: 'error',
+            message: 'Teacher ID is required',
+          });
+          failed++;
+          continue;
+        }
+
+        const teacherId = parseInt(teacherIdStr.trim(), 10);
+        if (isNaN(teacherId)) {
+          results.push({
+            row: rowNumber,
+            className: name.trim(),
+            status: 'error',
+            message: 'Teacher ID must be a valid number',
+          });
+          failed++;
+          continue;
+        }
+
+        // Validate teacher exists
+        const teacher = await this.teachersService.findById(teacherId);
+        if (!teacher) {
+          results.push({
+            row: rowNumber,
+            className: name.trim(),
+            status: 'error',
+            message: `Teacher with ID ${teacherId} does not exist`,
+          });
+          failed++;
+          continue;
+        }
+
+        if (!feeUSDStr || feeUSDStr.trim() === '') {
+          results.push({
+            row: rowNumber,
+            className: name.trim(),
+            status: 'error',
+            message: 'Fee USD is required',
+          });
+          failed++;
+          continue;
+        }
+
+        const feeUSD = parseFloat(feeUSDStr.trim());
+        if (isNaN(feeUSD) || feeUSD < 0) {
+          results.push({
+            row: rowNumber,
+            className: name.trim(),
+            status: 'error',
+            message: 'Fee USD must be a valid positive number',
+          });
+          failed++;
+          continue;
+        }
+
+        if (!feePKRStr || feePKRStr.trim() === '') {
+          results.push({
+            row: rowNumber,
+            className: name.trim(),
+            status: 'error',
+            message: 'Fee PKR is required',
+          });
+          failed++;
+          continue;
+        }
+
+        const feePKR = parseFloat(feePKRStr.trim());
+        if (isNaN(feePKR) || feePKR < 0) {
+          results.push({
+            row: rowNumber,
+            className: name.trim(),
+            status: 'error',
+            message: 'Fee PKR must be a valid positive number',
+          });
+          failed++;
+          continue;
+        }
+
+        if (!classMode || classMode.trim() === '') {
+          results.push({
+            row: rowNumber,
+            className: name.trim(),
+            status: 'error',
+            message: 'Class Mode is required (virtual or in-person)',
+          });
+          failed++;
+          continue;
+        }
+
+        if (classMode.trim() !== 'virtual' && classMode.trim() !== 'in-person') {
+          results.push({
+            row: rowNumber,
+            className: name.trim(),
+            status: 'error',
+            message: 'Class Mode must be either "virtual" or "in-person"',
+          });
+          failed++;
+          continue;
+        }
+
+        // Check if class already exists
+        const existingClass = await this.classesRepository.findByName(
+          name.trim(),
+        );
+        if (existingClass) {
+          results.push({
+            row: rowNumber,
+            className: name.trim(),
+            status: 'skipped',
+            message: 'Class with this name already exists',
+            classId: existingClass.id,
+          });
+          failed++;
+          continue;
+        }
+
+        // Parse optional fields
+        const weekdaysArray = weekdays
+          ? weekdays.split(';').map((d: string) => d.trim()).filter((d: string) => d)
+          : undefined;
+        const isPublicForSale = isPublicForSaleStr.toLowerCase() === 'true';
+
+        // Create class
+        const createClassDto: CreateClassDto = {
+          name: name.trim(),
+          batchTerm: batchTerm.trim(),
+          subject: { id: subjectId },
+          teacher: { id: teacherId },
+          feeUSD,
+          feePKR,
+          classMode: classMode.trim() as 'virtual' | 'in-person',
+          weekdays: weekdaysArray,
+          timing: timing?.trim() || undefined,
+          timezone: timezone?.trim() || undefined,
+          courseOutline: courseOutline?.trim() || undefined,
+          isPublicForSale,
+          thumbnailUrl: thumbnailUrl?.trim() || undefined,
+          coverImageUrl: coverImageUrl?.trim() || undefined,
+        };
+
+        const createdClass = await this.create(createClassDto);
+
+        results.push({
+          row: rowNumber,
+          className: createdClass.name,
+          status: 'success',
+          message: 'Class created successfully',
+          classId: createdClass.id,
+        });
+        successful++;
+      } catch (error: any) {
+        const className =
+          row['Name'] ||
+          row['name'] ||
+          row['Class Name'] ||
+          row['ClassName'] ||
+          'Unknown';
+
+        results.push({
+          row: rowNumber,
+          className,
+          status: 'error',
+          message:
+            error.message ||
+            error.response?.message ||
+            'Failed to create class',
+        });
+        failed++;
+      }
+    }
+
+    return {
+      totalRows: rows.length,
+      successful,
+      failed,
+      results,
+    };
   }
 }
