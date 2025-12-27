@@ -10,6 +10,7 @@ import { ParentsModule } from './parents/parents.module';
 import { TeachersModule } from './teachers/teachers.module';
 import { ClassesModule } from './classes/classes.module';
 import { SubjectsModule } from './subjects/subjects.module';
+import { BatchTermsModule } from './batch-terms/batch-terms.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { AssignmentsModule } from './assignments/assignments.module';
 import { PerformanceModule } from './performance/performance.module';
@@ -77,6 +78,7 @@ import sentryConfig from './config/sentry.config';
     TeachersModule,
     ClassesModule,
     SubjectsModule,
+    BatchTermsModule,
     AttendanceModule,
     AssignmentsModule,
     PerformanceModule,

@@ -9,12 +9,14 @@ import {
   UpdateDateColumn,
   JoinColumn,
   OneToMany,
+  OneToOne,
 } from 'typeorm';
 import { EntityRelationalHelper } from '../../../../../utils/relational-entity-helper';
 import { SubjectEntity } from '../../../../../subjects/infrastructure/persistence/relational/entities/subject.entity';
 import { TeacherEntity } from '../../../../../teachers/infrastructure/persistence/relational/entities/teacher.entity';
 import { StudentClassEnrollmentEntity } from '../../../../../students/infrastructure/persistence/relational/entities/student-class-enrollment.entity';
 import { ClassScheduleEntity } from './class-schedule.entity';
+import { FileEntity } from '../../../../../files/infrastructure/persistence/relational/entities/file.entity';
 
 @Entity({
   name: 'class',
@@ -62,6 +64,20 @@ export class ClassEntity extends EntityRelationalHelper {
 
   @Column({ type: String, nullable: true, name: 'cover_image_url' })
   coverImageUrl?: string | null;
+
+  @OneToOne(() => FileEntity, {
+    eager: true,
+    nullable: true,
+  })
+  @JoinColumn({ name: 'thumbnail_file_id' })
+  thumbnailFile?: FileEntity | null;
+
+  @OneToOne(() => FileEntity, {
+    eager: true,
+    nullable: true,
+  })
+  @JoinColumn({ name: 'cover_image_file_id' })
+  coverImageFile?: FileEntity | null;
 
   @Column({ type: 'jsonb', nullable: true })
   features?: any | null;
