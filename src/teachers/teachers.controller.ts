@@ -65,6 +65,20 @@ export class TeachersController {
     return this.teachersService.findPublicTeachers();
   }
 
+  // Public endpoint - get single teacher by ID
+  @Get('public/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiParam({
+    name: 'id',
+    type: String,
+  })
+  @ApiOkResponse({
+    type: Teacher,
+  })
+  findPublicTeacherById(@Param('id') id: string): Promise<Teacher | null> {
+    return this.teachersService.findPublicTeacherById(+id);
+  }
+
   @ApiBearerAuth()
   @Roles(RoleEnum.admin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
