@@ -341,6 +341,14 @@ export class TeachersService {
     return this.teachersRepository.findPublicTeachers();
   }
 
+  async findPublicTeacherById(id: Teacher['id']): Promise<Teacher | null> {
+    const teacher = await this.teachersRepository.findById(id);
+    if (!teacher || !teacher.showOnPublicSite) {
+      return null;
+    }
+    return teacher;
+  }
+
   async bulkCreateFromFile(file: Express.Multer.File): Promise<{
     totalRows: number;
     successful: number;
