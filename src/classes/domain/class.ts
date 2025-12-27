@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Subject } from '../../subjects/domain/subject';
 import { Teacher } from '../../teachers/domain/teacher';
 import { ClassSchedule } from './class-schedule';
+import { FileType } from '../../files/domain/file';
 
 export class Class {
   @ApiProperty({ example: 1 })
@@ -53,6 +54,12 @@ export class Class {
 
   @ApiProperty({ example: 'https://example.com/cover.jpg', nullable: true })
   coverImageUrl?: string | null;
+
+  @ApiProperty({ nullable: true })
+  thumbnailFile?: FileType | null;
+
+  @ApiProperty({ nullable: true })
+  coverImageFile?: FileType | null;
 
   @ApiProperty({
     example: { duration: '3 months', level: 'Beginner', format: 'Online' },
