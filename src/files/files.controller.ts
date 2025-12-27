@@ -254,6 +254,226 @@ export class FilesController {
     };
   }
 
+  @Post('upload/profile')
+  @ApiOperation({ summary: 'Upload a profile picture (for teachers, students, etc.)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin)
+  async uploadProfilePicture(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB for profile pics
+          new FileTypeValidator({
+            fileType: '.(jpg|jpeg|png|gif|webp)',
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+    @Req() req: any,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const context: FileUploadContext = {
+      type: 'profile',
+      id: req.user?.id || 'unknown',
+      userId: req.user?.id || 'unknown',
+    };
+
+    const uploadedFile = await this.filesService.uploadFileWithContext(file, context);
+
+    return {
+      id: uploadedFile.id,
+      fileId: uploadedFile.id, // For backward compatibility
+      filename: uploadedFile.filename,
+      originalName: uploadedFile.originalName,
+      path: uploadedFile.path,
+      size: uploadedFile.size,
+      mimeType: uploadedFile.mimeType,
+      uploadedAt: uploadedFile.uploadedAt,
+      url: uploadedFile.url || this.filesService.getFileUrl(uploadedFile),
+    };
+  }
+
+  @Post('upload/course/thumbnail')
+  @ApiOperation({ summary: 'Upload a course thumbnail image' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  async uploadCourseThumbnail(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+          new FileTypeValidator({
+            fileType: '.(jpg|jpeg|png|gif|webp)',
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+    @Req() req: any,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const context: FileUploadContext = {
+      type: 'course',
+      id: 'thumbnail',
+      userId: req.user?.id || 'unknown',
+    };
+
+    const uploadedFile = await this.filesService.uploadFileWithContext(file, context);
+
+    return {
+      id: uploadedFile.id,
+      fileId: uploadedFile.id,
+      filename: uploadedFile.filename,
+      originalName: uploadedFile.originalName,
+      path: uploadedFile.path,
+      size: uploadedFile.size,
+      mimeType: uploadedFile.mimeType,
+      uploadedAt: uploadedFile.uploadedAt,
+      url: uploadedFile.url || this.filesService.getFileUrl(uploadedFile),
+    };
+  }
+
+  @Post('upload/course/cover')
+  @ApiOperation({ summary: 'Upload a course cover image' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  async uploadCourseCover(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }), // 10MB for cover images
+          new FileTypeValidator({
+            fileType: '.(jpg|jpeg|png|gif|webp)',
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+    @Req() req: any,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const context: FileUploadContext = {
+      type: 'course',
+      id: 'cover',
+      userId: req.user?.id || 'unknown',
+    };
+
+    const uploadedFile = await this.filesService.uploadFileWithContext(file, context);
+
+    return {
+      id: uploadedFile.id,
+      fileId: uploadedFile.id,
+      filename: uploadedFile.filename,
+      originalName: uploadedFile.originalName,
+      path: uploadedFile.path,
+      size: uploadedFile.size,
+      mimeType: uploadedFile.mimeType,
+      uploadedAt: uploadedFile.uploadedAt,
+      url: uploadedFile.url || this.filesService.getFileUrl(uploadedFile),
+    };
+  }
+
+  @Post('upload')
+  @ApiOperation({ summary: 'Upload a general file (e.g., documents)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin)
+  async uploadFile(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }), // 10MB
+          new FileTypeValidator({
+            fileType: '.(pdf|doc|docx|jpg|jpeg|png|gif|webp)',
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+    @Req() req: any,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const context: FileUploadContext = {
+      type: 'general',
+      id: 'general',
+      userId: req.user?.id || 'unknown',
+    };
+
+    const uploadedFile = await this.filesService.uploadFileWithContext(file, context);
+
+    return {
+      id: uploadedFile.id,
+      fileId: uploadedFile.id, // For backward compatibility
+      filename: uploadedFile.filename,
+      originalName: uploadedFile.originalName,
+      path: uploadedFile.path,
+      size: uploadedFile.size,
+      mimeType: uploadedFile.mimeType,
+      uploadedAt: uploadedFile.uploadedAt,
+      url: uploadedFile.url || this.filesService.getFileUrl(uploadedFile),
+    };
+  }
+
   @Get('context/:contextType/:contextId')
   @ApiOperation({ summary: 'Get files by context' })
   @ApiParam({
