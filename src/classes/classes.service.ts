@@ -66,6 +66,8 @@ export class ClassesService {
       isPublicForSale: createClassDto.isPublicForSale,
       thumbnailUrl: createClassDto.thumbnailUrl,
       coverImageUrl: createClassDto.coverImageUrl,
+      thumbnailFileId: createClassDto.thumbnailFileId,
+      coverImageFileId: createClassDto.coverImageFileId,
       features: createClassDto.features,
     } as any;
 

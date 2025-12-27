@@ -7,6 +7,7 @@ import {
   IsNumber,
   ValidateNested,
   IsIn,
+  IsUUID,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateClassScheduleDto } from './class-schedule.dto';
@@ -100,6 +101,16 @@ export class CreateClassDto {
   @IsOptional()
   @IsString()
   coverImageUrl?: string;
+
+  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000', required: false, description: 'File ID for thumbnail image' })
+  @IsOptional()
+  @IsUUID()
+  thumbnailFileId?: string;
+
+  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174001', required: false, description: 'File ID for cover image' })
+  @IsOptional()
+  @IsUUID()
+  coverImageFileId?: string;
 
   @ApiProperty({
     example: { duration: '3 months', level: 'Beginner', format: 'Online' },
