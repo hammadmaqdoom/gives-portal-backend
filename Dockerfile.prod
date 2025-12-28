@@ -1,20 +1,33 @@
-FROM node:20-slim AS builder
+FROM node:20-slim AS deps
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (skip prepare script for production)
-RUN npm ci --only=production --ignore-scripts && npm cache clean --force
+# Install ALL dependencies (including dev) for building, with cache mount
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --ignore-scripts && \
+    npm cache clean --force
 
-# Install NestJS CLI for building
-RUN npm install -g @nestjs/cli
+FROM node:20-slim AS builder
 
-# Copy source code
+WORKDIR /app
+
+# Copy dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy package files
+COPY package*.json ./
+
+# Install NestJS CLI globally (cached separately)
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g @nestjs/cli
+
+# Copy source code (this layer changes most frequently)
 COPY . .
 
-# Build the application
+# Build the application (incremental builds if tsconfig has incremental: true)
 RUN npm run build
 
 # Production stage
@@ -23,17 +36,20 @@ FROM node:20-slim AS production
 WORKDIR /app
 
 # Create non-root user
-RUN groupadd -g 1001 nodejs
-RUN useradd -r -u 1001 -g nodejs nestjs
+RUN groupadd -g 1001 nodejs && \
+    useradd -r -u 1001 -g nodejs nestjs
 
-# Install curl for health checks
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Install curl for health checks (single layer)
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
 
-# Install only production dependencies (skip prepare script for production)
-RUN npm ci --only=production --ignore-scripts && npm cache clean --force
+# Install only production dependencies with cache mount
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --only=production --ignore-scripts && \
+    npm cache clean --force
 
 # Create crypto polyfill script
 RUN echo 'const crypto = require("crypto"); global.crypto = crypto; require("./dist/main.js");' > start.js
@@ -44,16 +60,14 @@ COPY --from=builder /app/dist ./dist
 # Copy mail templates (needed at runtime)
 COPY --from=builder /app/src/mail/mail-templates ./src/mail/mail-templates
 
-# Create necessary directories and set permissions
-RUN mkdir -p src/mail/mail-templates && chown -R nestjs:nodejs src
-
 # Copy wait-for-it script (embedded in repository for reliability)
 COPY scripts/wait-for-it.sh /usr/local/bin/wait-for-it
-RUN chmod +x /usr/local/bin/wait-for-it && \
-    ln -s /usr/local/bin/wait-for-it ./wait-for-it.sh
 
-# Create uploads directory
-RUN mkdir -p uploads && chown -R nestjs:nodejs uploads
+# Create necessary directories and set permissions (combined into single layer)
+RUN chmod +x /usr/local/bin/wait-for-it && \
+    ln -s /usr/local/bin/wait-for-it ./wait-for-it.sh && \
+    mkdir -p src/mail/mail-templates uploads && \
+    chown -R nestjs:nodejs src uploads
 
 # Switch to non-root user
 USER nestjs
