@@ -1,7 +1,9 @@
 import {
   Controller,
   Get,
+  Patch,
   Param,
+  Body,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -36,6 +38,23 @@ export class AccessControlController {
       Number(classId),
     );
     return { data: status };
+  }
+
+  @Patch('toggle-admin-access/:studentId/:classId')
+  @Roles(RoleEnum.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ description: 'Toggle admin-granted access for student course' })
+  async toggleAdminAccess(
+    @Param('studentId') studentId: string,
+    @Param('classId') classId: string,
+    @Body() body: { enabled: boolean },
+  ) {
+    const result = await this.accessControlService.toggleAdminGrantedAccess(
+      Number(studentId),
+      Number(classId),
+      body.enabled,
+    );
+    return { data: result };
   }
 }
 

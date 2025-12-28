@@ -4,6 +4,7 @@ import { Class } from '../../../../domain/class';
 import { Subject } from '../../../../../subjects/domain/subject';
 import { Teacher } from '../../../../../teachers/domain/teacher';
 import { ClassSchedule } from '../../../../domain/class-schedule';
+import { File } from '../../../../../files/domain/file';
 
 @Injectable()
 export class ClassMapper {
@@ -23,6 +24,43 @@ export class ClassMapper {
     (classObj as any).thumbnailUrl = raw.thumbnailUrl;
     (classObj as any).coverImageUrl = raw.coverImageUrl;
     (classObj as any).features = raw.features;
+
+    // Map file entities
+    if (raw.thumbnailFile) {
+      (classObj as any).thumbnailFile = {
+        id: raw.thumbnailFile.id,
+        filename: raw.thumbnailFile.filename,
+        originalName: raw.thumbnailFile.originalName,
+        path: raw.thumbnailFile.path,
+        url: raw.thumbnailFile.url,
+        size: raw.thumbnailFile.size,
+        mimeType: raw.thumbnailFile.mimeType,
+        uploadedBy: raw.thumbnailFile.uploadedBy,
+        uploadedAt: raw.thumbnailFile.uploadedAt,
+        contextId: raw.thumbnailFile.contextId,
+        createdAt: raw.thumbnailFile.createdAt,
+        updatedAt: raw.thumbnailFile.updatedAt,
+        deletedAt: raw.thumbnailFile.deletedAt,
+      } as File;
+    }
+
+    if (raw.coverImageFile) {
+      (classObj as any).coverImageFile = {
+        id: raw.coverImageFile.id,
+        filename: raw.coverImageFile.filename,
+        originalName: raw.coverImageFile.originalName,
+        path: raw.coverImageFile.path,
+        url: raw.coverImageFile.url,
+        size: raw.coverImageFile.size,
+        mimeType: raw.coverImageFile.mimeType,
+        uploadedBy: raw.coverImageFile.uploadedBy,
+        uploadedAt: raw.coverImageFile.uploadedAt,
+        contextId: raw.coverImageFile.contextId,
+        createdAt: raw.coverImageFile.createdAt,
+        updatedAt: raw.coverImageFile.updatedAt,
+        deletedAt: raw.coverImageFile.deletedAt,
+      } as File;
+    }
     classObj.createdAt = raw.createdAt;
     classObj.updatedAt = raw.updatedAt;
     classObj.deletedAt = raw.deletedAt;
@@ -132,6 +170,27 @@ export class ClassMapper {
       (classEntity as any).teacher = {
         id: (classObj as any).teacher.id,
       } as any;
+    }
+
+    // Map file relations by id
+    if ((classObj as any).thumbnailFile?.id !== undefined) {
+      (classEntity as any).thumbnailFile = {
+        id: (classObj as any).thumbnailFile.id,
+      } as any;
+    } else if ((classObj as any).thumbnailFileId !== undefined) {
+      (classEntity as any).thumbnailFile = (classObj as any).thumbnailFileId
+        ? { id: (classObj as any).thumbnailFileId }
+        : null;
+    }
+
+    if ((classObj as any).coverImageFile?.id !== undefined) {
+      (classEntity as any).coverImageFile = {
+        id: (classObj as any).coverImageFile.id,
+      } as any;
+    } else if ((classObj as any).coverImageFileId !== undefined) {
+      (classEntity as any).coverImageFile = (classObj as any).coverImageFileId
+        ? { id: (classObj as any).coverImageFileId }
+        : null;
     }
 
     return classEntity;

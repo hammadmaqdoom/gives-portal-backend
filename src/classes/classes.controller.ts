@@ -11,7 +11,13 @@ import {
   HttpStatus,
   HttpCode,
   SerializeOptions,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
 import {
@@ -20,6 +26,10 @@ import {
   ApiOkResponse,
   ApiParam,
   ApiTags,
+  ApiOperation,
+  ApiConsumes,
+  ApiBody,
+  ApiResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../roles/roles.decorator';
 import { RoleEnum } from '../roles/roles.enum';
@@ -34,6 +44,8 @@ import { Class } from './domain/class';
 import { ClassesService } from './classes.service';
 import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
+import { BulkClassesResultDto } from './dto/bulk-classes-response.dto';
+import { BulkCreateClassesDto } from './dto/bulk-create-classes.dto';
 
 @ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -175,5 +187,23 @@ export class ClassesController {
     body: { studentIds: number[]; status?: string; enrollmentDate?: string },
   ): Promise<{ count: number }> {
     return this.classesService.bulkEnroll(+classId, body);
+  }
+
+  @Post('bulk-create')
+  @Roles(RoleEnum.admin)
+  @ApiOperation({
+    summary: 'Bulk create classes from JSON data',
+    description:
+      'Send an array of class objects to bulk create classes',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Bulk creation processed successfully',
+    type: BulkClassesResultDto,
+  })
+  async bulkCreate(
+    @Body() bulkCreateDto: BulkCreateClassesDto,
+  ): Promise<BulkClassesResultDto> {
+    return this.classesService.bulkCreateFromData(bulkCreateDto.classes);
   }
 }
