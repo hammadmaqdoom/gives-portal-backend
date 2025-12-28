@@ -49,6 +49,20 @@ export class AccessControlService {
       };
     }
 
+    // Check if admin has granted access (bypasses payment requirement)
+    if (enrollment.adminGrantedAccess) {
+      const paymentStatus = await this.getPaymentStatus(studentId, classId);
+      return {
+        hasAccess: true,
+        isPaid: paymentStatus.isPaid,
+        enrollmentStatus: enrollment.status,
+        invoiceStatus: paymentStatus.invoiceStatus,
+        invoiceId: paymentStatus.invoiceId,
+        requiresPayment: false,
+        message: 'Access granted by administrator',
+      };
+    }
+
     // Check enrollment status
     if (enrollment.status === 'active') {
       // Active enrollment - check if payment is required
@@ -173,6 +187,48 @@ export class AccessControlService {
     return {
       success: true,
       message: 'Enrollment activated successfully',
+    };
+  }
+
+  /**
+   * Toggle admin-granted access for a student course enrollment
+   * This allows admins to grant access even if payment is not completed
+   */
+  async toggleAdminGrantedAccess(
+    studentId: number,
+    classId: number,
+    enabled: boolean,
+  ): Promise<{ success: boolean; message: string; enrollment?: any }> {
+    const enrollment = await this.enrollmentRepository.findByStudentAndClass(
+      studentId,
+      classId,
+    );
+
+    if (!enrollment) {
+      return {
+        success: false,
+        message: 'Enrollment not found',
+      };
+    }
+
+    // Update admin granted access
+    const updatedEnrollment = await this.enrollmentRepository.update(
+      enrollment.id,
+      {
+        adminGrantedAccess: enabled,
+      },
+    );
+
+    this.logger.log(
+      `Admin ${enabled ? 'granted' : 'revoked'} access for student ${studentId} in class ${classId}`,
+    );
+
+    return {
+      success: true,
+      message: enabled
+        ? 'Access granted by administrator'
+        : 'Admin-granted access revoked',
+      enrollment: updatedEnrollment,
     };
   }
 }

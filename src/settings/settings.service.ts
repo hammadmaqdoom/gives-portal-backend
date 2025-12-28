@@ -233,4 +233,16 @@ export class SettingsService {
       socialInstagram: settings.socialInstagram,
     };
   }
+
+  async getThemeConfig(): Promise<{
+    themeColorPreset?: string | null;
+    themeCustomColor?: string | null;
+  }> {
+    const settings = await this.getSettingsOrCreate();
+
+    return {
+      themeColorPreset: (settings as any).themeColorPreset || null,
+      themeCustomColor: (settings as any).themeCustomColor || null,
+    };
+  }
 }
