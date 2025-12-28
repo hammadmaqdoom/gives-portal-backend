@@ -39,6 +39,9 @@ export class StudentClassEnrollmentEntity extends EntityRelationalHelper {
   @Column({ type: 'varchar', default: 'active' })
   status: 'active' | 'inactive' | 'completed' | 'dropped';
 
+  @Column({ type: 'boolean', default: false })
+  adminGrantedAccess: boolean;
+
   @ManyToOne(() => StudentEntity, {})
   @JoinColumn({ name: 'studentId' })
   student: StudentEntity;

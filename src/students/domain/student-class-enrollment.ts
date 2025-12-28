@@ -14,6 +14,8 @@ export class StudentClassEnrollment {
 
   status: 'active' | 'inactive' | 'completed' | 'dropped';
 
+  adminGrantedAccess?: boolean;
+
   student?: Student;
 
   class?: Class;
