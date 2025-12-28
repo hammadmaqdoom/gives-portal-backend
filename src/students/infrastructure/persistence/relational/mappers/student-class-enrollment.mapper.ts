@@ -39,10 +39,30 @@ export class StudentClassEnrollmentMapper {
         weekdays: raw.class.weekdays,
         timing: raw.class.timing,
         courseOutline: raw.class.courseOutline,
+        thumbnailUrl: raw.class.thumbnailUrl,
+        coverImageUrl: raw.class.coverImageUrl,
         createdAt: raw.class.createdAt,
         updatedAt: raw.class.updatedAt,
         deletedAt: raw.class.deletedAt,
       } as Class;
+
+      // Map teacher if available
+      if (raw.class.teacher) {
+        (enrollment.class as any).teacher = {
+          id: raw.class.teacher.id,
+          name: raw.class.teacher.name,
+          email: raw.class.teacher.email,
+          phone: raw.class.teacher.phone,
+        };
+      }
+
+      // Map subject if available
+      if (raw.class.subject) {
+        (enrollment.class as any).subject = {
+          id: raw.class.subject.id,
+          name: raw.class.subject.name,
+        };
+      }
     }
 
     return enrollment;
