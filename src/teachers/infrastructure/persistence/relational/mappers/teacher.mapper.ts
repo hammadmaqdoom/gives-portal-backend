@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { TeacherEntity } from '../entities/teacher.entity';
 import { Teacher } from '../../../../domain/teacher';
+import { FileMapper } from '../../../../../files/infrastructure/persistence/relational/mappers/file.mapper';
+import { FileEntity } from '../../../../../files/infrastructure/persistence/relational/entities/file.entity';
 
 @Injectable()
 export class TeacherMapper {
+  constructor(private fileMapper: FileMapper) {}
+
   toDomain(raw: TeacherEntity): Teacher {
     const teacher = new Teacher();
     teacher.id = raw.id;
@@ -19,6 +23,10 @@ export class TeacherMapper {
     teacher.iban = raw.iban;
     teacher.accountHolderName = raw.accountHolderName;
     teacher.bankBranch = raw.bankBranch;
+    teacher.photo = raw.photo ? this.fileMapper.toDomain(raw.photo) : null;
+    teacher.bio = raw.bio;
+    teacher.showOnPublicSite = raw.showOnPublicSite;
+    teacher.displayOrder = raw.displayOrder;
     teacher.createdAt = raw.createdAt;
     teacher.updatedAt = raw.updatedAt;
     teacher.deletedAt = raw.deletedAt;
@@ -66,6 +74,20 @@ export class TeacherMapper {
     }
     if (teacher.bankBranch !== undefined) {
       teacherEntity.bankBranch = teacher.bankBranch;
+    }
+    if (teacher.photo !== undefined) {
+      teacherEntity.photo = teacher.photo
+        ? ({ id: teacher.photo.id } as FileEntity)
+        : null;
+    }
+    if (teacher.bio !== undefined) {
+      teacherEntity.bio = teacher.bio;
+    }
+    if (teacher.showOnPublicSite !== undefined) {
+      teacherEntity.showOnPublicSite = teacher.showOnPublicSite;
+    }
+    if (teacher.displayOrder !== undefined) {
+      teacherEntity.displayOrder = teacher.displayOrder;
     }
 
     return teacherEntity;

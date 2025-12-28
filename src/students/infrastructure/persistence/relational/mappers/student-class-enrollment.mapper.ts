@@ -13,6 +13,7 @@ export class StudentClassEnrollmentMapper {
     enrollment.classId = raw.classId;
     enrollment.enrollmentDate = raw.enrollmentDate;
     enrollment.status = raw.status;
+    enrollment.adminGrantedAccess = raw.adminGrantedAccess ?? false;
     enrollment.createdAt = raw.createdAt;
     enrollment.updatedAt = raw.updatedAt;
     enrollment.deletedAt = raw.deletedAt;
@@ -66,6 +67,9 @@ export class StudentClassEnrollmentMapper {
     }
     if (enrollment.status !== undefined) {
       enrollmentEntity.status = enrollment.status;
+    }
+    if (enrollment.adminGrantedAccess !== undefined) {
+      enrollmentEntity.adminGrantedAccess = enrollment.adminGrantedAccess;
     }
 
     return enrollmentEntity;

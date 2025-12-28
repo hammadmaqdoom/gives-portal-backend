@@ -187,4 +187,17 @@ export class PublicController {
       },
     };
   }
+
+  @Get('theme-config')
+  @ApiOkResponse({ description: 'Public theme configuration' })
+  async getPublicThemeConfig() {
+    // Return only theme customization data for public/student use
+    const theme = await this.settingsService.getThemeConfig();
+    return {
+      data: {
+        themeColorPreset: theme?.themeColorPreset || null,
+        themeCustomColor: theme?.themeCustomColor || null,
+      },
+    };
+  }
 }
