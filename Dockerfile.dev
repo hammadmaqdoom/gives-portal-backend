@@ -12,7 +12,7 @@ COPY package*.json ./
 # Install all dependencies with cache mount
 RUN --mount=type=cache,target=/root/.npm \
     npm ci && \
-    npm cache clean --force
+    (npm cache clean --force || true)
 
 # Install NestJS CLI globally with cache mount
 RUN --mount=type=cache,target=/root/.npm \

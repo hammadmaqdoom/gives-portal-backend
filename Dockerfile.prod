@@ -8,7 +8,7 @@ COPY package*.json ./
 # Install ALL dependencies (including dev) for building, with cache mount
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --ignore-scripts && \
-    npm cache clean --force
+    (npm cache clean --force || true)
 
 FROM node:20-slim AS builder
 
@@ -49,7 +49,7 @@ COPY package*.json ./
 # Install only production dependencies with cache mount
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --only=production --ignore-scripts && \
-    npm cache clean --force
+    (npm cache clean --force || true)
 
 # Create crypto polyfill script
 RUN echo 'const crypto = require("crypto"); global.crypto = crypto; require("./dist/main.js");' > start.js
