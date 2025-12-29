@@ -22,7 +22,10 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Copy updated code to Lightsail
+        id: scp-copy
+        if: github.event.inputs.update_type != 'config'
         uses: appleboy/scp-action@v0.1.7
+        continue-on-error: true
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ${{ secrets.LIGHTSAIL_USER }}
@@ -30,6 +33,42 @@ jobs:
           source: "."
           target: "/tmp/backend"
           strip_components: 1
+          debug: true
+      
+      - name: Retry SCP if failed
+        if: steps.scp-copy.outcome == 'failure' && github.event.inputs.update_type != 'config'
+        uses: appleboy/scp-action@v0.1.7
+        continue-on-error: true
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          source: "."
+          target: "/tmp/backend"
+          strip_components: 1
+          debug: true
+      
+      - name: Fail if SCP still failed
+        if: steps.scp-copy.outcome == 'failure' && github.event.inputs.update_type != 'config'
+        run: |
+          echo "::error::Failed to copy files to Lightsail server after retry"
+          echo "Please check:"
+          echo "  1. Server is running and accessible from GitHub Actions"
+          echo "  2. SSH port 22 is open in Lightsail firewall rules"
+          echo "  3. LIGHTSAIL_HOST secret contains correct IP or domain"
+          echo "  4. LIGHTSAIL_USER and LIGHTSAIL_SSH_KEY secrets are correct"
+          echo "  5. Server firewall allows connections from GitHub Actions IPs"
+          echo ""
+          echo "To troubleshoot:"
+          echo "  - Test SSH connection manually: ssh ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }}"
+          echo "  - Check Lightsail firewall rules allow port 22"
+          echo "  - Verify server is running: aws lightsail get-instance-state --instance-name <name>"
+          exit 1
+      
+      - name: Skip SCP for config-only updates
+        if: github.event.inputs.update_type == 'config'
+        run: |
+          echo "Skipping SCP - config-only update doesn't require code transfer"
 
       - name: Deploy update to AWS Lightsail
         uses: appleboy/ssh-action@v1.0.3
