@@ -10,9 +10,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && \
 COPY package*.json ./
 
 # Install all dependencies with cache mount
+# Note: Don't clean cache - BuildKit manages it and cleaning causes corruption
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci && \
-    (npm cache clean --force || true)
+    npm ci
 
 # Install NestJS CLI globally with cache mount
 RUN --mount=type=cache,target=/root/.npm \
