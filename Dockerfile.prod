@@ -6,8 +6,11 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install ALL dependencies (including dev) for building, with cache mount
+# Add network timeout and retry settings for reliability
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --ignore-scripts && \
+    npm config set fetch-timeout 600000 && \
+    npm config set fetch-retries 5 && \
+    npm ci --ignore-scripts --legacy-peer-deps && \
     (npm cache clean --force || true)
 
 FROM node:20-slim AS builder
@@ -47,8 +50,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && \
 COPY package*.json ./
 
 # Install only production dependencies with cache mount
+# Use --omit=dev instead of deprecated --only=production
+# Add network timeout and retry settings for reliability
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --only=production --ignore-scripts && \
+    npm config set fetch-timeout 600000 && \
+    npm config set fetch-retries 5 && \
+    npm ci --omit=dev --ignore-scripts --legacy-peer-deps && \
     (npm cache clean --force || true)
 
 # Create crypto polyfill script
