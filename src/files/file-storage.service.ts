@@ -15,7 +15,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { SettingsService } from '../settings/settings.service';
 
 export interface FileUploadContext {
-  type: 'assignment' | 'submission' | 'module' | 'payment-proof' | 'general' | 'profile' | 'course';
+  type:
+    | 'assignment'
+    | 'submission'
+    | 'module'
+    | 'payment-proof'
+    | 'general'
+    | 'profile'
+    | 'course';
   id: string | number;
   userId: string | number;
 }

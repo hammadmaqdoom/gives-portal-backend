@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CreateBatchTermsTable1767000000000
-  implements MigrationInterface
-{
+export class CreateBatchTermsTable1767000000000 implements MigrationInterface {
   name = 'CreateBatchTermsTable1767000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -44,15 +42,10 @@ export class CreateBatchTermsTable1767000000000
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Remove indexes
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS "IDX_batch_term_is_active"`,
-    );
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS "IDX_batch_term_name"`,
-    );
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_batch_term_is_active"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_batch_term_name"`);
 
     // Drop table
     await queryRunner.query(`DROP TABLE IF EXISTS "batch_term"`);
   }
 }
-

@@ -81,6 +81,10 @@ export class InvoicesService {
       generatedDate: new Date(),
       description: createInvoiceDto.description,
       notes: createInvoiceDto.notes,
+      originalPrice: createInvoiceDto.originalPrice,
+      discountAmount: createInvoiceDto.discountAmount,
+      discountType: createInvoiceDto.discountType,
+      classId: createInvoiceDto.classId,
       items:
         createInvoiceDto.items?.map((item) => ({
           id: 0, // Will be set by database

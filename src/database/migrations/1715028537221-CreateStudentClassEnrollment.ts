@@ -63,7 +63,9 @@ export class CreateStudentClassEnrollment1715028537221
     await queryRunner.query(
       `ALTER TABLE "student" DROP CONSTRAINT IF EXISTS "FK_student_class"`,
     );
-    await queryRunner.query(`ALTER TABLE "student" DROP COLUMN IF EXISTS "classId"`);
+    await queryRunner.query(
+      `ALTER TABLE "student" DROP COLUMN IF EXISTS "classId"`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

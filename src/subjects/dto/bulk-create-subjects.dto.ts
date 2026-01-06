@@ -31,4 +31,3 @@ export class BulkCreateSubjectsDto {
   @Type(() => BulkCreateSubjectItemDto)
   subjects: BulkCreateSubjectItemDto[];
 }
-

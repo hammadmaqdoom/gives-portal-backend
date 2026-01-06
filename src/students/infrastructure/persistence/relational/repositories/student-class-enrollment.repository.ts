@@ -190,7 +190,7 @@ export class StudentClassEnrollmentRepository {
   async countThisMonth(): Promise<number> {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+
     return this.enrollmentRepository
       .createQueryBuilder('enrollment')
       .where('enrollment.enrollmentDate >= :startOfMonth', { startOfMonth })

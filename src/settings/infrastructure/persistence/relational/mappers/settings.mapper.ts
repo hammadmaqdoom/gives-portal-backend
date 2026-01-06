@@ -127,13 +127,19 @@ export class SettingsMapper {
     persistenceEntity.fileDriver = domainEntity.fileDriver || null;
     persistenceEntity.accessKeyId = domainEntity.accessKeyId || null;
     persistenceEntity.secretAccessKey = domainEntity.secretAccessKey || null;
-    persistenceEntity.awsDefaultS3Bucket = domainEntity.awsDefaultS3Bucket || null;
+    persistenceEntity.awsDefaultS3Bucket =
+      domainEntity.awsDefaultS3Bucket || null;
     persistenceEntity.awsS3Region = domainEntity.awsS3Region || null;
-    persistenceEntity.azureStorageAccountName = domainEntity.azureStorageAccountName || null;
-    persistenceEntity.azureStorageAccountKey = domainEntity.azureStorageAccountKey || null;
-    persistenceEntity.azureContainerName = domainEntity.azureContainerName || null;
-    persistenceEntity.azureBlobSasExpirySeconds = domainEntity.azureBlobSasExpirySeconds || null;
-    persistenceEntity.azureBlobPublicBaseUrl = domainEntity.azureBlobPublicBaseUrl || null;
+    persistenceEntity.azureStorageAccountName =
+      domainEntity.azureStorageAccountName || null;
+    persistenceEntity.azureStorageAccountKey =
+      domainEntity.azureStorageAccountKey || null;
+    persistenceEntity.azureContainerName =
+      domainEntity.azureContainerName || null;
+    persistenceEntity.azureBlobSasExpirySeconds =
+      domainEntity.azureBlobSasExpirySeconds || null;
+    persistenceEntity.azureBlobPublicBaseUrl =
+      domainEntity.azureBlobPublicBaseUrl || null;
     persistenceEntity.themeColorPreset = domainEntity.themeColorPreset || null;
     persistenceEntity.themeCustomColor = domainEntity.themeCustomColor || null;
     persistenceEntity.createdAt = domainEntity.createdAt;

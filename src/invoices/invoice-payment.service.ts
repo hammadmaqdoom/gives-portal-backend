@@ -155,10 +155,7 @@ export class InvoicePaymentService {
       try {
         await this.activateEnrollmentsForInvoice(updatedInvoice!);
       } catch (error) {
-        this.logger.error(
-          'Error activating enrollments after payment:',
-          error,
-        );
+        this.logger.error('Error activating enrollments after payment:', error);
         // Don't fail payment processing if enrollment activation fails
       }
 
@@ -218,7 +215,9 @@ export class InvoicePaymentService {
     // Find class by name
     const classEntity = await this.classesService.findByName(className);
     if (!classEntity) {
-      this.logger.warn(`Class "${className}" not found for invoice ${invoice.id}`);
+      this.logger.warn(
+        `Class "${className}" not found for invoice ${invoice.id}`,
+      );
       return;
     }
 

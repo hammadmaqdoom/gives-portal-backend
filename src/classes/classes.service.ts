@@ -332,22 +332,24 @@ export class ClassesService {
     })) as any;
   }
 
-  async bulkCreateFromData(classes: Array<{
-    name: string;
-    batchTerm: string;
-    subjectId: number;
-    teacherId: number;
-    feeUSD: number;
-    feePKR: number;
-    classMode: 'virtual' | 'in-person';
-    weekdays?: string[];
-    timing?: string;
-    timezone?: string;
-    courseOutline?: string;
-    isPublicForSale?: boolean;
-    thumbnailUrl?: string;
-    coverImageUrl?: string;
-  }>): Promise<{
+  async bulkCreateFromData(
+    classes: Array<{
+      name: string;
+      batchTerm: string;
+      subjectId: number;
+      teacherId: number;
+      feeUSD: number;
+      feePKR: number;
+      classMode: 'virtual' | 'in-person';
+      weekdays?: string[];
+      timing?: string;
+      timezone?: string;
+      courseOutline?: string;
+      isPublicForSale?: boolean;
+      thumbnailUrl?: string;
+      coverImageUrl?: string;
+    }>,
+  ): Promise<{
     totalRows: number;
     successful: number;
     failed: number;
@@ -425,7 +427,11 @@ export class ClassesService {
           continue;
         }
 
-        if (classData.feeUSD === undefined || isNaN(classData.feeUSD) || classData.feeUSD < 0) {
+        if (
+          classData.feeUSD === undefined ||
+          isNaN(classData.feeUSD) ||
+          classData.feeUSD < 0
+        ) {
           results.push({
             row: rowNumber,
             className: classData.name.trim(),
@@ -436,7 +442,11 @@ export class ClassesService {
           continue;
         }
 
-        if (classData.feePKR === undefined || isNaN(classData.feePKR) || classData.feePKR < 0) {
+        if (
+          classData.feePKR === undefined ||
+          isNaN(classData.feePKR) ||
+          classData.feePKR < 0
+        ) {
           results.push({
             row: rowNumber,
             className: classData.name.trim(),
@@ -447,12 +457,18 @@ export class ClassesService {
           continue;
         }
 
-        if (!classData.classMode || (classData.classMode !== 'virtual' && classData.classMode !== 'in-person')) {
+        if (
+          !classData.classMode ||
+          (classData.classMode !== 'virtual' &&
+            classData.classMode !== 'in-person' &&
+            classData.classMode !== 'hybrid')
+        ) {
           results.push({
             row: rowNumber,
             className: classData.name.trim(),
             status: 'error',
-            message: 'Class Mode must be either "virtual" or "in-person"',
+            message:
+              'Class Mode must be either "virtual", "in-person", or "hybrid"',
           });
           failed++;
           continue;
@@ -591,26 +607,78 @@ export class ClassesService {
     const classes = rows.map((row: any) => {
       const feeUSDStr = row['Fee USD'] || row['FeeUSD'] || row['fee_usd'] || '';
       const feePKRStr = row['Fee PKR'] || row['FeePKR'] || row['fee_pkr'] || '';
-      const subjectIdStr = row['Subject ID'] || row['SubjectID'] || row['subject_id'] || row['Subject'] || '';
-      const teacherIdStr = row['Teacher ID'] || row['TeacherID'] || row['teacher_id'] || row['Teacher'] || '';
+      const subjectIdStr =
+        row['Subject ID'] ||
+        row['SubjectID'] ||
+        row['subject_id'] ||
+        row['Subject'] ||
+        '';
+      const teacherIdStr =
+        row['Teacher ID'] ||
+        row['TeacherID'] ||
+        row['teacher_id'] ||
+        row['Teacher'] ||
+        '';
       const weekdays = row['Weekdays'] || row['weekdays'] || row['Days'] || '';
-      const isPublicForSaleStr = row['Is Public For Sale'] || row['IsPublicForSale'] || row['is_public_for_sale'] || row['Public'] || 'false';
+      const isPublicForSaleStr =
+        row['Is Public For Sale'] ||
+        row['IsPublicForSale'] ||
+        row['is_public_for_sale'] ||
+        row['Public'] ||
+        'false';
 
       return {
-        name: row['Name'] || row['name'] || row['Class Name'] || row['ClassName'] || '',
-        batchTerm: row['Batch/Term'] || row['BatchTerm'] || row['batch_term'] || row['Batch'] || '',
+        name:
+          row['Name'] ||
+          row['name'] ||
+          row['Class Name'] ||
+          row['ClassName'] ||
+          '',
+        batchTerm:
+          row['Batch/Term'] ||
+          row['BatchTerm'] ||
+          row['batch_term'] ||
+          row['Batch'] ||
+          '',
         subjectId: parseInt(subjectIdStr.trim(), 10),
         teacherId: parseInt(teacherIdStr.trim(), 10),
         feeUSD: parseFloat(feeUSDStr.trim()),
         feePKR: parseFloat(feePKRStr.trim()),
-        classMode: (row['Class Mode'] || row['ClassMode'] || row['class_mode'] || row['Mode'] || '').trim() as 'virtual' | 'in-person',
-        weekdays: weekdays ? weekdays.split(';').map((d: string) => d.trim()).filter((d: string) => d) : undefined,
+        classMode: (
+          row['Class Mode'] ||
+          row['ClassMode'] ||
+          row['class_mode'] ||
+          row['Mode'] ||
+          ''
+        ).trim() as 'virtual' | 'in-person',
+        weekdays: weekdays
+          ? weekdays
+              .split(';')
+              .map((d: string) => d.trim())
+              .filter((d: string) => d)
+          : undefined,
         timing: row['Timing'] || row['timing'] || row['Time'] || undefined,
-        timezone: row['Timezone'] || row['timezone'] || row['Time Zone'] || undefined,
-        courseOutline: row['Course Outline'] || row['CourseOutline'] || row['course_outline'] || row['Outline'] || undefined,
+        timezone:
+          row['Timezone'] || row['timezone'] || row['Time Zone'] || undefined,
+        courseOutline:
+          row['Course Outline'] ||
+          row['CourseOutline'] ||
+          row['course_outline'] ||
+          row['Outline'] ||
+          undefined,
         isPublicForSale: isPublicForSaleStr.toLowerCase() === 'true',
-        thumbnailUrl: row['Thumbnail URL'] || row['ThumbnailURL'] || row['thumbnail_url'] || row['Thumbnail'] || undefined,
-        coverImageUrl: row['Cover Image URL'] || row['CoverImageURL'] || row['cover_image_url'] || row['Cover Image'] || undefined,
+        thumbnailUrl:
+          row['Thumbnail URL'] ||
+          row['ThumbnailURL'] ||
+          row['thumbnail_url'] ||
+          row['Thumbnail'] ||
+          undefined,
+        coverImageUrl:
+          row['Cover Image URL'] ||
+          row['CoverImageURL'] ||
+          row['cover_image_url'] ||
+          row['Cover Image'] ||
+          undefined,
       };
     });
 
@@ -745,20 +813,10 @@ export class ClassesService {
           row['Mode'] ||
           '';
         const weekdays =
-          row['Weekdays'] ||
-          row['weekdays'] ||
-          row['Days'] ||
-          '';
-        const timing =
-          row['Timing'] ||
-          row['timing'] ||
-          row['Time'] ||
-          '';
+          row['Weekdays'] || row['weekdays'] || row['Days'] || '';
+        const timing = row['Timing'] || row['timing'] || row['Time'] || '';
         const timezone =
-          row['Timezone'] ||
-          row['timezone'] ||
-          row['Time Zone'] ||
-          '';
+          row['Timezone'] || row['timezone'] || row['Time Zone'] || '';
         const courseOutline =
           row['Course Outline'] ||
           row['CourseOutline'] ||
@@ -936,7 +994,10 @@ export class ClassesService {
           continue;
         }
 
-        if (classMode.trim() !== 'virtual' && classMode.trim() !== 'in-person') {
+        if (
+          classMode.trim() !== 'virtual' &&
+          classMode.trim() !== 'in-person'
+        ) {
           results.push({
             row: rowNumber,
             className: name.trim(),
@@ -965,7 +1026,10 @@ export class ClassesService {
 
         // Parse optional fields
         const weekdaysArray = weekdays
-          ? weekdays.split(';').map((d: string) => d.trim()).filter((d: string) => d)
+          ? weekdays
+              .split(';')
+              .map((d: string) => d.trim())
+              .filter((d: string) => d)
           : undefined;
         const isPublicForSale = isPublicForSaleStr.toLowerCase() === 'true';
 

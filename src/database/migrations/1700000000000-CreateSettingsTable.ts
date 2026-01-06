@@ -96,7 +96,9 @@ export class CreateSettingsTable1700000000000 implements MigrationInterface {
         WHERE table_schema = 'public' 
         AND table_name = 'settings'
       `);
-      const existingColumns = existingColumnsResult.map((row: any) => row.column_name);
+      const existingColumns = existingColumnsResult.map(
+        (row: any) => row.column_name,
+      );
 
       // Helper function to check and add column
       const addColumnIfMissing = async (
@@ -233,4 +235,3 @@ export class CreateSettingsTable1700000000000 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS "settings"`);
   }
 }
-

@@ -168,8 +168,7 @@ export class SubjectsController {
   @Roles(RoleEnum.admin)
   @ApiOperation({
     summary: 'Bulk create subjects from JSON data',
-    description:
-      'Send an array of subject objects to bulk create subjects',
+    description: 'Send an array of subject objects to bulk create subjects',
   })
   @ApiResponse({
     status: HttpStatus.OK,

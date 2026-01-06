@@ -255,7 +255,9 @@ export class FilesController {
   }
 
   @Post('upload/profile')
-  @ApiOperation({ summary: 'Upload a profile picture (for teachers, students, etc.)' })
+  @ApiOperation({
+    summary: 'Upload a profile picture (for teachers, students, etc.)',
+  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -294,7 +296,10 @@ export class FilesController {
       userId: req.user?.id || 'unknown',
     };
 
-    const uploadedFile = await this.filesService.uploadFileWithContext(file, context);
+    const uploadedFile = await this.filesService.uploadFileWithContext(
+      file,
+      context,
+    );
 
     return {
       id: uploadedFile.id,
@@ -349,7 +354,10 @@ export class FilesController {
       userId: req.user?.id || 'unknown',
     };
 
-    const uploadedFile = await this.filesService.uploadFileWithContext(file, context);
+    const uploadedFile = await this.filesService.uploadFileWithContext(
+      file,
+      context,
+    );
 
     return {
       id: uploadedFile.id,
@@ -404,7 +412,10 @@ export class FilesController {
       userId: req.user?.id || 'unknown',
     };
 
-    const uploadedFile = await this.filesService.uploadFileWithContext(file, context);
+    const uploadedFile = await this.filesService.uploadFileWithContext(
+      file,
+      context,
+    );
 
     return {
       id: uploadedFile.id,
@@ -459,7 +470,10 @@ export class FilesController {
       userId: req.user?.id || 'unknown',
     };
 
-    const uploadedFile = await this.filesService.uploadFileWithContext(file, context);
+    const uploadedFile = await this.filesService.uploadFileWithContext(
+      file,
+      context,
+    );
 
     return {
       id: uploadedFile.id,

@@ -19,4 +19,3 @@ export class AddAdminGrantedAccessToEnrollment1768000000000
     );
   }
 }
-

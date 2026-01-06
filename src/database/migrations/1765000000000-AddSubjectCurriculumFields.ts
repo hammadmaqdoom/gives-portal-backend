@@ -23,4 +23,3 @@ export class AddSubjectCurriculumFields1765000000000
     await queryRunner.query(`ALTER TABLE "subject" DROP COLUMN "syllabusCode"`);
   }
 }
-

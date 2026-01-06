@@ -65,7 +65,8 @@ export class Teacher {
 
   @ApiProperty({
     example: 0,
-    description: 'Display order for public website (lower numbers appear first)',
+    description:
+      'Display order for public website (lower numbers appear first)',
   })
   displayOrder: number;
 

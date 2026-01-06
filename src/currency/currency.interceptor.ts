@@ -16,11 +16,11 @@ export class CurrencyInterceptor implements NestInterceptor {
     next: CallHandler,
   ): Promise<Observable<any>> {
     const request = context.switchToHttp().getRequest();
-    
+
     // Extract IP and detect currency
     const ip = this.currencyService.extractClientIp(request);
     const currency = await this.currencyService.detectCurrencyFromIp(ip);
-    
+
     // Attach currency to request object
     request.currency = currency;
     request.clientIp = ip;
@@ -28,4 +28,3 @@ export class CurrencyInterceptor implements NestInterceptor {
     return next.handle();
   }
 }
-

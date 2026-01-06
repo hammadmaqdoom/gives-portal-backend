@@ -5,6 +5,8 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, Between } from 'typeorm';
 import { CreateFeeDto } from './dto/create-fee.dto';
 import { NullableType } from '../utils/types/nullable.type';
 import { FilterFeeDto, SortFeeDto } from './dto/query-fee.dto';
@@ -14,6 +16,8 @@ import { IPaginationOptions } from '../utils/types/pagination-options';
 import { UpdateFeeDto } from './dto/update-fee.dto';
 import { ParentsService } from '../parents/parents.service';
 import { StudentsService } from '../students/students.service';
+import { InvoiceEntity } from '../invoices/infrastructure/persistence/relational/entities/invoice.entity';
+import { DiscountAnalyticsDto } from './dto/discount-analytics.dto';
 
 @Injectable()
 export class FeesService {
@@ -23,6 +27,8 @@ export class FeesService {
     private readonly parentsService: ParentsService,
     @Inject(forwardRef(() => StudentsService))
     private readonly studentsService: StudentsService,
+    @InjectRepository(InvoiceEntity)
+    private readonly invoiceRepository: Repository<InvoiceEntity>,
   ) {}
 
   async create(createFeeDto: CreateFeeDto): Promise<Fee> {
@@ -201,5 +207,116 @@ export class FeesService {
       console.error('Error getting fees for student:', error);
       return [];
     }
+  }
+
+  async getFinancialReports(
+    startDate?: Date,
+    endDate?: Date,
+    discountType?: string,
+  ): Promise<DiscountAnalyticsDto> {
+    const queryBuilder = this.invoiceRepository
+      .createQueryBuilder('invoice')
+      .where('invoice.discountAmount > 0')
+      .andWhere('invoice.deletedAt IS NULL');
+
+    // Apply date filter if provided
+    if (startDate || endDate) {
+      if (startDate && endDate) {
+        queryBuilder.andWhere(
+          'invoice.generatedDate BETWEEN :startDate AND :endDate',
+          {
+            startDate,
+            endDate,
+          },
+        );
+      } else if (startDate) {
+        queryBuilder.andWhere('invoice.generatedDate >= :startDate', {
+          startDate,
+        });
+      } else if (endDate) {
+        queryBuilder.andWhere('invoice.generatedDate <= :endDate', { endDate });
+      }
+    }
+
+    // Apply discount type filter if provided
+    if (discountType) {
+      queryBuilder.andWhere('invoice.discountType = :discountType', {
+        discountType,
+      });
+    }
+
+    const invoices = await queryBuilder.getMany();
+
+    // Group by discount type and currency
+    const discountsByTypeMap = new Map<
+      string,
+      { totalAmount: number; count: number; currency: string }
+    >();
+
+    let totalDiscountAmount = 0;
+    let totalDiscounts = 0;
+
+    for (const invoice of invoices) {
+      if (!invoice.discountAmount || invoice.discountAmount <= 0) continue;
+
+      const type = invoice.discountType || 'unknown';
+      const key = `${type}_${invoice.currency}`;
+
+      if (!discountsByTypeMap.has(key)) {
+        discountsByTypeMap.set(key, {
+          totalAmount: 0,
+          count: 0,
+          currency: invoice.currency,
+        });
+      }
+
+      const entry = discountsByTypeMap.get(key)!;
+      entry.totalAmount += Number(invoice.discountAmount);
+      entry.count += 1;
+      totalDiscountAmount += Number(invoice.discountAmount);
+      totalDiscounts += 1;
+    }
+
+    // Convert map to array and calculate averages
+    const discountsByType = Array.from(discountsByTypeMap.entries()).map(
+      ([key, data]) => {
+        const [type] = key.split('_');
+        return {
+          type,
+          totalAmount: data.totalAmount,
+          count: data.count,
+          averageAmount: data.count > 0 ? data.totalAmount / data.count : 0,
+          currency: data.currency,
+        };
+      },
+    );
+
+    // Sort by total amount descending
+    discountsByType.sort((a, b) => b.totalAmount - a.totalAmount);
+
+    // Determine date range
+    const dateRange = {
+      start: startDate || new Date(0),
+      end: endDate || new Date(),
+    };
+
+    // Determine primary currency (most common)
+    const currencyCounts = new Map<string, number>();
+    invoices.forEach((inv) => {
+      const curr = inv.currency || 'USD';
+      currencyCounts.set(curr, (currencyCounts.get(curr) || 0) + 1);
+    });
+    const primaryCurrency =
+      Array.from(currencyCounts.entries()).sort(
+        (a, b) => b[1] - a[1],
+      )[0]?.[0] || 'USD';
+
+    return {
+      discountsByType,
+      totalDiscounts,
+      totalDiscountAmount,
+      currency: primaryCurrency,
+      dateRange,
+    };
   }
 }

@@ -38,14 +38,15 @@ export class PublicController {
     const page = Number(query?.page ?? 1);
     const limit = Number(query?.limit ?? 12);
     const currency = req.currency || 'USD';
-    
+
     // Parse filters if provided as JSON string
     let filterOptions = null;
     if (query?.filters) {
       try {
-        filterOptions = typeof query.filters === 'string' 
-          ? JSON.parse(query.filters) 
-          : query.filters;
+        filterOptions =
+          typeof query.filters === 'string'
+            ? JSON.parse(query.filters)
+            : query.filters;
       } catch {
         filterOptions = null;
       }
@@ -56,15 +57,15 @@ export class PublicController {
       filterOptions,
       { page, limit },
     );
-    
-    return { 
-      data, 
-      meta: { 
-        page, 
-        limit, 
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
         total: data.length,
         currency,
-      } 
+      },
     };
   }
 
@@ -73,7 +74,7 @@ export class PublicController {
   async getPublicClass(@Param('id') id: string, @Req() req: any) {
     const currency = req.currency || 'USD';
     const data = await this.classesService.findById(+id);
-    
+
     if (!data) {
       return { data: null };
     }
@@ -85,13 +86,13 @@ export class PublicController {
 
     // Add currency-aware price
     const price = this.classesService.getPriceForCurrency(data, currency);
-    
-    return { 
+
+    return {
       data: {
         ...data,
         price,
         currency,
-      }
+      },
     };
   }
 
@@ -99,13 +100,13 @@ export class PublicController {
   @ApiOkResponse({ description: 'Get all modules for a public class' })
   async getPublicClassModules(@Param('id') id: string) {
     const classEntity = await this.classesService.findById(+id);
-    
+
     if (!classEntity || !(classEntity as any).isPublicForSale) {
       return { data: [], error: 'Course not available' };
     }
 
     const modules = await this.learningModulesService.list({ classId: +id });
-    
+
     // Return modules with preview flag, but only show previewable content
     return {
       data: modules.map((module: any) => ({
@@ -118,7 +119,11 @@ export class PublicController {
         videoUrl: module.isPreviewable ? module.videoUrl : null,
         attachments: module.isPreviewable ? module.attachments : null,
         // Always show type indicators
-        moduleType: module.videoUrl ? 'video' : module.attachments?.length ? 'document' : 'text',
+        moduleType: module.videoUrl
+          ? 'video'
+          : module.attachments?.length
+            ? 'document'
+            : 'text',
       })),
     };
   }
@@ -127,16 +132,18 @@ export class PublicController {
   @ApiOkResponse({ description: 'Get previewable modules only' })
   async getPublicClassPreview(@Param('id') id: string) {
     const classEntity = await this.classesService.findById(+id);
-    
+
     if (!classEntity || !(classEntity as any).isPublicForSale) {
       return { data: [], error: 'Course not available' };
     }
 
     const allModules = await this.learningModulesService.list({ classId: +id });
-    
+
     // Filter to only previewable modules with full content
-    const previewModules = allModules.filter((module: any) => module.isPreviewable);
-    
+    const previewModules = allModules.filter(
+      (module: any) => module.isPreviewable,
+    );
+
     return {
       data: previewModules,
     };

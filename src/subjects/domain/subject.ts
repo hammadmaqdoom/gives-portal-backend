@@ -16,7 +16,10 @@ export class Subject {
   @ApiProperty({ example: 'AS Level', required: false })
   level?: string | null;
 
-  @ApiProperty({ example: 'https://www.cambridgeinternational.org/9709', required: false })
+  @ApiProperty({
+    example: 'https://www.cambridgeinternational.org/9709',
+    required: false,
+  })
   officialLink?: string | null;
 
   @ApiProperty({ example: '2024-01-01T00:00:00.000Z' })

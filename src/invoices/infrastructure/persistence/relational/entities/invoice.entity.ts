@@ -79,6 +79,26 @@ export class InvoiceEntity extends EntityRelationalHelper {
   @Column({ type: String, nullable: true })
   paymentProofUrl?: string;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  originalPrice?: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    default: 0,
+  })
+  discountAmount?: number;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  @Index()
+  discountType?: string;
+
+  @Column({ type: 'int', nullable: true })
+  @Index()
+  classId?: number;
+
   @CreateDateColumn()
   createdAt: Date;
 

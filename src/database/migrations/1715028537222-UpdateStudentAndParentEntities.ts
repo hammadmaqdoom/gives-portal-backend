@@ -232,7 +232,9 @@ export class UpdateStudentAndParentEntities1715028537222
       await queryRunner.query(
         `ALTER TABLE "student" DROP CONSTRAINT IF EXISTS "FK_student_parent"`,
       );
-      await queryRunner.query(`ALTER TABLE "student" DROP COLUMN IF EXISTS "parentId"`);
+      await queryRunner.query(
+        `ALTER TABLE "student" DROP COLUMN IF EXISTS "parentId"`,
+      );
 
       // Commit transaction
       await queryRunner.commitTransaction();
@@ -274,9 +276,15 @@ export class UpdateStudentAndParentEntities1715028537222
       );
 
       // Drop indexes for parent_student table
-      await queryRunner.query(`DROP INDEX IF EXISTS "IDX_parent_student_status"`);
-      await queryRunner.query(`DROP INDEX IF EXISTS "IDX_parent_student_student_id"`);
-      await queryRunner.query(`DROP INDEX IF EXISTS "IDX_parent_student_parent_id"`);
+      await queryRunner.query(
+        `DROP INDEX IF EXISTS "IDX_parent_student_status"`,
+      );
+      await queryRunner.query(
+        `DROP INDEX IF EXISTS "IDX_parent_student_student_id"`,
+      );
+      await queryRunner.query(
+        `DROP INDEX IF EXISTS "IDX_parent_student_parent_id"`,
+      );
 
       // Drop foreign key constraints for parent_student table
       await queryRunner.query(

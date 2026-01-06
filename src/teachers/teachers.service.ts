@@ -66,8 +66,8 @@ export class TeachersService {
       photo: createTeacherDto.photo
         ? ({ id: createTeacherDto.photo } as FileType)
         : createTeacherDto.photo === null
-        ? null
-        : undefined,
+          ? null
+          : undefined,
     };
 
     // Create teacher first
@@ -188,8 +188,8 @@ export class TeachersService {
       photo: updateTeacherDto.photo
         ? ({ id: updateTeacherDto.photo } as FileType)
         : updateTeacherDto.photo === null
-        ? null
-        : undefined,
+          ? null
+          : undefined,
     };
 
     // Update teacher record
@@ -469,39 +469,23 @@ export class TeachersService {
           row['payout_method'] ||
           '';
         const bankName =
-          row['Bank Name'] ||
-          row['BankName'] ||
-          row['bank_name'] ||
-          '';
+          row['Bank Name'] || row['BankName'] || row['bank_name'] || '';
         const accountNumber =
           row['Account Number'] ||
           row['AccountNumber'] ||
           row['account_number'] ||
           '';
         const bankCode =
-          row['Bank Code'] ||
-          row['BankCode'] ||
-          row['bank_code'] ||
-          '';
-        const iban =
-          row['IBAN'] ||
-          row['iban'] ||
-          '';
+          row['Bank Code'] || row['BankCode'] || row['bank_code'] || '';
+        const iban = row['IBAN'] || row['iban'] || '';
         const accountHolderName =
           row['Account Holder Name'] ||
           row['AccountHolderName'] ||
           row['account_holder_name'] ||
           '';
         const bankBranch =
-          row['Bank Branch'] ||
-          row['BankBranch'] ||
-          row['bank_branch'] ||
-          '';
-        const bio =
-          row['Bio'] ||
-          row['bio'] ||
-          row['Biography'] ||
-          '';
+          row['Bank Branch'] || row['BankBranch'] || row['bank_branch'] || '';
+        const bio = row['Bio'] || row['bio'] || row['Biography'] || '';
         const showOnPublicSiteStr =
           row['Show On Public Site'] ||
           row['ShowOnPublicSite'] ||
@@ -539,7 +523,11 @@ export class TeachersService {
         }
 
         const commissionPercentage = parseFloat(commissionPercentageStr);
-        if (isNaN(commissionPercentage) || commissionPercentage < 0 || commissionPercentage > 100) {
+        if (
+          isNaN(commissionPercentage) ||
+          commissionPercentage < 0 ||
+          commissionPercentage > 100
+        ) {
           results.push({
             row: rowNumber,
             teacherName: name.trim(),
@@ -555,7 +543,8 @@ export class TeachersService {
             row: rowNumber,
             teacherName: name.trim(),
             status: 'error',
-            message: 'Subjects Allowed is required (comma-separated subject IDs)',
+            message:
+              'Subjects Allowed is required (comma-separated subject IDs)',
           });
           failed++;
           continue;
@@ -572,7 +561,8 @@ export class TeachersService {
             row: rowNumber,
             teacherName: name.trim(),
             status: 'error',
-            message: 'Invalid Subjects Allowed format. Must be comma-separated numbers.',
+            message:
+              'Invalid Subjects Allowed format. Must be comma-separated numbers.',
           });
           failed++;
           continue;
@@ -639,7 +629,12 @@ export class TeachersService {
 
         // Validate payout method if provided
         if (payoutMethod && payoutMethod.trim()) {
-          const validPayoutMethods = ['bank_transfer', 'cash', 'check', 'online'];
+          const validPayoutMethods = [
+            'bank_transfer',
+            'cash',
+            'check',
+            'online',
+          ];
           if (!validPayoutMethods.includes(payoutMethod.trim())) {
             results.push({
               row: rowNumber,

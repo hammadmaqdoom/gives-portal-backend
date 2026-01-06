@@ -349,7 +349,8 @@ export class CreateSettingsDto {
   // Theme Configuration
   @ApiPropertyOptional({
     example: 'brand',
-    description: 'Theme color preset: default, brand, cyan, purple, blue, orange, red, custom',
+    description:
+      'Theme color preset: default, brand, cyan, purple, blue, orange, red, custom',
   })
   @IsOptional()
   @IsString()
@@ -358,7 +359,8 @@ export class CreateSettingsDto {
 
   @ApiPropertyOptional({
     example: '#00C7AB',
-    description: 'Custom theme color in hex format (only used when themeColorPreset is "custom")',
+    description:
+      'Custom theme color in hex format (only used when themeColorPreset is "custom")',
   })
   @IsOptional()
   @IsString()

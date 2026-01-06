@@ -592,17 +592,26 @@ export class StudentsService {
         try {
           await this.generateMonthlyInvoice(studentId, classId);
         } catch (error) {
-          console.error(`Error generating invoice for student ${studentId} in class ${classId}:`, error);
+          console.error(
+            `Error generating invoice for student ${studentId} in class ${classId}:`,
+            error,
+          );
         }
 
         // Send enrollment notification email
         try {
           await this.sendEnrollmentNotification(studentId, classId);
         } catch (error) {
-          console.error(`Error sending enrollment notification for student ${studentId} in class ${classId}:`, error);
+          console.error(
+            `Error sending enrollment notification for student ${studentId} in class ${classId}:`,
+            error,
+          );
         }
       } catch (error) {
-        console.error(`Error enrolling student ${studentId} in class ${classId}:`, error);
+        console.error(
+          `Error enrolling student ${studentId} in class ${classId}:`,
+          error,
+        );
         // Continue with other classes even if one fails
       }
     }

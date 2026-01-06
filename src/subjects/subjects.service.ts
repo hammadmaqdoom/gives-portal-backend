@@ -113,13 +113,15 @@ export class SubjectsService {
     }
   }
 
-  async bulkCreateFromData(subjects: Array<{
-    name: string;
-    description?: string;
-    syllabusCode?: string;
-    level?: string;
-    officialLink?: string;
-  }>): Promise<{
+  async bulkCreateFromData(
+    subjects: Array<{
+      name: string;
+      description?: string;
+      syllabusCode?: string;
+      level?: string;
+      officialLink?: string;
+    }>,
+  ): Promise<{
     totalRows: number;
     successful: number;
     failed: number;
@@ -293,10 +295,7 @@ export class SubjectsService {
         row['SubjectName'] ||
         '',
       description:
-        row['Description'] ||
-        row['description'] ||
-        row['Desc'] ||
-        undefined,
+        row['Description'] || row['description'] || row['Desc'] || undefined,
       syllabusCode:
         row['Syllabus Code'] ||
         row['SyllabusCode'] ||

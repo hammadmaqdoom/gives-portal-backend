@@ -43,8 +43,8 @@ export class Class {
   @ApiProperty({ example: 42000.0 })
   feePKR: number;
 
-  @ApiProperty({ example: 'virtual', enum: ['virtual', 'in-person'] })
-  classMode: 'virtual' | 'in-person';
+  @ApiProperty({ example: 'virtual', enum: ['virtual', 'in-person', 'hybrid'] })
+  classMode: 'virtual' | 'in-person' | 'hybrid';
 
   @ApiProperty({ example: false })
   isPublicForSale?: boolean;

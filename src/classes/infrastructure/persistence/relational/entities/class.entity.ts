@@ -50,8 +50,12 @@ export class ClassEntity extends EntityRelationalHelper {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   feePKR: number;
 
-  @Column({ type: 'enum', enum: ['virtual', 'in-person'], default: 'virtual' })
-  classMode: 'virtual' | 'in-person';
+  @Column({
+    type: 'enum',
+    enum: ['virtual', 'in-person', 'hybrid'],
+    default: 'virtual',
+  })
+  classMode: 'virtual' | 'in-person' | 'hybrid';
 
   @Column({ type: 'boolean', default: false, name: 'drip_content_enabled' })
   dripContentEnabled: boolean;

@@ -17,4 +17,3 @@ import { BatchTermMapper } from './mappers/batch-term.mapper';
   exports: [BatchTermRepository],
 })
 export class RelationalBatchTermPersistenceModule {}
-

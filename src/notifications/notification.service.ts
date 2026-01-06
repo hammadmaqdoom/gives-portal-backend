@@ -251,7 +251,11 @@ export class NotificationService {
       studentEmail: string;
       checkoutId: string;
       courses: Array<{ name: string }>;
-      invoices: Array<{ invoiceNumber: string; amount: number; currency: string }>;
+      invoices: Array<{
+        invoiceNumber: string;
+        amount: number;
+        currency: string;
+      }>;
       total: number;
       currency: string;
     },

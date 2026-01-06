@@ -357,7 +357,6 @@ export class StudentsController {
     return this.studentsService.getEnrollmentHistory(+id);
   }
 
-
   @Post(':id/enrollments/bulk')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -368,7 +367,8 @@ export class StudentsController {
   })
   bulkEnrollStudentInClasses(
     @Param('id') id: string,
-    @Body() body: { classIds: number[]; status?: string; enrollmentDate?: string },
+    @Body()
+    body: { classIds: number[]; status?: string; enrollmentDate?: string },
   ) {
     return this.studentsService.bulkEnrollStudentInClasses(+id, body);
   }

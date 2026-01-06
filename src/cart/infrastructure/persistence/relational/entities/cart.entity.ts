@@ -38,4 +38,3 @@ export class CartEntity extends EntityRelationalHelper {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-
