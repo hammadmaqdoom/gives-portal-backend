@@ -42,8 +42,8 @@ WORKDIR /app
 RUN groupadd -g 1001 nodejs && \
     useradd -r -u 1001 -g nodejs nestjs
 
-# Install curl for health checks (single layer)
-RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+# Install curl and timeout for health checks and build timeouts (single layer)
+RUN apt-get update && apt-get install -y --no-install-recommends curl coreutils && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy package files
@@ -51,20 +51,21 @@ COPY package*.json ./
 
 # Install only production dependencies with cache mount
 # Use npm install with better timeout and retry handling
-# Removed --prefer-offline to avoid hanging on corrupted cache
-# Increased timeouts and added better retry logic
+# Increased maxsockets for faster downloads, added timeout wrapper to prevent hangs
 RUN --mount=type=cache,target=/root/.npm \
-    npm config set fetch-timeout 600000 && \
-    npm config set fetch-retries 5 && \
+    npm config set fetch-timeout 300000 && \
+    npm config set fetch-retries 3 && \
     npm config set progress=true && \
     npm config set loglevel=info && \
-    npm config set maxsockets 1 && \
+    npm config set maxsockets 5 && \
     echo "Starting npm install for production dependencies..." && \
-    npm install --omit=dev --ignore-scripts --legacy-peer-deps --no-audit --no-fund || \
-    (echo "First install attempt failed, clearing cache and retrying..." && \
+    timeout 1200 npm install --omit=dev --ignore-scripts --legacy-peer-deps --no-audit --no-fund 2>&1 | tee /tmp/npm-install.log || \
+    (echo "First install attempt failed or timed out, checking logs..." && \
+     tail -50 /tmp/npm-install.log || true && \
+     echo "Clearing cache and retrying..." && \
      npm cache clean --force && \
      echo "Retrying npm install after cache clear..." && \
-     npm install --omit=dev --ignore-scripts --legacy-peer-deps --no-audit --no-fund) && \
+     timeout 1200 npm install --omit=dev --ignore-scripts --legacy-peer-deps --no-audit --no-fund) && \
     echo "npm install completed successfully"
 
 # Create crypto polyfill script
