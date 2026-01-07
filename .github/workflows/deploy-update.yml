@@ -21,32 +21,90 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
+      - name: Prepare files for deployment
+        if: github.event.inputs.update_type != 'config'
+        run: |
+          echo "Preparing files for deployment..."
+          # Create tar archive excluding unnecessary files
+          tar -czf deploy.tar.gz \
+            --exclude='node_modules' \
+            --exclude='dist' \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.vscode' \
+            --exclude='.idea' \
+            --exclude='*.log' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='coverage' \
+            --exclude='.nyc_output' \
+            --exclude='uploads' \
+            --exclude='test' \
+            --exclude='*.md' \
+            --exclude='.gitignore' \
+            --exclude='.eslintrc*' \
+            --exclude='.prettierrc*' \
+            --exclude='tsconfig.build.json' \
+            --exclude='nest-cli.json' \
+            --exclude='commitlint.config.js' \
+            --exclude='renovate.json' \
+            --exclude='clients.yml' \
+            --exclude='docker-compose.dev.yml' \
+            --exclude='Dockerfile.dev' \
+            --exclude='Dockerfile.fly' \
+            --exclude='fly.toml' \
+            --exclude='postgresql-fly.conf' \
+            --exclude='pg_hba.conf' \
+            --exclude='env-example' \
+            --exclude='env-fly.example' \
+            --exclude='scripts' \
+            --exclude='test-structure.js' \
+            --exclude='deploy.tar.gz' \
+            .
+          echo "Archive created. Size:"
+          ls -lh deploy.tar.gz
+      
       - name: Copy updated code to Lightsail
         id: scp-copy
         if: github.event.inputs.update_type != 'config'
         uses: appleboy/scp-action@v0.1.7
         continue-on-error: true
+        timeout-minutes: 15
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ${{ secrets.LIGHTSAIL_USER }}
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
-          source: "."
-          target: "/tmp/backend"
-          strip_components: 1
+          port: 22
+          source: "deploy.tar.gz"
+          target: "/tmp/"
           debug: true
+          rm: true
+          overwrite: true
+          timeout: 15m
+          command_timeout: 15m
       
       - name: Retry SCP if failed
         if: steps.scp-copy.outcome == 'failure' && github.event.inputs.update_type != 'config'
         uses: appleboy/scp-action@v0.1.7
         continue-on-error: true
+        timeout-minutes: 15
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ${{ secrets.LIGHTSAIL_USER }}
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
-          source: "."
-          target: "/tmp/backend"
-          strip_components: 1
+          port: 22
+          source: "deploy.tar.gz"
+          target: "/tmp/"
           debug: true
+          rm: true
+          overwrite: true
+          timeout: 15m
+          command_timeout: 15m
+      
+      - name: Cleanup temporary files
+        if: github.event.inputs.update_type != 'config'
+        run: |
+          rm -f deploy.tar.gz
       
       - name: Fail if SCP still failed
         if: steps.scp-copy.outcome == 'failure' && github.event.inputs.update_type != 'config'
@@ -96,16 +154,24 @@ jobs:
             echo "Frontend Domain: $FRONTEND_DOMAIN"
             echo "Static IP: $STATIC_IP"
             
-            # Move files from /tmp/backend to /opt/backend
-            echo "=== Moving updated files to application directory ==="
-            if [ -d "/tmp/backend" ]; then
+            # Extract files from archive to /opt/backend
+            echo "=== Extracting updated files to application directory ==="
+            if [ -f "/tmp/deploy.tar.gz" ]; then
+              sudo rm -rf $APP_HOME/*
+              cd /tmp
+              sudo tar -xzf deploy.tar.gz -C $APP_HOME --strip-components=0
+              sudo chown -R "$USER":"$USER" $APP_HOME
+              rm -f /tmp/deploy.tar.gz
+              echo "Files extracted successfully to $APP_HOME"
+            elif [ -d "/tmp/backend" ]; then
+              # Fallback to old method if archive doesn't exist
               sudo rm -rf $APP_HOME/*
               sudo cp -r /tmp/backend/* $APP_HOME/
               sudo chown -R "$USER":"$USER" $APP_HOME
               sudo rm -rf /tmp/backend
               echo "Files moved successfully to $APP_HOME"
             else
-              echo "Warning: /tmp/backend directory not found"
+              echo "Warning: /tmp/deploy.tar.gz or /tmp/backend not found"
             fi
             
             cd $APP_HOME
