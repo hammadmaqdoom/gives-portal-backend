@@ -50,13 +50,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && \
 COPY package*.json ./
 
 # Install only production dependencies with cache mount
-# Use --omit=dev instead of deprecated --only=production
-# Add network timeout and retry settings for reliability
-# Note: Don't clean cache - BuildKit manages it and cleaning causes corruption
+# Use npm install instead of npm ci for better network resilience
+# Add progress output and better error handling
 RUN --mount=type=cache,target=/root/.npm \
-    npm config set fetch-timeout 600000 && \
-    npm config set fetch-retries 5 && \
-    npm ci --omit=dev --ignore-scripts --legacy-peer-deps
+    npm config set fetch-timeout 300000 && \
+    npm config set fetch-retries 3 && \
+    npm config set progress=true && \
+    npm config set loglevel=info && \
+    echo "Starting npm install for production dependencies..." && \
+    npm install --omit=dev --ignore-scripts --legacy-peer-deps --no-audit --no-fund --prefer-offline || \
+    (echo "Install with cache failed, retrying without cache preference..." && \
+     npm install --omit=dev --ignore-scripts --legacy-peer-deps --no-audit --no-fund) && \
+    echo "npm install completed successfully"
 
 # Create crypto polyfill script
 RUN echo 'const crypto = require("crypto"); global.crypto = crypto; require("./dist/main.js");' > start.js

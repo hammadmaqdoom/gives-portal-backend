@@ -490,7 +490,7 @@ export class ClassesService {
       teacherId: number;
       feeUSD: number;
       feePKR: number;
-      classMode: 'virtual' | 'in-person';
+      classMode: 'virtual' | 'in-person' | 'hybrid';
       weekdays?: string[];
       timing?: string;
       timezone?: string;
