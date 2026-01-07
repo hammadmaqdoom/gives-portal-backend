@@ -50,16 +50,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && \
 COPY package*.json ./
 
 # Install only production dependencies with cache mount
-# Use npm install instead of npm ci for better network resilience
-# Add progress output and better error handling
+# Use npm install with better timeout and retry handling
+# Removed --prefer-offline to avoid hanging on corrupted cache
+# Increased timeouts and added better retry logic
 RUN --mount=type=cache,target=/root/.npm \
-    npm config set fetch-timeout 300000 && \
-    npm config set fetch-retries 3 && \
+    npm config set fetch-timeout 600000 && \
+    npm config set fetch-retries 5 && \
     npm config set progress=true && \
     npm config set loglevel=info && \
+    npm config set maxsockets 1 && \
     echo "Starting npm install for production dependencies..." && \
-    npm install --omit=dev --ignore-scripts --legacy-peer-deps --no-audit --no-fund --prefer-offline || \
-    (echo "Install with cache failed, retrying without cache preference..." && \
+    npm install --omit=dev --ignore-scripts --legacy-peer-deps --no-audit --no-fund || \
+    (echo "First install attempt failed, clearing cache and retrying..." && \
+     npm cache clean --force && \
+     echo "Retrying npm install after cache clear..." && \
      npm install --omit=dev --ignore-scripts --legacy-peer-deps --no-audit --no-fund) && \
     echo "npm install completed successfully"
 
