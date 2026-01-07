@@ -20,6 +20,8 @@ import { LearningModuleSectionEntity } from '../learning-modules/infrastructure/
 import { AssignmentEntity } from '../assignments/infrastructure/persistence/relational/entities/assignment.entity';
 import { SubjectsService } from '../subjects/subjects.service';
 import { TeachersService } from '../teachers/teachers.service';
+import { CreateClassScheduleDto } from './dto/class-schedule.dto';
+import { Weekday } from './infrastructure/persistence/relational/entities/class-schedule.entity';
 
 @Injectable()
 export class ClassesService {
@@ -35,6 +37,154 @@ export class ClassesService {
     private readonly subjectsService: SubjectsService,
     private readonly teachersService: TeachersService,
   ) {}
+
+  /**
+   * Normalize weekday name to lowercase enum value
+   */
+  private normalizeWeekday(day: string): Weekday | null {
+    const normalized = day.trim().toLowerCase();
+    const weekdayMap: Record<string, Weekday> = {
+      monday: Weekday.MONDAY,
+      tuesday: Weekday.TUESDAY,
+      wednesday: Weekday.WEDNESDAY,
+      thursday: Weekday.THURSDAY,
+      friday: Weekday.FRIDAY,
+      saturday: Weekday.SATURDAY,
+      sunday: Weekday.SUNDAY,
+      mon: Weekday.MONDAY,
+      tue: Weekday.TUESDAY,
+      wed: Weekday.WEDNESDAY,
+      thu: Weekday.THURSDAY,
+      fri: Weekday.FRIDAY,
+      sat: Weekday.SATURDAY,
+      sun: Weekday.SUNDAY,
+    };
+    return weekdayMap[normalized] || null;
+  }
+
+  /**
+   * Parse weekdays string (semicolon-separated) and return normalized array
+   */
+  private parseWeekdays(weekdaysStr: string): Weekday[] {
+    if (!weekdaysStr || !weekdaysStr.trim()) {
+      return [];
+    }
+    return weekdaysStr
+      .split(';')
+      .map((d) => this.normalizeWeekday(d))
+      .filter((d): d is Weekday => d !== null);
+  }
+
+  /**
+   * Convert 12-hour time format to 24-hour format (HH:MM)
+   * Handles formats like: "7:00PM", "7:00 PM", "19:00", etc.
+   */
+  private convertTo24Hour(timeStr: string): string | null {
+    if (!timeStr || !timeStr.trim()) {
+      return null;
+    }
+
+    const trimmed = timeStr.trim().toUpperCase();
+    
+    // If already in 24-hour format (HH:MM), return as-is
+    if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+      const [hours, minutes] = trimmed.split(':');
+      const hour = parseInt(hours, 10);
+      if (hour >= 0 && hour <= 23 && parseInt(minutes, 10) >= 0 && parseInt(minutes, 10) <= 59) {
+        return `${hour.toString().padStart(2, '0')}:${minutes}`;
+      }
+    }
+
+    // Parse 12-hour format with AM/PM
+    const match = trimmed.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+    if (!match) {
+      return null;
+    }
+
+    let hours = parseInt(match[1], 10);
+    const minutes = match[2];
+    const period = match[3];
+
+    if (hours < 1 || hours > 12) {
+      return null;
+    }
+
+    if (period === 'PM' && hours !== 12) {
+      hours += 12;
+    } else if (period === 'AM' && hours === 12) {
+      hours = 0;
+    }
+
+    return `${hours.toString().padStart(2, '0')}:${minutes}`;
+  }
+
+  /**
+   * Parse timing string to extract time ranges
+   * Handles formats like: "7:00PM-8:00PM", "7:00PM-8:00PM;9:00PM-10:00PM", etc.
+   */
+  private parseTiming(timingStr: string): Array<{ startTime: string; endTime: string }> {
+    if (!timingStr || !timingStr.trim()) {
+      return [];
+    }
+
+    const ranges: Array<{ startTime: string; endTime: string }> = [];
+    
+    // Split by semicolon to handle multiple time ranges
+    const timeRanges = timingStr.split(';').map(t => t.trim()).filter(t => t);
+    
+    for (const timeRange of timeRanges) {
+      // Split by hyphen to get start and end times
+      const parts = timeRange.split('-').map(t => t.trim()).filter(t => t);
+      
+      if (parts.length >= 2) {
+        const startTime = this.convertTo24Hour(parts[0]);
+        const endTime = this.convertTo24Hour(parts[1]);
+        
+        // Only add if both times are valid
+        if (startTime && endTime) {
+          ranges.push({ startTime, endTime });
+        }
+      }
+    }
+
+    return ranges;
+  }
+
+  /**
+   * Convert weekdays and timing to schedule objects
+   */
+  private convertToSchedules(
+    weekdays: Weekday[],
+    timing: string,
+    timezone: string = 'Asia/Karachi',
+  ): CreateClassScheduleDto[] {
+    const schedules: CreateClassScheduleDto[] = [];
+    
+    if (weekdays.length === 0 || !timing) {
+      return schedules;
+    }
+
+    const timeRanges = this.parseTiming(timing);
+    
+    if (timeRanges.length === 0) {
+      return schedules;
+    }
+
+    // Create a schedule for each weekday and time range combination
+    for (const weekday of weekdays) {
+      for (const timeRange of timeRanges) {
+        schedules.push({
+          weekday,
+          startTime: timeRange.startTime,
+          endTime: timeRange.endTime,
+          timezone: timezone || 'Asia/Karachi',
+          isActive: true,
+        });
+      }
+    }
+
+    return schedules;
+  }
 
   async create(createClassDto: CreateClassDto): Promise<Class> {
     const existingClass = await this.classesRepository.findByName(
@@ -344,6 +494,7 @@ export class ClassesService {
       weekdays?: string[];
       timing?: string;
       timezone?: string;
+      schedules?: CreateClassScheduleDto[];
       courseOutline?: string;
       isPublicForSale?: boolean;
       thumbnailUrl?: string;
@@ -490,6 +641,28 @@ export class ClassesService {
           continue;
         }
 
+        // Convert weekdays and timing to schedules if schedules not provided
+        let schedules = classData.schedules;
+        if (!schedules && classData.weekdays && classData.timing) {
+          // Parse weekdays - handle both array and string formats
+          let weekdaysArray: Weekday[] = [];
+          if (Array.isArray(classData.weekdays)) {
+            weekdaysArray = classData.weekdays
+              .map((d) => this.normalizeWeekday(d))
+              .filter((d): d is Weekday => d !== null);
+          } else if (typeof classData.weekdays === 'string') {
+            weekdaysArray = this.parseWeekdays(classData.weekdays);
+          }
+          
+          if (weekdaysArray.length > 0 && classData.timing) {
+            schedules = this.convertToSchedules(
+              weekdaysArray,
+              classData.timing,
+              classData.timezone || 'Asia/Karachi',
+            );
+          }
+        }
+
         // Create class
         const createClassDto: CreateClassDto = {
           name: classData.name.trim(),
@@ -502,6 +675,7 @@ export class ClassesService {
           weekdays: classData.weekdays,
           timing: classData.timing?.trim() || undefined,
           timezone: classData.timezone?.trim() || undefined,
+          schedules: schedules || undefined,
           courseOutline: classData.courseOutline?.trim() || undefined,
           isPublicForSale: classData.isPublicForSale,
           thumbnailUrl: classData.thumbnailUrl?.trim() || undefined,
@@ -619,13 +793,24 @@ export class ClassesService {
         row['teacher_id'] ||
         row['Teacher'] ||
         '';
-      const weekdays = row['Weekdays'] || row['weekdays'] || row['Days'] || '';
+      const weekdaysStr = row['Weekdays'] || row['weekdays'] || row['Days'] || '';
+      const timingStr = row['Timing'] || row['timing'] || row['Time'] || '';
+      const timezoneStr =
+        row['Timezone'] || row['timezone'] || row['Time Zone'] || 'Asia/Karachi';
       const isPublicForSaleStr =
         row['Is Public For Sale'] ||
         row['IsPublicForSale'] ||
         row['is_public_for_sale'] ||
         row['Public'] ||
         'false';
+
+      // Parse weekdays and timing properly
+      const parsedWeekdays = this.parseWeekdays(weekdaysStr);
+      const schedules = this.convertToSchedules(
+        parsedWeekdays,
+        timingStr,
+        timezoneStr,
+      );
 
       return {
         name:
@@ -651,15 +836,10 @@ export class ClassesService {
           row['Mode'] ||
           ''
         ).trim() as 'virtual' | 'in-person',
-        weekdays: weekdays
-          ? weekdays
-              .split(';')
-              .map((d: string) => d.trim())
-              .filter((d: string) => d)
-          : undefined,
-        timing: row['Timing'] || row['timing'] || row['Time'] || undefined,
-        timezone:
-          row['Timezone'] || row['timezone'] || row['Time Zone'] || undefined,
+        weekdays: parsedWeekdays.length > 0 ? parsedWeekdays.map(w => w) : undefined,
+        timing: timingStr || undefined,
+        timezone: timezoneStr || undefined,
+        schedules: schedules.length > 0 ? schedules : undefined,
         courseOutline:
           row['Course Outline'] ||
           row['CourseOutline'] ||
