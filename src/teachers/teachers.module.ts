@@ -8,6 +8,7 @@ import { RelationalTeacherCommissionPersistenceModule } from './infrastructure/p
 import { UsersModule } from '../users/users.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { SubjectsModule } from '../subjects/subjects.module';
+import { FilesModule } from '../files/files.module';
 
 const infrastructurePersistenceModule = RelationalTeacherPersistenceModule;
 const commissionPersistenceModule =
@@ -20,6 +21,7 @@ const commissionPersistenceModule =
     UsersModule,
     NotificationModule,
     SubjectsModule,
+    FilesModule,
   ],
   controllers: [TeachersController, TeacherCommissionController],
   providers: [TeachersService, TeacherCommissionService],
