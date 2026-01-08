@@ -6,6 +6,7 @@ import { RelationalClassPersistenceModule } from './infrastructure/persistence/r
 import { StudentsModule } from '../students/students.module';
 import { SubjectsModule } from '../subjects/subjects.module';
 import { TeachersModule } from '../teachers/teachers.module';
+import { FilesModule } from '../files/files.module';
 import { LearningModuleEntity } from '../learning-modules/infrastructure/persistence/relational/entities/learning-module.entity';
 import { LearningModuleSectionEntity } from '../learning-modules/infrastructure/persistence/relational/entities/learning-module-section.entity';
 import { AssignmentEntity } from '../assignments/infrastructure/persistence/relational/entities/assignment.entity';
@@ -18,6 +19,7 @@ const infrastructurePersistenceModule = RelationalClassPersistenceModule;
     forwardRef(() => StudentsModule),
     SubjectsModule,
     TeachersModule,
+    FilesModule,
     TypeOrmModule.forFeature([
       LearningModuleEntity,
       LearningModuleSectionEntity,

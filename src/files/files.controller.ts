@@ -35,6 +35,7 @@ import { RoleEnum } from '../roles/roles.enum';
 import { FilesService } from './files.service';
 import { ConfigService } from '@nestjs/config';
 import { FileStorageService, FileUploadContext } from './file-storage.service';
+import { FileDriver } from './config/file-config.type';
 import { User } from '../users/domain/user';
 import * as path from 'path';
 
@@ -61,6 +62,37 @@ export class FilesController {
     const host = process.env.HOST || 'localhost';
     const port = process.env.PORT || '3000';
     return `${protocol}://${host}:${port}`;
+  }
+
+  /**
+   * Generate proper file URL (presigned for S3, serve endpoint for local)
+   */
+  private async generateFileUrl(fileId: string, filePath: string): Promise<string> {
+    const fileDriver = await this.fileStorageService.getDriver();
+    const baseUrl = this.getBaseUrl();
+
+    if (fileDriver === FileDriver.LOCAL) {
+      // For local files, use the serve endpoint
+      return `${baseUrl}/api/v1/files/serve/${fileId}`;
+    } else if (
+      fileDriver === FileDriver.S3 ||
+      fileDriver === FileDriver.S3_PRESIGNED
+    ) {
+      // For S3 files, generate presigned URL
+      try {
+        return await this.fileStorageService.getPresignedFileUrl(
+          filePath,
+          3600, // 1 hour expiry
+        );
+      } catch (error) {
+        console.error('Error generating presigned URL:', error);
+        // Fallback to serve endpoint if presigned URL generation fails
+        return `${baseUrl}/api/v1/files/serve/${fileId}`;
+      }
+    } else {
+      // Fallback for other storage types
+      return `${baseUrl}/api/v1/files/serve/${fileId}`;
+    }
   }
 
   @Post('upload/assignment/:assignmentId')
@@ -111,9 +143,9 @@ export class FilesController {
     const uploadedFiles =
       await this.filesService.uploadMultipleFilesWithContext(files, context);
 
-    return {
-      message: 'Files uploaded successfully',
-      files: uploadedFiles.map((file) => ({
+    // Generate proper URLs for all uploaded files
+    const filesWithUrls = await Promise.all(
+      uploadedFiles.map(async (file) => ({
         id: file.id,
         filename: file.filename,
         originalName: file.originalName,
@@ -121,8 +153,13 @@ export class FilesController {
         size: file.size,
         mimeType: file.mimeType,
         uploadedAt: file.uploadedAt,
-        url: file.url || this.filesService.getFileUrl(file), // Use stored URL or generate if missing
+        url: await this.generateFileUrl(file.id, file.path),
       })),
+    );
+
+    return {
+      message: 'Files uploaded successfully',
+      files: filesWithUrls,
     };
   }
 
@@ -174,9 +211,9 @@ export class FilesController {
     const uploadedFiles =
       await this.filesService.uploadMultipleFilesWithContext(files, context);
 
-    return {
-      message: 'Files uploaded successfully',
-      files: uploadedFiles.map((file) => ({
+    // Generate proper URLs for all uploaded files
+    const filesWithUrls = await Promise.all(
+      uploadedFiles.map(async (file) => ({
         id: file.id,
         filename: file.filename,
         originalName: file.originalName,
@@ -184,9 +221,13 @@ export class FilesController {
         size: file.size,
         mimeType: file.mimeType,
         uploadedAt: file.uploadedAt,
-        // Generate proper URL for file serving
-        url: `${this.getBaseUrl()}/api/v1/files/serve/${file.id}`,
+        url: await this.generateFileUrl(file.id, file.path),
       })),
+    );
+
+    return {
+      message: 'Files uploaded successfully',
+      files: filesWithUrls,
     };
   }
 
@@ -239,9 +280,9 @@ export class FilesController {
     const uploadedFiles =
       await this.filesService.uploadMultipleFilesWithContext(files, context);
 
-    return {
-      message: 'Files uploaded successfully',
-      files: uploadedFiles.map((file) => ({
+    // Generate proper URLs for all uploaded files
+    const filesWithUrls = await Promise.all(
+      uploadedFiles.map(async (file) => ({
         id: file.id,
         filename: file.filename,
         originalName: file.originalName,
@@ -249,8 +290,13 @@ export class FilesController {
         size: file.size,
         mimeType: file.mimeType,
         uploadedAt: file.uploadedAt,
-        url: file.url || this.filesService.getFileUrl(file), // Use stored URL or generate if missing
+        url: await this.generateFileUrl(file.id, file.path),
       })),
+    );
+
+    return {
+      message: 'Files uploaded successfully',
+      files: filesWithUrls,
     };
   }
 
@@ -301,6 +347,9 @@ export class FilesController {
       context,
     );
 
+    // Generate proper URL for the uploaded file
+    const fileUrl = await this.generateFileUrl(uploadedFile.id, uploadedFile.path);
+
     return {
       id: uploadedFile.id,
       fileId: uploadedFile.id, // For backward compatibility
@@ -310,7 +359,7 @@ export class FilesController {
       size: uploadedFile.size,
       mimeType: uploadedFile.mimeType,
       uploadedAt: uploadedFile.uploadedAt,
-      url: uploadedFile.url || this.filesService.getFileUrl(uploadedFile),
+      url: fileUrl,
     };
   }
 
@@ -359,6 +408,9 @@ export class FilesController {
       context,
     );
 
+    // Generate proper URL for the uploaded file
+    const fileUrl = await this.generateFileUrl(uploadedFile.id, uploadedFile.path);
+
     return {
       id: uploadedFile.id,
       fileId: uploadedFile.id,
@@ -368,7 +420,7 @@ export class FilesController {
       size: uploadedFile.size,
       mimeType: uploadedFile.mimeType,
       uploadedAt: uploadedFile.uploadedAt,
-      url: uploadedFile.url || this.filesService.getFileUrl(uploadedFile),
+      url: fileUrl,
     };
   }
 
@@ -417,6 +469,9 @@ export class FilesController {
       context,
     );
 
+    // Generate proper URL for the uploaded file
+    const fileUrl = await this.generateFileUrl(uploadedFile.id, uploadedFile.path);
+
     return {
       id: uploadedFile.id,
       fileId: uploadedFile.id,
@@ -426,7 +481,7 @@ export class FilesController {
       size: uploadedFile.size,
       mimeType: uploadedFile.mimeType,
       uploadedAt: uploadedFile.uploadedAt,
-      url: uploadedFile.url || this.filesService.getFileUrl(uploadedFile),
+      url: fileUrl,
     };
   }
 
@@ -475,6 +530,9 @@ export class FilesController {
       context,
     );
 
+    // Generate proper URL for the uploaded file
+    const fileUrl = await this.generateFileUrl(uploadedFile.id, uploadedFile.path);
+
     return {
       id: uploadedFile.id,
       fileId: uploadedFile.id, // For backward compatibility
@@ -484,7 +542,7 @@ export class FilesController {
       size: uploadedFile.size,
       mimeType: uploadedFile.mimeType,
       uploadedAt: uploadedFile.uploadedAt,
-      url: uploadedFile.url || this.filesService.getFileUrl(uploadedFile),
+      url: fileUrl,
     };
   }
 

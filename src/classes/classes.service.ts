@@ -22,6 +22,9 @@ import { SubjectsService } from '../subjects/subjects.service';
 import { TeachersService } from '../teachers/teachers.service';
 import { CreateClassScheduleDto } from './dto/class-schedule.dto';
 import { Weekday } from './infrastructure/persistence/relational/entities/class-schedule.entity';
+import { FileStorageService } from '../files/file-storage.service';
+import { FileDriver } from '../files/config/file-config.type';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class ClassesService {
@@ -36,6 +39,8 @@ export class ClassesService {
     private readonly assignmentRepo: Repository<AssignmentEntity>,
     private readonly subjectsService: SubjectsService,
     private readonly teachersService: TeachersService,
+    private readonly fileStorageService: FileStorageService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -233,15 +238,24 @@ export class ClassesService {
     sortOptions?: SortClassDto[] | null;
     paginationOptions: IPaginationOptions;
   }): Promise<Class[]> {
-    return this.classesRepository.findManyWithPagination({
+    const classes = await this.classesRepository.findManyWithPagination({
       filterOptions,
       sortOptions,
       paginationOptions,
     });
+    
+    // Enrich all classes with proper image URLs
+    await Promise.all(classes.map(cls => this.enrichClassWithImageUrls(cls)));
+    
+    return classes;
   }
 
   async findById(id: Class['id']): Promise<NullableType<Class>> {
-    return this.classesRepository.findById(id);
+    const classEntity = await this.classesRepository.findById(id);
+    if (classEntity) {
+      await this.enrichClassWithImageUrls(classEntity);
+    }
+    return classEntity;
   }
 
   async findByName(name: Class['name']): Promise<NullableType<Class>> {
@@ -474,12 +488,89 @@ export class ClassesService {
       paginationOptions: paginationOptions || { page: 1, limit: 12 },
     });
 
+    // Enrich all classes with proper image URLs
+    await Promise.all(classes.map(cls => this.enrichClassWithImageUrls(cls)));
+
     // Transform to include currency-aware price
     return classes.map((cls) => ({
       ...cls,
       price: this.getPriceForCurrency(cls, currency),
       currency,
     })) as any;
+  }
+
+  /**
+   * Get base URL for the current server
+   */
+  private getBaseUrl(): string {
+    const protocol = this.configService.get('app.protocol') || 'http';
+    const host = this.configService.get('app.host') || 'localhost';
+    const port = this.configService.get('app.port') || 3000;
+    return `${protocol}://${host}:${port}`;
+  }
+
+  /**
+   * Enrich class with proper image URLs (presigned for S3, serve endpoint for local)
+   */
+  private async enrichClassWithImageUrls(classEntity: Class): Promise<void> {
+    const fileDriver = await this.fileStorageService.getDriver();
+    const baseUrl = this.getBaseUrl();
+
+    // Handle thumbnail file
+    if ((classEntity as any).thumbnailFile) {
+      const thumbnailFile = (classEntity as any).thumbnailFile;
+      
+      if (fileDriver === FileDriver.LOCAL) {
+        // For local files, use the serve endpoint
+        thumbnailFile.url = `${baseUrl}/api/v1/files/serve/${thumbnailFile.id}`;
+      } else if (
+        fileDriver === FileDriver.S3 ||
+        fileDriver === FileDriver.S3_PRESIGNED
+      ) {
+        // For S3 files, generate presigned URL
+        try {
+          thumbnailFile.url = await this.fileStorageService.getPresignedFileUrl(
+            thumbnailFile.path,
+            3600, // 1 hour expiry
+          );
+        } catch (error) {
+          console.error('Error generating presigned URL for thumbnail:', error);
+          // Fallback to serve endpoint if presigned URL generation fails
+          thumbnailFile.url = `${baseUrl}/api/v1/files/serve/${thumbnailFile.id}`;
+        }
+      } else {
+        // Fallback for other storage types
+        thumbnailFile.url = `${baseUrl}/api/v1/files/serve/${thumbnailFile.id}`;
+      }
+    }
+
+    // Handle cover image file
+    if ((classEntity as any).coverImageFile) {
+      const coverImageFile = (classEntity as any).coverImageFile;
+      
+      if (fileDriver === FileDriver.LOCAL) {
+        // For local files, use the serve endpoint
+        coverImageFile.url = `${baseUrl}/api/v1/files/serve/${coverImageFile.id}`;
+      } else if (
+        fileDriver === FileDriver.S3 ||
+        fileDriver === FileDriver.S3_PRESIGNED
+      ) {
+        // For S3 files, generate presigned URL
+        try {
+          coverImageFile.url = await this.fileStorageService.getPresignedFileUrl(
+            coverImageFile.path,
+            3600, // 1 hour expiry
+          );
+        } catch (error) {
+          console.error('Error generating presigned URL for cover image:', error);
+          // Fallback to serve endpoint if presigned URL generation fails
+          coverImageFile.url = `${baseUrl}/api/v1/files/serve/${coverImageFile.id}`;
+        }
+      } else {
+        // Fallback for other storage types
+        coverImageFile.url = `${baseUrl}/api/v1/files/serve/${coverImageFile.id}`;
+      }
+    }
   }
 
   async bulkCreateFromData(
