@@ -46,6 +46,7 @@ import { TeachersService } from './teachers.service';
 import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
 import { BulkTeachersResultDto } from './dto/bulk-teachers-response.dto';
+import { PublicTeacherDto } from './dto/public-teacher.dto';
 
 @ApiTags('Teachers')
 @Controller({
@@ -59,9 +60,10 @@ export class TeachersController {
   @Get('public')
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({
-    type: [Teacher],
+    type: [PublicTeacherDto],
+    description: 'Returns public teacher information without sensitive data',
   })
-  findPublicTeachers(): Promise<Teacher[]> {
+  findPublicTeachers(): Promise<PublicTeacherDto[]> {
     return this.teachersService.findPublicTeachers();
   }
 
@@ -73,9 +75,12 @@ export class TeachersController {
     type: String,
   })
   @ApiOkResponse({
-    type: Teacher,
+    type: PublicTeacherDto,
+    description: 'Returns public teacher information without sensitive data',
   })
-  findPublicTeacherById(@Param('id') id: string): Promise<Teacher | null> {
+  findPublicTeacherById(
+    @Param('id') id: string,
+  ): Promise<PublicTeacherDto | null> {
     return this.teachersService.findPublicTeacherById(+id);
   }
 

@@ -19,6 +19,10 @@ import { randomStringGenerator } from '../utils/random-string-generator';
 import { NotificationService } from '../notifications/notification.service';
 import { SubjectsService } from '../subjects/subjects.service';
 import { FileType } from '../files/domain/file';
+import { PublicTeacherDto } from './dto/public-teacher.dto';
+import { FileStorageService } from '../files/file-storage.service';
+import { ConfigService } from '@nestjs/config';
+import { FileDriver } from '../files/config/file-config.type';
 
 @Injectable()
 export class TeachersService {
@@ -27,6 +31,8 @@ export class TeachersService {
     private readonly usersService: UsersService,
     private readonly notificationService: NotificationService,
     private readonly subjectsService: SubjectsService,
+    private readonly fileStorageService: FileStorageService,
+    private readonly configService: ConfigService,
   ) {}
 
   async create(
@@ -337,16 +343,93 @@ export class TeachersService {
     return { teacher, user, hasUserAccount: !!user };
   }
 
-  async findPublicTeachers(): Promise<Teacher[]> {
-    return this.teachersRepository.findPublicTeachers();
+  async findPublicTeachers(): Promise<PublicTeacherDto[]> {
+    const teachers = await this.teachersRepository.findPublicTeachers();
+    return Promise.all(
+      teachers.map((teacher) => this.mapToPublicDto(teacher)),
+    );
   }
 
-  async findPublicTeacherById(id: Teacher['id']): Promise<Teacher | null> {
+  async findPublicTeacherById(
+    id: Teacher['id'],
+  ): Promise<PublicTeacherDto | null> {
     const teacher = await this.teachersRepository.findById(id);
     if (!teacher || !teacher.showOnPublicSite) {
       return null;
     }
-    return teacher;
+    return this.mapToPublicDto(teacher);
+  }
+
+  /**
+   * Map Teacher to PublicTeacherDto, excluding sensitive fields
+   * and generating proper URLs for photos
+   */
+  private async mapToPublicDto(teacher: Teacher): Promise<PublicTeacherDto> {
+    const dto = new PublicTeacherDto();
+    dto.id = teacher.id;
+    dto.name = teacher.name;
+    dto.subjectsAllowed = teacher.subjectsAllowed;
+    dto.bio = teacher.bio;
+    dto.showOnPublicSite = teacher.showOnPublicSite;
+    dto.displayOrder = teacher.displayOrder;
+
+    // Handle photo URL - generate presigned URL for S3 files
+    if (teacher.photo) {
+      const photo = { ...teacher.photo };
+      
+      // Generate proper URL for the photo
+      // For S3 files, use presigned URL; for local files, use serve endpoint
+      const fileDriver = await this.fileStorageService.getDriver();
+      
+      if (fileDriver === FileDriver.LOCAL) {
+        // For local files, use the serve endpoint
+        const baseUrl = this.getBaseUrl();
+        photo.url = `${baseUrl}/api/v1/files/serve/${photo.id}`;
+      } else if (
+        fileDriver === FileDriver.S3 ||
+        fileDriver === FileDriver.S3_PRESIGNED
+      ) {
+        // For S3 files, generate presigned URL
+        try {
+          photo.url = await this.fileStorageService.getPresignedFileUrl(
+            teacher.photo.path,
+            3600, // 1 hour expiry
+          );
+        } catch (error) {
+          console.error('Error generating presigned URL:', error);
+          // Fallback to serve endpoint if presigned URL generation fails
+          const baseUrl = this.getBaseUrl();
+          photo.url = `${baseUrl}/api/v1/files/serve/${photo.id}`;
+        }
+      } else {
+        // Fallback for other storage types
+        const baseUrl = this.getBaseUrl();
+        photo.url = `${baseUrl}/api/v1/files/serve/${photo.id}`;
+      }
+      
+      dto.photo = photo;
+    } else {
+      dto.photo = null;
+    }
+
+    return dto;
+  }
+
+  /**
+   * Get base URL for the current server
+   */
+  private getBaseUrl(): string {
+    const backendDomain = this.configService.get('app.backendDomain', {
+      infer: true,
+    });
+    if (backendDomain) {
+      return backendDomain;
+    }
+    // Fallback to environment-based URL
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const host = process.env.HOST || 'localhost';
+    const port = process.env.PORT || '3000';
+    return `${protocol}://${host}:${port}`;
   }
 
   async bulkCreateFromFile(file: Express.Multer.File): Promise<{
