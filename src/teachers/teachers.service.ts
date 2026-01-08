@@ -432,7 +432,10 @@ export class TeachersService {
     return `${protocol}://${host}:${port}`;
   }
 
-  async bulkCreateFromFile(file: Express.Multer.File): Promise<{
+  async bulkCreateFromFile(
+    file: Express.Multer.File,
+    duplicateHandling: 'skip' | 'update' = 'skip',
+  ): Promise<{
     totalRows: number;
     successful: number;
     failed: number;
@@ -672,37 +675,80 @@ export class TeachersService {
         }
 
         // Check if teacher already exists (by email or phone)
+        let existingTeacher: any = null;
         if (email && email.trim()) {
-          const existingTeacher = await this.teachersRepository.findByEmail(
+          existingTeacher = await this.teachersRepository.findByEmail(
             email.trim(),
           );
-          if (existingTeacher) {
-            results.push({
-              row: rowNumber,
-              teacherName: name.trim(),
-              status: 'skipped',
-              message: 'Teacher with this email already exists',
-              teacherId: existingTeacher.id,
-            });
-            failed++;
-            continue;
-          }
         }
-
-        if (phone && phone.trim()) {
-          const existingTeacher = await this.teachersRepository.findByPhone(
+        if (!existingTeacher && phone && phone.trim()) {
+          existingTeacher = await this.teachersRepository.findByPhone(
             phone.trim(),
           );
-          if (existingTeacher) {
+        }
+
+        if (existingTeacher) {
+          if (duplicateHandling === 'skip') {
             results.push({
               row: rowNumber,
               teacherName: name.trim(),
               status: 'skipped',
-              message: 'Teacher with this phone already exists',
+              message: 'Teacher with this email or phone already exists',
               teacherId: existingTeacher.id,
             });
             failed++;
             continue;
+          } else {
+            // Update existing teacher
+            try {
+              // Parse boolean and number fields
+              const showOnPublicSite = showOnPublicSiteStr?.toLowerCase() === 'true';
+              const displayOrder = parseInt(displayOrderStr, 10) || 0;
+
+              const updateTeacherDto: UpdateTeacherDto = {
+                name: name.trim(),
+                email: email?.trim() || undefined,
+                phone: phone?.trim() || undefined,
+                address: address?.trim() || undefined,
+                city: city?.trim() || undefined,
+                country: country?.trim() || undefined,
+                cnicNumber: cnicNumber?.trim() || undefined,
+                showOnPublicSite,
+                displayOrder,
+                bio: bio?.trim() || undefined,
+                qualifications: qualifications?.trim() || undefined,
+                expertise: expertise?.trim() || undefined,
+                payoutMethod: payoutMethod?.trim() || undefined,
+                bankDetails: bankDetails?.trim() || undefined,
+              };
+
+              // Update subjects allowed if provided
+              if (subjectIds && subjectIds.length > 0) {
+                updateTeacherDto.subjectsAllowed = subjectIds.map((id) => ({ id }));
+              }
+
+              const updatedTeacher = await this.update(existingTeacher.id, updateTeacherDto);
+
+              results.push({
+                row: rowNumber,
+                teacherName: updatedTeacher!.name,
+                status: 'success',
+                message: 'Teacher updated successfully',
+                teacherId: updatedTeacher!.id,
+              });
+              successful++;
+              continue;
+            } catch (error: any) {
+              results.push({
+                row: rowNumber,
+                teacherName: name.trim(),
+                status: 'error',
+                message: `Failed to update: ${error.message || 'Unknown error'}`,
+                teacherId: existingTeacher.id,
+              });
+              failed++;
+              continue;
+            }
           }
         }
 

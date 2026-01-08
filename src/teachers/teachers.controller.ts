@@ -31,6 +31,7 @@ import {
   ApiConsumes,
   ApiBody,
   ApiResponse,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { Roles } from '../roles/roles.decorator';
 import { RoleEnum } from '../roles/roles.enum';
@@ -221,6 +222,12 @@ export class TeachersController {
     description:
       'Upload an Excel or CSV file with teacher details to bulk create teachers. User accounts will be created for teachers with email addresses.',
   })
+  @ApiQuery({
+    name: 'duplicateHandling',
+    required: false,
+    enum: ['skip', 'update'],
+    description: 'How to handle duplicates: skip or update (default: skip)',
+  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -255,7 +262,8 @@ export class TeachersController {
       }),
     )
     file: Express.Multer.File,
+    @Query('duplicateHandling') duplicateHandling?: 'skip' | 'update',
   ): Promise<BulkTeachersResultDto> {
-    return this.teachersService.bulkCreateFromFile(file);
+    return this.teachersService.bulkCreateFromFile(file, duplicateHandling || 'skip');
   }
 }

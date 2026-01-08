@@ -908,7 +908,10 @@ export class StudentsService {
     return { linked, notFound, errors };
   }
 
-  async bulkEnrollFromFile(file: Express.Multer.File): Promise<{
+  async bulkEnrollFromFile(
+    file: Express.Multer.File,
+    duplicateHandling: 'skip' | 'update' = 'skip',
+  ): Promise<{
     totalRows: number;
     successful: number;
     failed: number;
@@ -1227,6 +1230,41 @@ export class StudentsService {
             }
           }
         } else if (student) {
+          // Handle duplicate student based on duplicateHandling option
+          if (duplicateHandling === 'skip') {
+            results.push({
+              row: rowNumber,
+              studentName: studentName.trim(),
+              status: 'skipped',
+              message: 'Student with this email already exists',
+              studentId: student.id,
+            });
+            failed++;
+            continue;
+          } else {
+            // Update existing student information
+            try {
+              const updateStudentDto: UpdateStudentDto = {
+                name: studentName.trim(),
+                email: studentEmail?.trim() || undefined,
+                contact: studentContact?.trim() || undefined,
+                address: studentAddress?.trim() || undefined,
+                city: studentCity?.trim() || undefined,
+                state: studentState?.trim() || undefined,
+                country: studentCountry?.trim() || undefined,
+                dateOfBirth: studentDateOfBirth?.trim() || undefined,
+              };
+
+              student = await this.update(student.id, updateStudentDto);
+            } catch (updateError) {
+              console.error(
+                `Error updating student ${student.id}:`,
+                updateError,
+              );
+              // Continue with enrollment even if update fails
+            }
+          }
+
           // Enroll existing student in classes
           for (const classId of validClassIds) {
             try {

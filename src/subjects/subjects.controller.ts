@@ -178,6 +178,9 @@ export class SubjectsController {
   async bulkCreate(
     @Body() bulkCreateDto: BulkCreateSubjectsDto,
   ): Promise<BulkSubjectsResultDto> {
-    return this.subjectsService.bulkCreateFromData(bulkCreateDto.subjects);
+    return this.subjectsService.bulkCreateFromData(
+      bulkCreateDto.subjects,
+      bulkCreateDto.duplicateHandling || 'skip',
+    );
   }
 }

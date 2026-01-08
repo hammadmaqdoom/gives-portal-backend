@@ -203,6 +203,9 @@ export class ClassesController {
   async bulkCreate(
     @Body() bulkCreateDto: BulkCreateClassesDto,
   ): Promise<BulkClassesResultDto> {
-    return this.classesService.bulkCreateFromData(bulkCreateDto.classes);
+    return this.classesService.bulkCreateFromData(
+      bulkCreateDto.classes,
+      bulkCreateDto.duplicateHandling || 'skip',
+    );
   }
 }

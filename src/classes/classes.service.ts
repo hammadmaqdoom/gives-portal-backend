@@ -591,6 +591,7 @@ export class ClassesService {
       thumbnailUrl?: string;
       coverImageUrl?: string;
     }>,
+    duplicateHandling: 'skip' | 'update' = 'skip',
   ): Promise<{
     totalRows: number;
     successful: number;
@@ -721,15 +722,81 @@ export class ClassesService {
           classData.name.trim(),
         );
         if (existingClass) {
-          results.push({
-            row: rowNumber,
-            className: classData.name.trim(),
-            status: 'skipped',
-            message: 'Class with this name already exists',
-            classId: existingClass.id,
-          });
-          failed++;
-          continue;
+          if (duplicateHandling === 'skip') {
+            results.push({
+              row: rowNumber,
+              className: classData.name.trim(),
+              status: 'skipped',
+              message: 'Class with this name already exists',
+              classId: existingClass.id,
+            });
+            failed++;
+            continue;
+          } else {
+            // Update existing class
+            try {
+              // Convert weekdays and timing to schedules if schedules not provided
+              let schedules = classData.schedules;
+              if (!schedules && classData.weekdays && classData.timing) {
+                let weekdaysArray: Weekday[] = [];
+                if (Array.isArray(classData.weekdays)) {
+                  weekdaysArray = classData.weekdays
+                    .map((d) => this.normalizeWeekday(d))
+                    .filter((d): d is Weekday => d !== null);
+                } else if (typeof classData.weekdays === 'string') {
+                  weekdaysArray = this.parseWeekdays(classData.weekdays);
+                }
+                
+                if (weekdaysArray.length > 0 && classData.timing) {
+                  schedules = this.convertToSchedules(
+                    weekdaysArray,
+                    classData.timing,
+                    classData.timezone || 'Asia/Karachi',
+                  );
+                }
+              }
+
+              const updateClassDto: UpdateClassDto = {
+                name: classData.name.trim(),
+                batchTerm: classData.batchTerm.trim(),
+                subject: { id: classData.subjectId },
+                teacher: { id: classData.teacherId },
+                feeUSD: classData.feeUSD,
+                feePKR: classData.feePKR,
+                classMode: classData.classMode,
+                weekdays: classData.weekdays,
+                timing: classData.timing?.trim() || undefined,
+                timezone: classData.timezone?.trim() || undefined,
+                schedules: schedules || undefined,
+                courseOutline: classData.courseOutline?.trim() || undefined,
+                isPublicForSale: classData.isPublicForSale,
+                thumbnailUrl: classData.thumbnailUrl?.trim() || undefined,
+                coverImageUrl: classData.coverImageUrl?.trim() || undefined,
+              };
+
+              const updatedClass = await this.update(existingClass.id, updateClassDto);
+              
+              results.push({
+                row: rowNumber,
+                className: updatedClass!.name,
+                status: 'success',
+                message: 'Class updated successfully',
+                classId: updatedClass!.id,
+              });
+              successful++;
+              continue;
+            } catch (error: any) {
+              results.push({
+                row: rowNumber,
+                className: classData.name.trim(),
+                status: 'error',
+                message: `Failed to update: ${error.message || 'Unknown error'}`,
+                classId: existingClass.id,
+              });
+              failed++;
+              continue;
+            }
+          }
         }
 
         // Convert weekdays and timing to schedules if schedules not provided

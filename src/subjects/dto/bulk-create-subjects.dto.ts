@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, ValidateNested, IsNotEmpty } from 'class-validator';
+import { IsArray, ValidateNested, IsNotEmpty, IsOptional, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class BulkCreateSubjectItemDto {
@@ -30,4 +30,14 @@ export class BulkCreateSubjectsDto {
   @ValidateNested({ each: true })
   @Type(() => BulkCreateSubjectItemDto)
   subjects: BulkCreateSubjectItemDto[];
+
+  @ApiProperty({
+    enum: ['skip', 'update'],
+    default: 'skip',
+    description: 'How to handle duplicates: skip or update',
+    required: false,
+  })
+  @IsOptional()
+  @IsIn(['skip', 'update'])
+  duplicateHandling?: 'skip' | 'update';
 }

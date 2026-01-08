@@ -95,4 +95,14 @@ export class BulkCreateClassesDto {
   @ValidateNested({ each: true })
   @Type(() => BulkCreateClassItemDto)
   classes: BulkCreateClassItemDto[];
+
+  @ApiProperty({
+    enum: ['skip', 'update'],
+    default: 'skip',
+    description: 'How to handle duplicates: skip or update',
+    required: false,
+  })
+  @IsOptional()
+  @IsIn(['skip', 'update'])
+  duplicateHandling?: 'skip' | 'update';
 }
