@@ -572,6 +572,12 @@ export class TeachersService {
         const bankBranch =
           row['Bank Branch'] || row['BankBranch'] || row['bank_branch'] || '';
         const bio = row['Bio'] || row['bio'] || row['Biography'] || '';
+        const address = row['Address'] || row['address'] || '';
+        const city = row['City'] || row['city'] || '';
+        const country = row['Country'] || row['country'] || '';
+        const cnicNumber = row['CNIC'] || row['cnic'] || row['CNIC Number'] || row['cnicNumber'] || '';
+        const qualifications = row['Qualifications'] || row['qualifications'] || '';
+        const expertise = row['Expertise'] || row['expertise'] || '';
         const showOnPublicSiteStr =
           row['Show On Public Site'] ||
           row['ShowOnPublicSite'] ||
@@ -584,6 +590,19 @@ export class TeachersService {
           row['display_order'] ||
           row['Order'] ||
           '0';
+        
+        // Construct bank details string if any bank fields are provided
+        let bankDetails = '';
+        if (bankName || accountNumber || iban) {
+          const details: string[] = [];
+          if (bankName) details.push(`Bank: ${bankName}`);
+          if (accountNumber) details.push(`Account: ${accountNumber}`);
+          if (iban) details.push(`IBAN: ${iban}`);
+          if (accountHolderName) details.push(`Holder: ${accountHolderName}`);
+          if (bankCode) details.push(`Code: ${bankCode}`);
+          if (bankBranch) details.push(`Branch: ${bankBranch}`);
+          bankDetails = details.join(', ');
+        }
 
         // Validation
         if (!name || name.trim() === '') {
@@ -709,17 +728,16 @@ export class TeachersService {
                 name: name.trim(),
                 email: email?.trim() || undefined,
                 phone: phone?.trim() || undefined,
-                address: address?.trim() || undefined,
-                city: city?.trim() || undefined,
-                country: country?.trim() || undefined,
-                cnicNumber: cnicNumber?.trim() || undefined,
                 showOnPublicSite,
                 displayOrder,
                 bio: bio?.trim() || undefined,
-                qualifications: qualifications?.trim() || undefined,
-                expertise: expertise?.trim() || undefined,
                 payoutMethod: payoutMethod?.trim() || undefined,
-                bankDetails: bankDetails?.trim() || undefined,
+                bankName: bankName?.trim() || undefined,
+                accountNumber: accountNumber?.trim() || undefined,
+                bankCode: bankCode?.trim() || undefined,
+                iban: iban?.trim() || undefined,
+                accountHolderName: accountHolderName?.trim() || undefined,
+                bankBranch: bankBranch?.trim() || undefined,
               };
 
               // Update subjects allowed if provided
@@ -727,14 +745,14 @@ export class TeachersService {
                 updateTeacherDto.subjectsAllowed = subjectIds.map((id) => ({ id }));
               }
 
-              const updatedTeacher = await this.update(existingTeacher.id, updateTeacherDto);
+              const updateResult = await this.update(existingTeacher.id, updateTeacherDto);
 
               results.push({
                 row: rowNumber,
-                teacherName: updatedTeacher!.name,
+                teacherName: updateResult.teacher?.name || name.trim(),
                 status: 'success',
                 message: 'Teacher updated successfully',
-                teacherId: updatedTeacher!.id,
+                teacherId: updateResult.teacher?.id || existingTeacher.id,
               });
               successful++;
               continue;
