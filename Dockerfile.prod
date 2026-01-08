@@ -28,6 +28,10 @@ RUN --mount=type=cache,target=/root/.npm \
     npm install -g @nestjs/cli
 
 # Copy source code (this layer changes most frequently)
+# Use cache-busting build arg to ensure fresh builds when code changes
+ARG CACHE_BUST
+# Add cache-bust to a file to invalidate this layer when commit changes
+RUN echo "Cache bust: ${CACHE_BUST:-$(date +%s)}" > /tmp/cache-bust.txt
 COPY . .
 
 # Build the application (incremental builds if tsconfig has incremental: true)

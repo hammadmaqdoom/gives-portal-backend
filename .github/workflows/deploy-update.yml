@@ -53,11 +53,19 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Cache strategy:
+          # - Use consistent scope for dependency layers (package.json, node_modules)
+          # - Docker's layer cache will naturally invalidate when files change
+          # - Commit SHA in build arg ensures source code layer rebuilds on each commit
+          # - Fallback to registry cache for faster initial builds
+          cache-from: |
+            type=gha,scope=${{ github.repository }}-lms-backend
+            type=registry,ref=ghcr.io/${{ github.repository }}/lms-backend:latest
+          cache-to: type=gha,mode=max,scope=${{ github.repository }}-lms-backend
           platforms: linux/amd64
           build-args: |
             BUILDKIT_INLINE_CACHE=1
+            CACHE_BUST=${{ github.sha }}
       
       - name: Output image name
         id: image
