@@ -511,6 +511,7 @@ export class ClassesService {
 
   /**
    * Enrich class with proper image URLs (presigned for S3, serve endpoint for local)
+   * Also sets thumbnailUrl and coverImageUrl from file URLs for frontend compatibility
    */
   private async enrichClassWithImageUrls(classEntity: Class): Promise<void> {
     const fileDriver = await this.fileStorageService.getDriver();
@@ -542,6 +543,9 @@ export class ClassesService {
         // Fallback for other storage types
         thumbnailFile.url = `${baseUrl}/api/v1/files/serve/${thumbnailFile.id}`;
       }
+      
+      // Set thumbnailUrl from file URL for frontend compatibility
+      (classEntity as any).thumbnailUrl = thumbnailFile.url;
     }
 
     // Handle cover image file
@@ -570,6 +574,9 @@ export class ClassesService {
         // Fallback for other storage types
         coverImageFile.url = `${baseUrl}/api/v1/files/serve/${coverImageFile.id}`;
       }
+      
+      // Set coverImageUrl from file URL for frontend compatibility
+      (classEntity as any).coverImageUrl = coverImageFile.url;
     }
   }
 
