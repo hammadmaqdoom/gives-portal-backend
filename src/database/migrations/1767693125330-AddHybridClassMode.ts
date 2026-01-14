@@ -86,7 +86,7 @@ export class AddHybridClassMode1767693125330 implements MigrationInterface {
       `ALTER TABLE "cart_item" DROP CONSTRAINT IF EXISTS "FK_cart_item_cart"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "announcement" DROP CONSTRAINT "FK_d351c526fb2245e761711d9f2b4"`,
+      `ALTER TABLE "announcement" DROP CONSTRAINT IF EXISTS "FK_d351c526fb2245e761711d9f2b4"`,
     );
     await queryRunner.query(`DROP INDEX "public"."IDX_FILES_CONTEXT"`);
     await queryRunner.query(`DROP INDEX "public"."IDX_FILES_UPLOADED_AT"`);
@@ -660,10 +660,10 @@ export class AddHybridClassMode1767693125330 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE "announcement" DROP CONSTRAINT "FK_d351c526fb2245e761711d9f2b4"`,
+      `ALTER TABLE "announcement" DROP CONSTRAINT IF EXISTS "FK_d351c526fb2245e761711d9f2b4"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "cart_item" DROP CONSTRAINT "FK_29e590514f9941296f3a2440d39"`,
+      `ALTER TABLE "cart_item" DROP CONSTRAINT IF EXISTS "FK_29e590514f9941296f3a2440d39"`,
     );
     await queryRunner.query(
       `ALTER TABLE "module_completion" DROP CONSTRAINT "FK_b1614eb3e81fefa6f595fb8b5da"`,
