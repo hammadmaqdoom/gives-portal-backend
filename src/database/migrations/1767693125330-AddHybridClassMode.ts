@@ -188,16 +188,16 @@ export class AddHybridClassMode1767693125330 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "module_completion" DROP CONSTRAINT "uq_student_module"`,
     );
-    await queryRunner.query(`ALTER TABLE "settings" DROP COLUMN "aiEnabled"`);
-    await queryRunner.query(`ALTER TABLE "settings" DROP COLUMN "aiProvider"`);
+    await queryRunner.query(`ALTER TABLE "settings" DROP COLUMN IF EXISTS "aiEnabled"`);
+    await queryRunner.query(`ALTER TABLE "settings" DROP COLUMN IF EXISTS "aiProvider"`);
     await queryRunner.query(
-      `ALTER TABLE "settings" DROP COLUMN "openaiApiKey"`,
+      `ALTER TABLE "settings" DROP COLUMN IF EXISTS "openaiApiKey"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "settings" DROP COLUMN "claudeApiKey"`,
+      `ALTER TABLE "settings" DROP COLUMN IF EXISTS "claudeApiKey"`,
     );
-    await queryRunner.query(`ALTER TABLE "settings" DROP COLUMN "aiModel"`);
-    await queryRunner.query(`ALTER TABLE "settings" DROP COLUMN "aiBaseUrl"`);
+    await queryRunner.query(`ALTER TABLE "settings" DROP COLUMN IF EXISTS "aiModel"`);
+    await queryRunner.query(`ALTER TABLE "settings" DROP COLUMN IF EXISTS "aiBaseUrl"`);
     await queryRunner.query(`ALTER TABLE "performance" ADD "class_id" integer`);
     await queryRunner.query(
       `ALTER TABLE "invoice" ADD "originalPrice" numeric(10,2)`,
