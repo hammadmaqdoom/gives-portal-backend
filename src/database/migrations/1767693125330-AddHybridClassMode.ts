@@ -77,13 +77,13 @@ export class AddHybridClassMode1767693125330 implements MigrationInterface {
       `ALTER TABLE "learning_module" DROP CONSTRAINT "FK_951de844e26a1023106ddc1b069"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "learning_module" DROP CONSTRAINT "FK_learning_module_zoom_meeting"`,
+      `ALTER TABLE "learning_module" DROP CONSTRAINT IF EXISTS "FK_learning_module_zoom_meeting"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "learning_module" DROP CONSTRAINT "FK_34899815c25c1c52690e6dfd6f0"`,
+      `ALTER TABLE "learning_module" DROP CONSTRAINT IF EXISTS "FK_34899815c25c1c52690e6dfd6f0"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "cart_item" DROP CONSTRAINT "FK_cart_item_cart"`,
+      `ALTER TABLE "cart_item" DROP CONSTRAINT IF EXISTS "FK_cart_item_cart"`,
     );
     await queryRunner.query(
       `ALTER TABLE "announcement" DROP CONSTRAINT "FK_d351c526fb2245e761711d9f2b4"`,
@@ -672,13 +672,13 @@ export class AddHybridClassMode1767693125330 implements MigrationInterface {
       `ALTER TABLE "module_completion" DROP CONSTRAINT "FK_9185a45947c2fed7c73fda2d303"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "learning_module" DROP CONSTRAINT "FK_951de844e26a1023106ddc1b069"`,
+      `ALTER TABLE "learning_module" DROP CONSTRAINT IF EXISTS "FK_951de844e26a1023106ddc1b069"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "learning_module" DROP CONSTRAINT "FK_34899815c25c1c52690e6dfd6f0"`,
+      `ALTER TABLE "learning_module" DROP CONSTRAINT IF EXISTS "FK_34899815c25c1c52690e6dfd6f0"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "learning_module_section" DROP CONSTRAINT "FK_46a5a955f1d35f07161a6494c0a"`,
+      `ALTER TABLE "learning_module_section" DROP CONSTRAINT IF EXISTS "FK_46a5a955f1d35f07161a6494c0a"`,
     );
     await queryRunner.query(
       `ALTER TABLE "payment_transaction" DROP CONSTRAINT "FK_a1a4edb3c3a84daba6fdfc2c081"`,
