@@ -1233,12 +1233,24 @@ export class StudentsService {
           );
         }
 
-        // Check if student already exists (by email if provided)
+        // Check if student already exists (by email OR phone number)
         let student: NullableType<Student> = null;
+        let duplicateReason: 'email' | 'phone' | null = null;
+        
+        // First check by email
         if (studentEmail && studentEmail.trim()) {
-          student = await this.studentsRepository.findByEmail(
-            studentEmail.trim(),
-          );
+          student = await this.studentsRepository.findByEmail(studentEmail.trim());
+          if (student) {
+            duplicateReason = 'email';
+          }
+        }
+        
+        // If not found by email, check by phone/contact
+        if (!student && studentContact && studentContact.trim()) {
+          student = await this.studentsRepository.findByContact(studentContact.trim());
+          if (student) {
+            duplicateReason = 'phone';
+          }
         }
 
         // Create or update student
@@ -1308,11 +1320,12 @@ export class StudentsService {
         } else if (student) {
           // Handle duplicate student based on duplicateHandling option
           if (duplicateHandling === 'skip') {
+            const duplicateField = duplicateReason === 'phone' ? 'phone number' : 'email';
             results.push({
               row: rowNumber,
               studentName: studentName.trim(),
               status: 'skipped',
-              message: 'Student with this email already exists',
+              message: `Student with this ${duplicateField} already exists (ID: ${student.id}, Name: ${student.name})`,
               studentId: student.id,
             });
             failed++;
