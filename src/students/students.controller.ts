@@ -369,7 +369,12 @@ export class StudentsController {
   bulkEnrollStudentInClasses(
     @Param('id') id: string,
     @Body()
-    body: { classIds: number[]; status?: string; enrollmentDate?: string },
+    body: { 
+      classIds: number[]; 
+      status?: string; 
+      enrollmentDate?: string;
+      customFees?: Array<{ classId: number; customFeePKR?: number | null; customFeeUSD?: number | null }>;
+    },
   ) {
     return this.studentsService.bulkEnrollStudentInClasses(+id, body);
   }

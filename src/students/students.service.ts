@@ -547,7 +547,12 @@ export class StudentsService {
 
   async bulkEnrollStudentInClasses(
     studentId: number,
-    body: { classIds: number[]; status?: string; enrollmentDate?: string },
+    body: { 
+      classIds: number[]; 
+      status?: string; 
+      enrollmentDate?: string;
+      customFees?: Array<{ classId: number; customFeePKR?: number | null; customFeeUSD?: number | null }>;
+    },
   ): Promise<{ count: number; enrollments: any[] }> {
     const student = await this.studentsRepository.findById(studentId);
     if (!student) {
@@ -564,6 +569,17 @@ export class StudentsService {
       ? new Date(body.enrollmentDate)
       : new Date();
 
+    // Create a map of custom fees by classId for quick lookup
+    const customFeesMap = new Map<number, { customFeePKR?: number | null; customFeeUSD?: number | null }>();
+    if (body.customFees) {
+      for (const fee of body.customFees) {
+        customFeesMap.set(fee.classId, {
+          customFeePKR: fee.customFeePKR,
+          customFeeUSD: fee.customFeeUSD,
+        });
+      }
+    }
+
     const enrollments: any[] = [];
     let created = 0;
 
@@ -578,11 +594,16 @@ export class StudentsService {
           continue; // Skip if already enrolled
         }
 
+        // Get custom fees for this class if available
+        const customFees = customFeesMap.get(classId);
+
         const enrollment = await this.enrollmentRepository.create({
           studentId,
           classId,
           enrollmentDate: date,
           status,
+          customFeePKR: customFees?.customFeePKR ?? null,
+          customFeeUSD: customFees?.customFeeUSD ?? null,
         });
 
         enrollments.push(enrollment);
