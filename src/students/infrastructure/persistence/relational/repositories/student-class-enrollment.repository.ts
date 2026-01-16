@@ -28,7 +28,7 @@ export class StudentClassEnrollmentRepository {
   async findById(id: number): Promise<NullableType<StudentClassEnrollment>> {
     const enrollment = await this.enrollmentRepository.findOne({
       where: { id },
-      relations: ['student', 'class', 'class.teacher', 'class.subject'],
+      relations: ['student', 'class', 'class.teacher', 'class.subject', 'class.thumbnailFile', 'class.coverImageFile'],
     });
 
     return enrollment ? this.enrollmentMapper.toDomain(enrollment) : null;
@@ -37,7 +37,7 @@ export class StudentClassEnrollmentRepository {
   async findByStudentId(studentId: number): Promise<StudentClassEnrollment[]> {
     const enrollments = await this.enrollmentRepository.find({
       where: { studentId },
-      relations: ['student', 'class', 'class.teacher', 'class.subject'],
+      relations: ['student', 'class', 'class.teacher', 'class.subject', 'class.thumbnailFile', 'class.coverImageFile'],
     });
 
     return enrollments.map((enrollment) =>
@@ -48,7 +48,7 @@ export class StudentClassEnrollmentRepository {
   async findByClassId(classId: number): Promise<StudentClassEnrollment[]> {
     const enrollments = await this.enrollmentRepository.find({
       where: { classId },
-      relations: ['student', 'class', 'class.teacher', 'class.subject'],
+      relations: ['student', 'class', 'class.teacher', 'class.subject', 'class.thumbnailFile', 'class.coverImageFile'],
     });
 
     return enrollments.map((enrollment) =>
@@ -62,7 +62,7 @@ export class StudentClassEnrollmentRepository {
   ): Promise<NullableType<StudentClassEnrollment>> {
     const enrollment = await this.enrollmentRepository.findOne({
       where: { studentId, classId },
-      relations: ['student', 'class', 'class.teacher', 'class.subject'],
+      relations: ['student', 'class', 'class.teacher', 'class.subject', 'class.thumbnailFile', 'class.coverImageFile'],
     });
 
     return enrollment ? this.enrollmentMapper.toDomain(enrollment) : null;
@@ -73,7 +73,7 @@ export class StudentClassEnrollmentRepository {
   ): Promise<StudentClassEnrollment[]> {
     const enrollments = await this.enrollmentRepository.find({
       where: { studentId, status: 'active' },
-      relations: ['student', 'class', 'class.teacher', 'class.subject'],
+      relations: ['student', 'class', 'class.teacher', 'class.subject', 'class.thumbnailFile', 'class.coverImageFile'],
     });
 
     return enrollments.map((enrollment) =>
@@ -86,7 +86,7 @@ export class StudentClassEnrollmentRepository {
   ): Promise<StudentClassEnrollment[]> {
     const enrollments = await this.enrollmentRepository.find({
       where: { studentId },
-      relations: ['student', 'class', 'class.teacher', 'class.subject'],
+      relations: ['student', 'class', 'class.teacher', 'class.subject', 'class.thumbnailFile', 'class.coverImageFile'],
       order: { enrollmentDate: 'DESC' },
     });
 
@@ -100,7 +100,7 @@ export class StudentClassEnrollmentRepository {
   ): Promise<StudentClassEnrollment[]> {
     const enrollments = await this.enrollmentRepository.find({
       where: { classId },
-      relations: ['student', 'class', 'class.teacher', 'class.subject'],
+      relations: ['student', 'class', 'class.teacher', 'class.subject', 'class.thumbnailFile', 'class.coverImageFile'],
       order: { enrollmentDate: 'DESC' },
     });
 
@@ -156,7 +156,7 @@ export class StudentClassEnrollmentRepository {
     order?: { [key: string]: 'ASC' | 'DESC' };
   }): Promise<StudentClassEnrollment[]> {
     const enrollments = await this.enrollmentRepository.find({
-      relations: ['student', 'class', 'class.teacher', 'class.subject'],
+      relations: ['student', 'class', 'class.teacher', 'class.subject', 'class.thumbnailFile', 'class.coverImageFile'],
       skip: options?.skip,
       take: options?.take,
       order: options?.order || { enrollmentDate: 'DESC' },
