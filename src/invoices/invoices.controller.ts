@@ -386,6 +386,18 @@ export class InvoicesController {
     return this.invoicesService.sendInvoiceEmail(+id);
   }
 
+  @Delete('bulk')
+  @Roles(RoleEnum.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete multiple invoices' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Invoices deleted successfully',
+  })
+  removeMany(@Body() body: { ids: number[] }) {
+    return this.invoicesService.removeMany(body.ids);
+  }
+
   @Delete(':id')
   @Roles(RoleEnum.admin)
   @HttpCode(HttpStatus.NO_CONTENT)
