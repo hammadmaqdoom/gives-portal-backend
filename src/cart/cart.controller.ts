@@ -34,7 +34,7 @@ export class CartController {
     const currency = req.currency || 'USD';
 
     const cart = await this.cartService.getCart(userId, sessionId, currency);
-    
+
     // Always set the session ID cookie to ensure it persists
     if (req.res && sessionId) {
       req.res.cookie('cartSessionId', sessionId, {
@@ -44,7 +44,7 @@ export class CartController {
         secure: process.env.NODE_ENV === 'production',
       });
     }
-    
+
     return { data: cart };
   }
 
@@ -62,7 +62,7 @@ export class CartController {
       sessionId,
       currency,
     );
-    
+
     // Always set the session ID cookie to ensure it persists
     if (req.res && sessionId) {
       req.res.cookie('cartSessionId', sessionId, {
@@ -72,7 +72,7 @@ export class CartController {
         secure: process.env.NODE_ENV === 'production',
       });
     }
-    
+
     return { data: cart };
   }
 
@@ -107,7 +107,8 @@ export class CartController {
    */
   private getOrCreateSessionId(req: any): string {
     // Check if session ID exists in cookies, headers, or request body
-    let sessionId = req.cookies?.cartSessionId || req.headers['x-cart-session-id'];
+    let sessionId =
+      req.cookies?.cartSessionId || req.headers['x-cart-session-id'];
 
     if (!sessionId) {
       // Generate new session ID
@@ -117,4 +118,3 @@ export class CartController {
     return sessionId;
   }
 }
-

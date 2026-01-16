@@ -9,7 +9,10 @@ import { SettingsService } from '../settings/settings.service';
 @Injectable()
 export class CurrencyService implements OnModuleInit {
   private readonly logger = new Logger(CurrencyService.name);
-  private readonly ipCache = new Map<string, { currency: string; timestamp: number }>();
+  private readonly ipCache = new Map<
+    string,
+    { currency: string; timestamp: number }
+  >();
   private readonly CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
   constructor(
@@ -167,7 +170,7 @@ export class CurrencyService implements OnModuleInit {
   async detectCurrencyFromIp(ip: string): Promise<string> {
     // Clean IP address (remove port, handle IPv6)
     const cleanIp = ip?.split(':').pop()?.split(',').shift()?.trim() || '';
-    
+
     if (!cleanIp || cleanIp === '::1' || cleanIp === '127.0.0.1') {
       // Localhost - default to USD
       return 'USD';
@@ -193,7 +196,7 @@ export class CurrencyService implements OnModuleInit {
       }
 
       const data = await response.json();
-      
+
       if (data.status === 'success' && data.countryCode === 'PK') {
         return this.cacheAndReturn(cleanIp, 'PKR');
       }

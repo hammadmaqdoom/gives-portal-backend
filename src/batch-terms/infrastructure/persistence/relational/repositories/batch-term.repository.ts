@@ -36,18 +36,23 @@ export class BatchTermsRelationalRepository implements BatchTermRepository {
   }
 
   async findAll(activeOnly: boolean = false): Promise<BatchTerm[]> {
-    const queryBuilder = this.batchTermsRepository.createQueryBuilder('batch_term');
-    
+    const queryBuilder =
+      this.batchTermsRepository.createQueryBuilder('batch_term');
+
     if (activeOnly) {
-      queryBuilder.where('batch_term.is_active = :isActive', { isActive: true });
+      queryBuilder.where('batch_term.is_active = :isActive', {
+        isActive: true,
+      });
     }
-    
+
     queryBuilder
       .orderBy('batch_term.display_order', 'ASC')
       .addOrderBy('batch_term.name', 'ASC');
-    
+
     const batchTerms = await queryBuilder.getMany();
-    return batchTerms.map((batchTerm) => this.batchTermMapper.toDomain(batchTerm));
+    return batchTerms.map((batchTerm) =>
+      this.batchTermMapper.toDomain(batchTerm),
+    );
   }
 
   async update(
@@ -66,4 +71,3 @@ export class BatchTermsRelationalRepository implements BatchTermRepository {
     await this.batchTermsRepository.softDelete(id);
   }
 }
-

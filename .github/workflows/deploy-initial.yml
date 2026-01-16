@@ -242,8 +242,11 @@ jobs:
             # Use newgrp to ensure docker permissions
             newgrp docker << EOF
             echo "Building and starting services with docker permissions"
-            # Ensure fresh app image with updated base (Node 20)
-            docker-compose -f docker-compose.prod.yml build --no-cache app
+            # Enable BuildKit for faster builds with caching
+            export DOCKER_BUILDKIT=1
+            export COMPOSE_DOCKER_CLI_BUILD=1
+            # Build app image with BuildKit enabled
+            DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.prod.yml build app
             # Start services without health check dependencies first
             docker-compose -f docker-compose.prod.yml up -d postgres redis app
             echo "Waiting for app to start..."

@@ -71,8 +71,11 @@ export class BatchTermsService {
       }
     }
 
-    const updatedBatchTerm = await this.batchTermsRepository.update(id, updateBatchTermDto);
-    
+    const updatedBatchTerm = await this.batchTermsRepository.update(
+      id,
+      updateBatchTermDto,
+    );
+
     if (!updatedBatchTerm) {
       throw new NotFoundException({
         status: HttpStatus.NOT_FOUND,
@@ -100,4 +103,3 @@ export class BatchTermsService {
     await this.batchTermsRepository.remove(id);
   }
 }
-

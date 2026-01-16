@@ -38,7 +38,7 @@ async function bootstrap() {
   }
 
   const app = await NestFactory.create(AppModule);
-  
+
   // Enable CORS with proper configuration
   // Note: When credentials: true, origin cannot be '*', must be specific or function
   app.enableCors({
@@ -49,7 +49,13 @@ async function bootstrap() {
     },
     credentials: true, // Allow cookies to be sent
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-cart-session-id', 'x-custom-lang', 'Accept'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-cart-session-id',
+      'x-custom-lang',
+      'Accept',
+    ],
     exposedHeaders: ['Content-Type', 'Authorization'],
   });
   (global as any).nestjsApp = app;

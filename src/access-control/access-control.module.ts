@@ -16,4 +16,3 @@ import { ClassesModule } from '../classes/classes.module';
   exports: [AccessControlService],
 })
 export class AccessControlModule {}
-

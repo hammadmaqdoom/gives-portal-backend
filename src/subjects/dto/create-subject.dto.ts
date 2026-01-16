@@ -22,7 +22,10 @@ export class CreateSubjectDto {
   @IsString()
   level?: string;
 
-  @ApiProperty({ example: 'https://www.cambridgeinternational.org/9709', required: false })
+  @ApiProperty({
+    example: 'https://www.cambridgeinternational.org/9709',
+    required: false,
+  })
   @IsOptional()
   @IsString()
   officialLink?: string;

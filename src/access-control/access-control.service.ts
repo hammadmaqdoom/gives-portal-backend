@@ -80,7 +80,7 @@ export class AccessControlService {
     }
 
     // Check if enrollment is pending payment
-    if (enrollment.status === 'pending_payment' as any) {
+    if (enrollment.status === ('pending_payment' as any)) {
       const paymentStatus = await this.getPaymentStatus(studentId, classId);
       return {
         hasAccess: false,
@@ -232,4 +232,3 @@ export class AccessControlService {
     };
   }
 }
-

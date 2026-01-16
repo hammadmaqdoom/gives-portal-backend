@@ -37,4 +37,3 @@ export class BulkTeachersResultDto {
     tempPassword?: string;
   }>;
 }
-

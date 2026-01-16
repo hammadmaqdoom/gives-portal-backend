@@ -193,8 +193,7 @@ export class ClassesController {
   @Roles(RoleEnum.admin)
   @ApiOperation({
     summary: 'Bulk create classes from JSON data',
-    description:
-      'Send an array of class objects to bulk create classes',
+    description: 'Send an array of class objects to bulk create classes',
   })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -204,6 +203,9 @@ export class ClassesController {
   async bulkCreate(
     @Body() bulkCreateDto: BulkCreateClassesDto,
   ): Promise<BulkClassesResultDto> {
-    return this.classesService.bulkCreateFromData(bulkCreateDto.classes);
+    return this.classesService.bulkCreateFromData(
+      bulkCreateDto.classes,
+      bulkCreateDto.duplicateHandling || 'skip',
+    );
   }
 }

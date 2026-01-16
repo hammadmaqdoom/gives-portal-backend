@@ -35,4 +35,3 @@ export class BulkClassesResultDto {
     classId?: number;
   }>;
 }
-

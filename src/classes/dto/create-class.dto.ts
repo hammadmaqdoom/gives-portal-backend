@@ -82,17 +82,20 @@ export class CreateClassDto {
   @IsNumber()
   feePKR: number;
 
-  @ApiProperty({ example: 'virtual', enum: ['virtual', 'in-person'] })
+  @ApiProperty({ example: 'virtual', enum: ['virtual', 'in-person', 'hybrid'] })
   @IsNotEmpty()
-  @IsIn(['virtual', 'in-person'])
-  classMode: 'virtual' | 'in-person';
+  @IsIn(['virtual', 'in-person', 'hybrid'])
+  classMode: 'virtual' | 'in-person' | 'hybrid';
 
   @ApiProperty({ example: false, required: false })
   @IsOptional()
   @IsIn([true, false])
   isPublicForSale?: boolean;
 
-  @ApiProperty({ example: 'https://example.com/thumbnail.jpg', required: false })
+  @ApiProperty({
+    example: 'https://example.com/thumbnail.jpg',
+    required: false,
+  })
   @IsOptional()
   @IsString()
   thumbnailUrl?: string;
@@ -102,12 +105,20 @@ export class CreateClassDto {
   @IsString()
   coverImageUrl?: string;
 
-  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000', required: false, description: 'File ID for thumbnail image' })
+  @ApiProperty({
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    required: false,
+    description: 'File ID for thumbnail image',
+  })
   @IsOptional()
   @IsUUID()
   thumbnailFileId?: string;
 
-  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174001', required: false, description: 'File ID for cover image' })
+  @ApiProperty({
+    example: '123e4567-e89b-12d3-a456-426614174001',
+    required: false,
+    description: 'File ID for cover image',
+  })
   @IsOptional()
   @IsUUID()
   coverImageFileId?: string;

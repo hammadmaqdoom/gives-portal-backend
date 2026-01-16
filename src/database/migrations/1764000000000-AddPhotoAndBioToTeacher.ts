@@ -6,12 +6,8 @@ export class AddPhotoAndBioToTeacher1764000000000
   name = 'AddPhotoAndBioToTeacher1764000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `ALTER TABLE "teacher" ADD "photoId" uuid`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "teacher" ADD "bio" text`,
-    );
+    await queryRunner.query(`ALTER TABLE "teacher" ADD "photoId" uuid`);
+    await queryRunner.query(`ALTER TABLE "teacher" ADD "bio" text`);
     await queryRunner.query(
       `ALTER TABLE "teacher" ADD "showOnPublicSite" boolean NOT NULL DEFAULT false`,
     );
@@ -35,4 +31,3 @@ export class AddPhotoAndBioToTeacher1764000000000
     await queryRunner.query(`ALTER TABLE "teacher" DROP COLUMN "photoId"`);
   }
 }
-

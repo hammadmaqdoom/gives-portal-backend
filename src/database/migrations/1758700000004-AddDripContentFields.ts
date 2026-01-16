@@ -18,7 +18,9 @@ export class AddDripContentFields1758700000004 implements MigrationInterface {
       );
     }
 
-    if (!learningModuleTable?.columns.find((c) => c.name === 'drip_release_date')) {
+    if (
+      !learningModuleTable?.columns.find((c) => c.name === 'drip_release_date')
+    ) {
       await queryRunner.addColumn(
         'learning_module',
         new TableColumn({
@@ -29,7 +31,9 @@ export class AddDripContentFields1758700000004 implements MigrationInterface {
       );
     }
 
-    if (!learningModuleTable?.columns.find((c) => c.name === 'drip_prerequisites')) {
+    if (
+      !learningModuleTable?.columns.find((c) => c.name === 'drip_prerequisites')
+    ) {
       await queryRunner.addColumn(
         'learning_module',
         new TableColumn({
@@ -40,7 +44,9 @@ export class AddDripContentFields1758700000004 implements MigrationInterface {
       );
     }
 
-    if (!learningModuleTable?.columns.find((c) => c.name === 'drip_delay_days')) {
+    if (
+      !learningModuleTable?.columns.find((c) => c.name === 'drip_delay_days')
+    ) {
       await queryRunner.addColumn(
         'learning_module',
         new TableColumn({

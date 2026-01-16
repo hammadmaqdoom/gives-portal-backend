@@ -70,6 +70,18 @@ export class Invoice {
   paymentProofUrl?: string;
 
   @ApiProperty()
+  originalPrice?: number;
+
+  @ApiProperty()
+  discountAmount?: number;
+
+  @ApiProperty()
+  discountType?: string;
+
+  @ApiProperty()
+  classId?: number;
+
+  @ApiProperty()
   createdAt: Date;
 
   @ApiProperty()

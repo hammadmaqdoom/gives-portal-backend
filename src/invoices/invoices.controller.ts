@@ -228,7 +228,9 @@ export class InvoicesController {
 
   @Post(':id/approve-payment')
   @Roles(RoleEnum.admin)
-  @ApiOperation({ summary: 'Approve bank transfer payment and activate enrollments' })
+  @ApiOperation({
+    summary: 'Approve bank transfer payment and activate enrollments',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Payment approved and enrollments activated successfully',

@@ -1,5 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, ValidateNested, IsNotEmpty, IsNumber, IsString, IsOptional, IsIn } from 'class-validator';
+import {
+  IsArray,
+  ValidateNested,
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  IsOptional,
+  IsIn,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class BulkCreateClassItemDto {
@@ -33,10 +41,10 @@ export class BulkCreateClassItemDto {
   @IsNumber()
   feePKR: number;
 
-  @ApiProperty({ example: 'virtual', enum: ['virtual', 'in-person'] })
+  @ApiProperty({ example: 'virtual', enum: ['virtual', 'in-person', 'hybrid'] })
   @IsNotEmpty()
-  @IsIn(['virtual', 'in-person'])
-  classMode: 'virtual' | 'in-person';
+  @IsIn(['virtual', 'in-person', 'hybrid'])
+  classMode: 'virtual' | 'in-person' | 'hybrid';
 
   @ApiProperty({ example: ['Tuesday', 'Thursday'], required: false })
   @IsOptional()
@@ -63,7 +71,10 @@ export class BulkCreateClassItemDto {
   @IsOptional()
   isPublicForSale?: boolean;
 
-  @ApiProperty({ example: 'https://example.com/thumbnail.jpg', required: false })
+  @ApiProperty({
+    example: 'https://example.com/thumbnail.jpg',
+    required: false,
+  })
   @IsOptional()
   @IsString()
   thumbnailUrl?: string;
@@ -84,5 +95,14 @@ export class BulkCreateClassesDto {
   @ValidateNested({ each: true })
   @Type(() => BulkCreateClassItemDto)
   classes: BulkCreateClassItemDto[];
-}
 
+  @ApiProperty({
+    enum: ['skip', 'update'],
+    default: 'skip',
+    description: 'How to handle duplicates: skip or update',
+    required: false,
+  })
+  @IsOptional()
+  @IsIn(['skip', 'update'])
+  duplicateHandling?: 'skip' | 'update';
+}

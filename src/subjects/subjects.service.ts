@@ -113,13 +113,16 @@ export class SubjectsService {
     }
   }
 
-  async bulkCreateFromData(subjects: Array<{
-    name: string;
-    description?: string;
-    syllabusCode?: string;
-    level?: string;
-    officialLink?: string;
-  }>): Promise<{
+  async bulkCreateFromData(
+    subjects: Array<{
+      name: string;
+      description?: string;
+      syllabusCode?: string;
+      level?: string;
+      officialLink?: string;
+    }>,
+    duplicateHandling: 'skip' | 'update' = 'skip',
+  ): Promise<{
     totalRows: number;
     successful: number;
     failed: number;
@@ -169,15 +172,50 @@ export class SubjectsService {
           subjectData.name.trim(),
         );
         if (existingSubject) {
-          results.push({
-            row: rowNumber,
-            name: subjectData.name.trim(),
-            status: 'skipped',
-            message: 'Subject with this name already exists',
-            subjectId: existingSubject.id,
-          });
-          failed++;
-          continue;
+          if (duplicateHandling === 'skip') {
+            results.push({
+              row: rowNumber,
+              name: subjectData.name.trim(),
+              status: 'skipped',
+              message: 'Subject with this name already exists',
+              subjectId: existingSubject.id,
+            });
+            failed++;
+            continue;
+          } else {
+            // Update existing subject
+            try {
+              const updateSubjectDto: UpdateSubjectDto = {
+                name: subjectData.name.trim(),
+                description: subjectData.description?.trim() || undefined,
+                syllabusCode: subjectData.syllabusCode?.trim() || undefined,
+                level: subjectData.level?.trim() || undefined,
+                officialLink: subjectData.officialLink?.trim() || undefined,
+              };
+
+              const updatedSubject = await this.update(existingSubject.id, updateSubjectDto);
+              
+              results.push({
+                row: rowNumber,
+                name: updatedSubject!.name,
+                status: 'success',
+                message: 'Subject updated successfully',
+                subjectId: updatedSubject!.id,
+              });
+              successful++;
+              continue;
+            } catch (error: any) {
+              results.push({
+                row: rowNumber,
+                name: subjectData.name.trim(),
+                status: 'error',
+                message: `Failed to update: ${error.message || 'Unknown error'}`,
+                subjectId: existingSubject.id,
+              });
+              failed++;
+              continue;
+            }
+          }
         }
 
         // Create subject
@@ -293,10 +331,7 @@ export class SubjectsService {
         row['SubjectName'] ||
         '',
       description:
-        row['Description'] ||
-        row['description'] ||
-        row['Desc'] ||
-        undefined,
+        row['Description'] || row['description'] || row['Desc'] || undefined,
       syllabusCode:
         row['Syllabus Code'] ||
         row['SyllabusCode'] ||

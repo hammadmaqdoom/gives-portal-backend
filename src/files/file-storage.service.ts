@@ -11,11 +11,19 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
 } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
 import { SettingsService } from '../settings/settings.service';
 
 export interface FileUploadContext {
-  type: 'assignment' | 'submission' | 'module' | 'payment-proof' | 'general' | 'profile' | 'course';
+  type:
+    | 'assignment'
+    | 'submission'
+    | 'module'
+    | 'payment-proof'
+    | 'general'
+    | 'profile'
+    | 'course';
   id: string | number;
   userId: string | number;
 }
@@ -430,6 +438,35 @@ export class FileStorageService {
     ) {
       // For S3 files, construct the full S3 URL
       return `https://${this.s3Bucket}.s3.${this.s3Region}.amazonaws.com/${filePath}`;
+    }
+
+    return filePath;
+  }
+
+  /**
+   * Get presigned URL for S3 files (for private buckets)
+   */
+  async getPresignedFileUrl(filePath: string, expiresIn: number = 3600): Promise<string> {
+    await this.ensureConfigLoaded();
+    
+    if (this.fileDriver === FileDriver.LOCAL) {
+      // For local files, return relative path
+      return filePath;
+    } else if (
+      this.fileDriver === FileDriver.S3 ||
+      this.fileDriver === FileDriver.S3_PRESIGNED
+    ) {
+      if (!this.s3Client) {
+        throw new Error('S3 client not initialized');
+      }
+      
+      const key = filePath.replace(/\\/g, '/');
+      const command = new GetObjectCommand({
+        Bucket: this.s3Bucket,
+        Key: key,
+      });
+      
+      return await getSignedUrl(this.s3Client, command, { expiresIn });
     }
 
     return filePath;

@@ -42,6 +42,12 @@ export class StudentClassEnrollmentEntity extends EntityRelationalHelper {
   @Column({ type: 'boolean', default: false })
   adminGrantedAccess: boolean;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  customFeePKR?: number | null;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  customFeeUSD?: number | null;
+
   @ManyToOne(() => StudentEntity, {})
   @JoinColumn({ name: 'studentId' })
   student: StudentEntity;

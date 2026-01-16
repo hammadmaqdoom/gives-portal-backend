@@ -67,10 +67,16 @@ export class AddUserProfileFields1754308080005 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "user" DROP COLUMN IF EXISTS "dateOfBirth"`);
-    await queryRunner.query(`ALTER TABLE "user" DROP COLUMN IF EXISTS "country"`);
+    await queryRunner.query(
+      `ALTER TABLE "user" DROP COLUMN IF EXISTS "dateOfBirth"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "user" DROP COLUMN IF EXISTS "country"`,
+    );
     await queryRunner.query(`ALTER TABLE "user" DROP COLUMN IF EXISTS "city"`);
-    await queryRunner.query(`ALTER TABLE "user" DROP COLUMN IF EXISTS "address"`);
+    await queryRunner.query(
+      `ALTER TABLE "user" DROP COLUMN IF EXISTS "address"`,
+    );
     await queryRunner.query(`ALTER TABLE "user" DROP COLUMN IF EXISTS "bio"`);
     await queryRunner.query(`ALTER TABLE "user" DROP COLUMN IF EXISTS "phone"`);
   }

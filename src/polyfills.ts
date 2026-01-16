@@ -2,7 +2,7 @@
  * Polyfill for SlowBuffer to support Node.js v25+
  * SlowBuffer was deprecated and removed in newer Node.js versions
  * This polyfill provides compatibility for packages like buffer-equal-constant-time
- * 
+ *
  * This must be loaded BEFORE any modules that use buffer-equal-constant-time
  */
 import { Buffer } from 'buffer';
@@ -13,16 +13,16 @@ if (typeof (global as any).SlowBuffer === 'undefined') {
   // Create SlowBuffer as an alias to Buffer
   // Use function constructor to avoid TypeScript spread issues
   const SlowBuffer = Buffer as any;
-  
+
   // Add prototype methods that buffer-equal-constant-time expects
   // The old SlowBuffer.prototype.equal method
   if (!(SlowBuffer.prototype as any).equal) {
     (SlowBuffer.prototype as any).equal = Buffer.prototype.equals;
   }
-  
+
   // Set on global
   (global as any).SlowBuffer = SlowBuffer;
-  
+
   // Also patch the buffer module
   try {
     const bufferModule = require('buffer');
@@ -39,7 +39,7 @@ if (typeof (global as any).SlowBuffer === 'undefined') {
   } catch (e) {
     // Ignore if buffer module can't be required
   }
-  
+
   // Patch require.cache if buffer module is already cached
   const bufferModulePath = require.resolve('buffer');
   if (require.cache[bufferModulePath]) {
@@ -49,4 +49,3 @@ if (typeof (global as any).SlowBuffer === 'undefined') {
     }
   }
 }
-

@@ -25,4 +25,3 @@ export class BatchTerm {
   @ApiProperty({ example: null })
   deletedAt: Date | null;
 }
-

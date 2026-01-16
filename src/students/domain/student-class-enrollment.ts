@@ -16,6 +16,10 @@ export class StudentClassEnrollment {
 
   adminGrantedAccess?: boolean;
 
+  customFeePKR?: number | null;
+
+  customFeeUSD?: number | null;
+
   student?: Student;
 
   class?: Class;

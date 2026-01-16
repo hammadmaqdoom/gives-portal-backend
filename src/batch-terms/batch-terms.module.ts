@@ -10,4 +10,3 @@ import { RelationalBatchTermPersistenceModule } from './infrastructure/persisten
   exports: [BatchTermsService, RelationalBatchTermPersistenceModule],
 })
 export class BatchTermsModule {}
-

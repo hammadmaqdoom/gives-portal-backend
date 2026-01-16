@@ -20,6 +20,11 @@ import { LearningModuleSectionEntity } from '../learning-modules/infrastructure/
 import { AssignmentEntity } from '../assignments/infrastructure/persistence/relational/entities/assignment.entity';
 import { SubjectsService } from '../subjects/subjects.service';
 import { TeachersService } from '../teachers/teachers.service';
+import { CreateClassScheduleDto } from './dto/class-schedule.dto';
+import { Weekday } from './infrastructure/persistence/relational/entities/class-schedule.entity';
+import { FileStorageService } from '../files/file-storage.service';
+import { FileDriver } from '../files/config/file-config.type';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class ClassesService {
@@ -34,7 +39,157 @@ export class ClassesService {
     private readonly assignmentRepo: Repository<AssignmentEntity>,
     private readonly subjectsService: SubjectsService,
     private readonly teachersService: TeachersService,
+    private readonly fileStorageService: FileStorageService,
+    private readonly configService: ConfigService,
   ) {}
+
+  /**
+   * Normalize weekday name to lowercase enum value
+   */
+  private normalizeWeekday(day: string): Weekday | null {
+    const normalized = day.trim().toLowerCase();
+    const weekdayMap: Record<string, Weekday> = {
+      monday: Weekday.MONDAY,
+      tuesday: Weekday.TUESDAY,
+      wednesday: Weekday.WEDNESDAY,
+      thursday: Weekday.THURSDAY,
+      friday: Weekday.FRIDAY,
+      saturday: Weekday.SATURDAY,
+      sunday: Weekday.SUNDAY,
+      mon: Weekday.MONDAY,
+      tue: Weekday.TUESDAY,
+      wed: Weekday.WEDNESDAY,
+      thu: Weekday.THURSDAY,
+      fri: Weekday.FRIDAY,
+      sat: Weekday.SATURDAY,
+      sun: Weekday.SUNDAY,
+    };
+    return weekdayMap[normalized] || null;
+  }
+
+  /**
+   * Parse weekdays string (semicolon-separated) and return normalized array
+   */
+  private parseWeekdays(weekdaysStr: string): Weekday[] {
+    if (!weekdaysStr || !weekdaysStr.trim()) {
+      return [];
+    }
+    return weekdaysStr
+      .split(';')
+      .map((d) => this.normalizeWeekday(d))
+      .filter((d): d is Weekday => d !== null);
+  }
+
+  /**
+   * Convert 12-hour time format to 24-hour format (HH:MM)
+   * Handles formats like: "7:00PM", "7:00 PM", "19:00", etc.
+   */
+  private convertTo24Hour(timeStr: string): string | null {
+    if (!timeStr || !timeStr.trim()) {
+      return null;
+    }
+
+    const trimmed = timeStr.trim().toUpperCase();
+    
+    // If already in 24-hour format (HH:MM), return as-is
+    if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+      const [hours, minutes] = trimmed.split(':');
+      const hour = parseInt(hours, 10);
+      if (hour >= 0 && hour <= 23 && parseInt(minutes, 10) >= 0 && parseInt(minutes, 10) <= 59) {
+        return `${hour.toString().padStart(2, '0')}:${minutes}`;
+      }
+    }
+
+    // Parse 12-hour format with AM/PM
+    const match = trimmed.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+    if (!match) {
+      return null;
+    }
+
+    let hours = parseInt(match[1], 10);
+    const minutes = match[2];
+    const period = match[3];
+
+    if (hours < 1 || hours > 12) {
+      return null;
+    }
+
+    if (period === 'PM' && hours !== 12) {
+      hours += 12;
+    } else if (period === 'AM' && hours === 12) {
+      hours = 0;
+    }
+
+    return `${hours.toString().padStart(2, '0')}:${minutes}`;
+  }
+
+  /**
+   * Parse timing string to extract time ranges
+   * Handles formats like: "7:00PM-8:00PM", "7:00PM-8:00PM;9:00PM-10:00PM", etc.
+   */
+  private parseTiming(timingStr: string): Array<{ startTime: string; endTime: string }> {
+    if (!timingStr || !timingStr.trim()) {
+      return [];
+    }
+
+    const ranges: Array<{ startTime: string; endTime: string }> = [];
+    
+    // Split by semicolon to handle multiple time ranges
+    const timeRanges = timingStr.split(';').map(t => t.trim()).filter(t => t);
+    
+    for (const timeRange of timeRanges) {
+      // Split by hyphen to get start and end times
+      const parts = timeRange.split('-').map(t => t.trim()).filter(t => t);
+      
+      if (parts.length >= 2) {
+        const startTime = this.convertTo24Hour(parts[0]);
+        const endTime = this.convertTo24Hour(parts[1]);
+        
+        // Only add if both times are valid
+        if (startTime && endTime) {
+          ranges.push({ startTime, endTime });
+        }
+      }
+    }
+
+    return ranges;
+  }
+
+  /**
+   * Convert weekdays and timing to schedule objects
+   */
+  private convertToSchedules(
+    weekdays: Weekday[],
+    timing: string,
+    timezone: string = 'Asia/Karachi',
+  ): CreateClassScheduleDto[] {
+    const schedules: CreateClassScheduleDto[] = [];
+    
+    if (weekdays.length === 0 || !timing) {
+      return schedules;
+    }
+
+    const timeRanges = this.parseTiming(timing);
+    
+    if (timeRanges.length === 0) {
+      return schedules;
+    }
+
+    // Create a schedule for each weekday and time range combination
+    for (const weekday of weekdays) {
+      for (const timeRange of timeRanges) {
+        schedules.push({
+          weekday,
+          startTime: timeRange.startTime,
+          endTime: timeRange.endTime,
+          timezone: timezone || 'Asia/Karachi',
+          isActive: true,
+        });
+      }
+    }
+
+    return schedules;
+  }
 
   async create(createClassDto: CreateClassDto): Promise<Class> {
     const existingClass = await this.classesRepository.findByName(
@@ -83,15 +238,24 @@ export class ClassesService {
     sortOptions?: SortClassDto[] | null;
     paginationOptions: IPaginationOptions;
   }): Promise<Class[]> {
-    return this.classesRepository.findManyWithPagination({
+    const classes = await this.classesRepository.findManyWithPagination({
       filterOptions,
       sortOptions,
       paginationOptions,
     });
+    
+    // Enrich all classes with proper image URLs
+    await Promise.all(classes.map(cls => this.enrichClassWithImageUrls(cls)));
+    
+    return classes;
   }
 
   async findById(id: Class['id']): Promise<NullableType<Class>> {
-    return this.classesRepository.findById(id);
+    const classEntity = await this.classesRepository.findById(id);
+    if (classEntity) {
+      await this.enrichClassWithImageUrls(classEntity);
+    }
+    return classEntity;
   }
 
   async findByName(name: Class['name']): Promise<NullableType<Class>> {
@@ -324,6 +488,9 @@ export class ClassesService {
       paginationOptions: paginationOptions || { page: 1, limit: 12 },
     });
 
+    // Enrich all classes with proper image URLs
+    await Promise.all(classes.map(cls => this.enrichClassWithImageUrls(cls)));
+
     // Transform to include currency-aware price
     return classes.map((cls) => ({
       ...cls,
@@ -332,22 +499,107 @@ export class ClassesService {
     })) as any;
   }
 
-  async bulkCreateFromData(classes: Array<{
-    name: string;
-    batchTerm: string;
-    subjectId: number;
-    teacherId: number;
-    feeUSD: number;
-    feePKR: number;
-    classMode: 'virtual' | 'in-person';
-    weekdays?: string[];
-    timing?: string;
-    timezone?: string;
-    courseOutline?: string;
-    isPublicForSale?: boolean;
-    thumbnailUrl?: string;
-    coverImageUrl?: string;
-  }>): Promise<{
+  /**
+   * Get base URL for the current server
+   */
+  private getBaseUrl(): string {
+    const protocol = this.configService.get('app.protocol') || 'http';
+    const host = this.configService.get('app.host') || 'localhost';
+    const port = this.configService.get('app.port') || 3000;
+    return `${protocol}://${host}:${port}`;
+  }
+
+  /**
+   * Enrich class with proper image URLs (presigned for S3, serve endpoint for local)
+   * Also sets thumbnailUrl and coverImageUrl from file URLs for frontend compatibility
+   */
+  private async enrichClassWithImageUrls(classEntity: Class): Promise<void> {
+    const fileDriver = await this.fileStorageService.getDriver();
+    const baseUrl = this.getBaseUrl();
+
+    // Handle thumbnail file
+    if ((classEntity as any).thumbnailFile) {
+      const thumbnailFile = (classEntity as any).thumbnailFile;
+      
+      if (fileDriver === FileDriver.LOCAL) {
+        // For local files, use the serve endpoint
+        thumbnailFile.url = `${baseUrl}/api/v1/files/serve/${thumbnailFile.id}`;
+      } else if (
+        fileDriver === FileDriver.S3 ||
+        fileDriver === FileDriver.S3_PRESIGNED
+      ) {
+        // For S3 files, generate presigned URL
+        try {
+          thumbnailFile.url = await this.fileStorageService.getPresignedFileUrl(
+            thumbnailFile.path,
+            3600, // 1 hour expiry
+          );
+        } catch (error) {
+          console.error('Error generating presigned URL for thumbnail:', error);
+          // Fallback to serve endpoint if presigned URL generation fails
+          thumbnailFile.url = `${baseUrl}/api/v1/files/serve/${thumbnailFile.id}`;
+        }
+      } else {
+        // Fallback for other storage types
+        thumbnailFile.url = `${baseUrl}/api/v1/files/serve/${thumbnailFile.id}`;
+      }
+      
+      // Set thumbnailUrl from file URL for frontend compatibility
+      (classEntity as any).thumbnailUrl = thumbnailFile.url;
+    }
+
+    // Handle cover image file
+    if ((classEntity as any).coverImageFile) {
+      const coverImageFile = (classEntity as any).coverImageFile;
+      
+      if (fileDriver === FileDriver.LOCAL) {
+        // For local files, use the serve endpoint
+        coverImageFile.url = `${baseUrl}/api/v1/files/serve/${coverImageFile.id}`;
+      } else if (
+        fileDriver === FileDriver.S3 ||
+        fileDriver === FileDriver.S3_PRESIGNED
+      ) {
+        // For S3 files, generate presigned URL
+        try {
+          coverImageFile.url = await this.fileStorageService.getPresignedFileUrl(
+            coverImageFile.path,
+            3600, // 1 hour expiry
+          );
+        } catch (error) {
+          console.error('Error generating presigned URL for cover image:', error);
+          // Fallback to serve endpoint if presigned URL generation fails
+          coverImageFile.url = `${baseUrl}/api/v1/files/serve/${coverImageFile.id}`;
+        }
+      } else {
+        // Fallback for other storage types
+        coverImageFile.url = `${baseUrl}/api/v1/files/serve/${coverImageFile.id}`;
+      }
+      
+      // Set coverImageUrl from file URL for frontend compatibility
+      (classEntity as any).coverImageUrl = coverImageFile.url;
+    }
+  }
+
+  async bulkCreateFromData(
+    classes: Array<{
+      name: string;
+      batchTerm: string;
+      subjectId: number;
+      teacherId: number;
+      feeUSD: number;
+      feePKR: number;
+      classMode: 'virtual' | 'in-person' | 'hybrid';
+      weekdays?: string[];
+      timing?: string;
+      timezone?: string;
+      schedules?: CreateClassScheduleDto[];
+      courseOutline?: string;
+      isPublicForSale?: boolean;
+      thumbnailUrl?: string;
+      coverImageUrl?: string;
+    }>,
+    duplicateHandling: 'skip' | 'update' = 'skip',
+  ): Promise<{
     totalRows: number;
     successful: number;
     failed: number;
@@ -425,7 +677,11 @@ export class ClassesService {
           continue;
         }
 
-        if (classData.feeUSD === undefined || isNaN(classData.feeUSD) || classData.feeUSD < 0) {
+        if (
+          classData.feeUSD === undefined ||
+          isNaN(classData.feeUSD) ||
+          classData.feeUSD < 0
+        ) {
           results.push({
             row: rowNumber,
             className: classData.name.trim(),
@@ -436,7 +692,11 @@ export class ClassesService {
           continue;
         }
 
-        if (classData.feePKR === undefined || isNaN(classData.feePKR) || classData.feePKR < 0) {
+        if (
+          classData.feePKR === undefined ||
+          isNaN(classData.feePKR) ||
+          classData.feePKR < 0
+        ) {
           results.push({
             row: rowNumber,
             className: classData.name.trim(),
@@ -447,12 +707,18 @@ export class ClassesService {
           continue;
         }
 
-        if (!classData.classMode || (classData.classMode !== 'virtual' && classData.classMode !== 'in-person')) {
+        if (
+          !classData.classMode ||
+          (classData.classMode !== 'virtual' &&
+            classData.classMode !== 'in-person' &&
+            classData.classMode !== 'hybrid')
+        ) {
           results.push({
             row: rowNumber,
             className: classData.name.trim(),
             status: 'error',
-            message: 'Class Mode must be either "virtual" or "in-person"',
+            message:
+              'Class Mode must be either "virtual", "in-person", or "hybrid"',
           });
           failed++;
           continue;
@@ -463,15 +729,103 @@ export class ClassesService {
           classData.name.trim(),
         );
         if (existingClass) {
-          results.push({
-            row: rowNumber,
-            className: classData.name.trim(),
-            status: 'skipped',
-            message: 'Class with this name already exists',
-            classId: existingClass.id,
-          });
-          failed++;
-          continue;
+          if (duplicateHandling === 'skip') {
+            results.push({
+              row: rowNumber,
+              className: classData.name.trim(),
+              status: 'skipped',
+              message: 'Class with this name already exists',
+              classId: existingClass.id,
+            });
+            failed++;
+            continue;
+          } else {
+            // Update existing class
+            try {
+              // Convert weekdays and timing to schedules if schedules not provided
+              let schedules = classData.schedules;
+              if (!schedules && classData.weekdays && classData.timing) {
+                let weekdaysArray: Weekday[] = [];
+                if (Array.isArray(classData.weekdays)) {
+                  weekdaysArray = classData.weekdays
+                    .map((d) => this.normalizeWeekday(d))
+                    .filter((d): d is Weekday => d !== null);
+                } else if (typeof classData.weekdays === 'string') {
+                  weekdaysArray = this.parseWeekdays(classData.weekdays);
+                }
+                
+                if (weekdaysArray.length > 0 && classData.timing) {
+                  schedules = this.convertToSchedules(
+                    weekdaysArray,
+                    classData.timing,
+                    classData.timezone || 'Asia/Karachi',
+                  );
+                }
+              }
+
+              const updateClassDto: UpdateClassDto = {
+                name: classData.name.trim(),
+                batchTerm: classData.batchTerm.trim(),
+                subject: { id: classData.subjectId },
+                teacher: { id: classData.teacherId },
+                feeUSD: classData.feeUSD,
+                feePKR: classData.feePKR,
+                classMode: classData.classMode,
+                weekdays: classData.weekdays,
+                timing: classData.timing?.trim() || undefined,
+                timezone: classData.timezone?.trim() || undefined,
+                schedules: schedules || undefined,
+                courseOutline: classData.courseOutline?.trim() || undefined,
+                isPublicForSale: classData.isPublicForSale,
+                thumbnailUrl: classData.thumbnailUrl?.trim() || undefined,
+                coverImageUrl: classData.coverImageUrl?.trim() || undefined,
+              };
+
+              const updatedClass = await this.update(existingClass.id, updateClassDto);
+              
+              results.push({
+                row: rowNumber,
+                className: updatedClass!.name,
+                status: 'success',
+                message: 'Class updated successfully',
+                classId: updatedClass!.id,
+              });
+              successful++;
+              continue;
+            } catch (error: any) {
+              results.push({
+                row: rowNumber,
+                className: classData.name.trim(),
+                status: 'error',
+                message: `Failed to update: ${error.message || 'Unknown error'}`,
+                classId: existingClass.id,
+              });
+              failed++;
+              continue;
+            }
+          }
+        }
+
+        // Convert weekdays and timing to schedules if schedules not provided
+        let schedules = classData.schedules;
+        if (!schedules && classData.weekdays && classData.timing) {
+          // Parse weekdays - handle both array and string formats
+          let weekdaysArray: Weekday[] = [];
+          if (Array.isArray(classData.weekdays)) {
+            weekdaysArray = classData.weekdays
+              .map((d) => this.normalizeWeekday(d))
+              .filter((d): d is Weekday => d !== null);
+          } else if (typeof classData.weekdays === 'string') {
+            weekdaysArray = this.parseWeekdays(classData.weekdays);
+          }
+          
+          if (weekdaysArray.length > 0 && classData.timing) {
+            schedules = this.convertToSchedules(
+              weekdaysArray,
+              classData.timing,
+              classData.timezone || 'Asia/Karachi',
+            );
+          }
         }
 
         // Create class
@@ -486,6 +840,7 @@ export class ClassesService {
           weekdays: classData.weekdays,
           timing: classData.timing?.trim() || undefined,
           timezone: classData.timezone?.trim() || undefined,
+          schedules: schedules || undefined,
           courseOutline: classData.courseOutline?.trim() || undefined,
           isPublicForSale: classData.isPublicForSale,
           thumbnailUrl: classData.thumbnailUrl?.trim() || undefined,
@@ -591,26 +946,84 @@ export class ClassesService {
     const classes = rows.map((row: any) => {
       const feeUSDStr = row['Fee USD'] || row['FeeUSD'] || row['fee_usd'] || '';
       const feePKRStr = row['Fee PKR'] || row['FeePKR'] || row['fee_pkr'] || '';
-      const subjectIdStr = row['Subject ID'] || row['SubjectID'] || row['subject_id'] || row['Subject'] || '';
-      const teacherIdStr = row['Teacher ID'] || row['TeacherID'] || row['teacher_id'] || row['Teacher'] || '';
-      const weekdays = row['Weekdays'] || row['weekdays'] || row['Days'] || '';
-      const isPublicForSaleStr = row['Is Public For Sale'] || row['IsPublicForSale'] || row['is_public_for_sale'] || row['Public'] || 'false';
+      const subjectIdStr =
+        row['Subject ID'] ||
+        row['SubjectID'] ||
+        row['subject_id'] ||
+        row['Subject'] ||
+        '';
+      const teacherIdStr =
+        row['Teacher ID'] ||
+        row['TeacherID'] ||
+        row['teacher_id'] ||
+        row['Teacher'] ||
+        '';
+      const weekdaysStr = row['Weekdays'] || row['weekdays'] || row['Days'] || '';
+      const timingStr = row['Timing'] || row['timing'] || row['Time'] || '';
+      const timezoneStr =
+        row['Timezone'] || row['timezone'] || row['Time Zone'] || 'Asia/Karachi';
+      const isPublicForSaleStr =
+        row['Is Public For Sale'] ||
+        row['IsPublicForSale'] ||
+        row['is_public_for_sale'] ||
+        row['Public'] ||
+        'false';
+
+      // Parse weekdays and timing properly
+      const parsedWeekdays = this.parseWeekdays(weekdaysStr);
+      const schedules = this.convertToSchedules(
+        parsedWeekdays,
+        timingStr,
+        timezoneStr,
+      );
 
       return {
-        name: row['Name'] || row['name'] || row['Class Name'] || row['ClassName'] || '',
-        batchTerm: row['Batch/Term'] || row['BatchTerm'] || row['batch_term'] || row['Batch'] || '',
+        name:
+          row['Name'] ||
+          row['name'] ||
+          row['Class Name'] ||
+          row['ClassName'] ||
+          '',
+        batchTerm:
+          row['Batch/Term'] ||
+          row['BatchTerm'] ||
+          row['batch_term'] ||
+          row['Batch'] ||
+          '',
         subjectId: parseInt(subjectIdStr.trim(), 10),
         teacherId: parseInt(teacherIdStr.trim(), 10),
         feeUSD: parseFloat(feeUSDStr.trim()),
         feePKR: parseFloat(feePKRStr.trim()),
-        classMode: (row['Class Mode'] || row['ClassMode'] || row['class_mode'] || row['Mode'] || '').trim() as 'virtual' | 'in-person',
-        weekdays: weekdays ? weekdays.split(';').map((d: string) => d.trim()).filter((d: string) => d) : undefined,
-        timing: row['Timing'] || row['timing'] || row['Time'] || undefined,
-        timezone: row['Timezone'] || row['timezone'] || row['Time Zone'] || undefined,
-        courseOutline: row['Course Outline'] || row['CourseOutline'] || row['course_outline'] || row['Outline'] || undefined,
+        classMode: (
+          row['Class Mode'] ||
+          row['ClassMode'] ||
+          row['class_mode'] ||
+          row['Mode'] ||
+          ''
+        ).trim() as 'virtual' | 'in-person',
+        weekdays: parsedWeekdays.length > 0 ? parsedWeekdays.map(w => w) : undefined,
+        timing: timingStr || undefined,
+        timezone: timezoneStr || undefined,
+        schedules: schedules.length > 0 ? schedules : undefined,
+        courseOutline:
+          row['Course Outline'] ||
+          row['CourseOutline'] ||
+          row['course_outline'] ||
+          row['Outline'] ||
+          undefined,
         isPublicForSale: isPublicForSaleStr.toLowerCase() === 'true',
-        thumbnailUrl: row['Thumbnail URL'] || row['ThumbnailURL'] || row['thumbnail_url'] || row['Thumbnail'] || undefined,
-        coverImageUrl: row['Cover Image URL'] || row['CoverImageURL'] || row['cover_image_url'] || row['Cover Image'] || undefined,
+        thumbnailUrl:
+          row['Thumbnail URL'] ||
+          row['ThumbnailURL'] ||
+          row['thumbnail_url'] ||
+          row['Thumbnail'] ||
+          undefined,
+        coverImageUrl:
+          row['Cover Image URL'] ||
+          row['CoverImageURL'] ||
+          row['cover_image_url'] ||
+          row['Cover Image'] ||
+          undefined,
       };
     });
 
@@ -745,20 +1158,10 @@ export class ClassesService {
           row['Mode'] ||
           '';
         const weekdays =
-          row['Weekdays'] ||
-          row['weekdays'] ||
-          row['Days'] ||
-          '';
-        const timing =
-          row['Timing'] ||
-          row['timing'] ||
-          row['Time'] ||
-          '';
+          row['Weekdays'] || row['weekdays'] || row['Days'] || '';
+        const timing = row['Timing'] || row['timing'] || row['Time'] || '';
         const timezone =
-          row['Timezone'] ||
-          row['timezone'] ||
-          row['Time Zone'] ||
-          '';
+          row['Timezone'] || row['timezone'] || row['Time Zone'] || '';
         const courseOutline =
           row['Course Outline'] ||
           row['CourseOutline'] ||
@@ -936,7 +1339,10 @@ export class ClassesService {
           continue;
         }
 
-        if (classMode.trim() !== 'virtual' && classMode.trim() !== 'in-person') {
+        if (
+          classMode.trim() !== 'virtual' &&
+          classMode.trim() !== 'in-person'
+        ) {
           results.push({
             row: rowNumber,
             className: name.trim(),
@@ -965,7 +1371,10 @@ export class ClassesService {
 
         // Parse optional fields
         const weekdaysArray = weekdays
-          ? weekdays.split(';').map((d: string) => d.trim()).filter((d: string) => d)
+          ? weekdays
+              .split(';')
+              .map((d: string) => d.trim())
+              .filter((d: string) => d)
           : undefined;
         const isPublicForSale = isPublicForSaleStr.toLowerCase() === 'true';
 

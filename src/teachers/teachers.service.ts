@@ -19,6 +19,10 @@ import { randomStringGenerator } from '../utils/random-string-generator';
 import { NotificationService } from '../notifications/notification.service';
 import { SubjectsService } from '../subjects/subjects.service';
 import { FileType } from '../files/domain/file';
+import { PublicTeacherDto } from './dto/public-teacher.dto';
+import { FileStorageService } from '../files/file-storage.service';
+import { ConfigService } from '@nestjs/config';
+import { FileDriver } from '../files/config/file-config.type';
 
 @Injectable()
 export class TeachersService {
@@ -27,6 +31,8 @@ export class TeachersService {
     private readonly usersService: UsersService,
     private readonly notificationService: NotificationService,
     private readonly subjectsService: SubjectsService,
+    private readonly fileStorageService: FileStorageService,
+    private readonly configService: ConfigService,
   ) {}
 
   async create(
@@ -66,8 +72,8 @@ export class TeachersService {
       photo: createTeacherDto.photo
         ? ({ id: createTeacherDto.photo } as FileType)
         : createTeacherDto.photo === null
-        ? null
-        : undefined,
+          ? null
+          : undefined,
     };
 
     // Create teacher first
@@ -188,8 +194,8 @@ export class TeachersService {
       photo: updateTeacherDto.photo
         ? ({ id: updateTeacherDto.photo } as FileType)
         : updateTeacherDto.photo === null
-        ? null
-        : undefined,
+          ? null
+          : undefined,
     };
 
     // Update teacher record
@@ -337,19 +343,99 @@ export class TeachersService {
     return { teacher, user, hasUserAccount: !!user };
   }
 
-  async findPublicTeachers(): Promise<Teacher[]> {
-    return this.teachersRepository.findPublicTeachers();
+  async findPublicTeachers(): Promise<PublicTeacherDto[]> {
+    const teachers = await this.teachersRepository.findPublicTeachers();
+    return Promise.all(
+      teachers.map((teacher) => this.mapToPublicDto(teacher)),
+    );
   }
 
-  async findPublicTeacherById(id: Teacher['id']): Promise<Teacher | null> {
+  async findPublicTeacherById(
+    id: Teacher['id'],
+  ): Promise<PublicTeacherDto | null> {
     const teacher = await this.teachersRepository.findById(id);
     if (!teacher || !teacher.showOnPublicSite) {
       return null;
     }
-    return teacher;
+    return this.mapToPublicDto(teacher);
   }
 
-  async bulkCreateFromFile(file: Express.Multer.File): Promise<{
+  /**
+   * Map Teacher to PublicTeacherDto, excluding sensitive fields
+   * and generating proper URLs for photos
+   */
+  private async mapToPublicDto(teacher: Teacher): Promise<PublicTeacherDto> {
+    const dto = new PublicTeacherDto();
+    dto.id = teacher.id;
+    dto.name = teacher.name;
+    dto.subjectsAllowed = teacher.subjectsAllowed;
+    dto.bio = teacher.bio;
+    dto.showOnPublicSite = teacher.showOnPublicSite;
+    dto.displayOrder = teacher.displayOrder;
+
+    // Handle photo URL - generate presigned URL for S3 files
+    if (teacher.photo) {
+      const photo = { ...teacher.photo };
+      
+      // Generate proper URL for the photo
+      // For S3 files, use presigned URL; for local files, use serve endpoint
+      const fileDriver = await this.fileStorageService.getDriver();
+      
+      if (fileDriver === FileDriver.LOCAL) {
+        // For local files, use the serve endpoint
+        const baseUrl = this.getBaseUrl();
+        photo.url = `${baseUrl}/api/v1/files/serve/${photo.id}`;
+      } else if (
+        fileDriver === FileDriver.S3 ||
+        fileDriver === FileDriver.S3_PRESIGNED
+      ) {
+        // For S3 files, generate presigned URL
+        try {
+          photo.url = await this.fileStorageService.getPresignedFileUrl(
+            teacher.photo.path,
+            3600, // 1 hour expiry
+          );
+        } catch (error) {
+          console.error('Error generating presigned URL:', error);
+          // Fallback to serve endpoint if presigned URL generation fails
+          const baseUrl = this.getBaseUrl();
+          photo.url = `${baseUrl}/api/v1/files/serve/${photo.id}`;
+        }
+      } else {
+        // Fallback for other storage types
+        const baseUrl = this.getBaseUrl();
+        photo.url = `${baseUrl}/api/v1/files/serve/${photo.id}`;
+      }
+      
+      dto.photo = photo;
+    } else {
+      dto.photo = null;
+    }
+
+    return dto;
+  }
+
+  /**
+   * Get base URL for the current server
+   */
+  private getBaseUrl(): string {
+    const backendDomain = this.configService.get('app.backendDomain', {
+      infer: true,
+    });
+    if (backendDomain) {
+      return backendDomain;
+    }
+    // Fallback to environment-based URL
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const host = process.env.HOST || 'localhost';
+    const port = process.env.PORT || '3000';
+    return `${protocol}://${host}:${port}`;
+  }
+
+  async bulkCreateFromFile(
+    file: Express.Multer.File,
+    duplicateHandling: 'skip' | 'update' = 'skip',
+  ): Promise<{
     totalRows: number;
     successful: number;
     failed: number;
@@ -469,39 +555,29 @@ export class TeachersService {
           row['payout_method'] ||
           '';
         const bankName =
-          row['Bank Name'] ||
-          row['BankName'] ||
-          row['bank_name'] ||
-          '';
+          row['Bank Name'] || row['BankName'] || row['bank_name'] || '';
         const accountNumber =
           row['Account Number'] ||
           row['AccountNumber'] ||
           row['account_number'] ||
           '';
         const bankCode =
-          row['Bank Code'] ||
-          row['BankCode'] ||
-          row['bank_code'] ||
-          '';
-        const iban =
-          row['IBAN'] ||
-          row['iban'] ||
-          '';
+          row['Bank Code'] || row['BankCode'] || row['bank_code'] || '';
+        const iban = row['IBAN'] || row['iban'] || '';
         const accountHolderName =
           row['Account Holder Name'] ||
           row['AccountHolderName'] ||
           row['account_holder_name'] ||
           '';
         const bankBranch =
-          row['Bank Branch'] ||
-          row['BankBranch'] ||
-          row['bank_branch'] ||
-          '';
-        const bio =
-          row['Bio'] ||
-          row['bio'] ||
-          row['Biography'] ||
-          '';
+          row['Bank Branch'] || row['BankBranch'] || row['bank_branch'] || '';
+        const bio = row['Bio'] || row['bio'] || row['Biography'] || '';
+        const address = row['Address'] || row['address'] || '';
+        const city = row['City'] || row['city'] || '';
+        const country = row['Country'] || row['country'] || '';
+        const cnicNumber = row['CNIC'] || row['cnic'] || row['CNIC Number'] || row['cnicNumber'] || '';
+        const qualifications = row['Qualifications'] || row['qualifications'] || '';
+        const expertise = row['Expertise'] || row['expertise'] || '';
         const showOnPublicSiteStr =
           row['Show On Public Site'] ||
           row['ShowOnPublicSite'] ||
@@ -514,6 +590,19 @@ export class TeachersService {
           row['display_order'] ||
           row['Order'] ||
           '0';
+        
+        // Construct bank details string if any bank fields are provided
+        let bankDetails = '';
+        if (bankName || accountNumber || iban) {
+          const details: string[] = [];
+          if (bankName) details.push(`Bank: ${bankName}`);
+          if (accountNumber) details.push(`Account: ${accountNumber}`);
+          if (iban) details.push(`IBAN: ${iban}`);
+          if (accountHolderName) details.push(`Holder: ${accountHolderName}`);
+          if (bankCode) details.push(`Code: ${bankCode}`);
+          if (bankBranch) details.push(`Branch: ${bankBranch}`);
+          bankDetails = details.join(', ');
+        }
 
         // Validation
         if (!name || name.trim() === '') {
@@ -539,7 +628,11 @@ export class TeachersService {
         }
 
         const commissionPercentage = parseFloat(commissionPercentageStr);
-        if (isNaN(commissionPercentage) || commissionPercentage < 0 || commissionPercentage > 100) {
+        if (
+          isNaN(commissionPercentage) ||
+          commissionPercentage < 0 ||
+          commissionPercentage > 100
+        ) {
           results.push({
             row: rowNumber,
             teacherName: name.trim(),
@@ -555,7 +648,8 @@ export class TeachersService {
             row: rowNumber,
             teacherName: name.trim(),
             status: 'error',
-            message: 'Subjects Allowed is required (comma-separated subject IDs)',
+            message:
+              'Subjects Allowed is required (comma-separated subject IDs)',
           });
           failed++;
           continue;
@@ -572,7 +666,8 @@ export class TeachersService {
             row: rowNumber,
             teacherName: name.trim(),
             status: 'error',
-            message: 'Invalid Subjects Allowed format. Must be comma-separated numbers.',
+            message:
+              'Invalid Subjects Allowed format. Must be comma-separated numbers.',
           });
           failed++;
           continue;
@@ -599,37 +694,79 @@ export class TeachersService {
         }
 
         // Check if teacher already exists (by email or phone)
+        let existingTeacher: any = null;
         if (email && email.trim()) {
-          const existingTeacher = await this.teachersRepository.findByEmail(
+          existingTeacher = await this.teachersRepository.findByEmail(
             email.trim(),
           );
-          if (existingTeacher) {
-            results.push({
-              row: rowNumber,
-              teacherName: name.trim(),
-              status: 'skipped',
-              message: 'Teacher with this email already exists',
-              teacherId: existingTeacher.id,
-            });
-            failed++;
-            continue;
-          }
         }
-
-        if (phone && phone.trim()) {
-          const existingTeacher = await this.teachersRepository.findByPhone(
+        if (!existingTeacher && phone && phone.trim()) {
+          existingTeacher = await this.teachersRepository.findByPhone(
             phone.trim(),
           );
-          if (existingTeacher) {
+        }
+
+        if (existingTeacher) {
+          if (duplicateHandling === 'skip') {
             results.push({
               row: rowNumber,
               teacherName: name.trim(),
               status: 'skipped',
-              message: 'Teacher with this phone already exists',
+              message: 'Teacher with this email or phone already exists',
               teacherId: existingTeacher.id,
             });
             failed++;
             continue;
+          } else {
+            // Update existing teacher
+            try {
+              // Parse boolean and number fields
+              const showOnPublicSite = showOnPublicSiteStr?.toLowerCase() === 'true';
+              const displayOrder = parseInt(displayOrderStr, 10) || 0;
+
+              const updateTeacherDto: UpdateTeacherDto = {
+                name: name.trim(),
+                email: email?.trim() || undefined,
+                phone: phone?.trim() || undefined,
+                showOnPublicSite,
+                displayOrder,
+                bio: bio?.trim() || undefined,
+                payoutMethod: payoutMethod?.trim() || undefined,
+                bankName: bankName?.trim() || undefined,
+                accountNumber: accountNumber?.trim() || undefined,
+                bankCode: bankCode?.trim() || undefined,
+                iban: iban?.trim() || undefined,
+                accountHolderName: accountHolderName?.trim() || undefined,
+                bankBranch: bankBranch?.trim() || undefined,
+              };
+
+              // Update subjects allowed if provided
+              if (subjectIds && subjectIds.length > 0) {
+                updateTeacherDto.subjectsAllowed = subjectIds.map((id) => ({ id }));
+              }
+
+              const updateResult = await this.update(existingTeacher.id, updateTeacherDto);
+
+              results.push({
+                row: rowNumber,
+                teacherName: updateResult.teacher?.name || name.trim(),
+                status: 'success',
+                message: 'Teacher updated successfully',
+                teacherId: updateResult.teacher?.id || existingTeacher.id,
+              });
+              successful++;
+              continue;
+            } catch (error: any) {
+              results.push({
+                row: rowNumber,
+                teacherName: name.trim(),
+                status: 'error',
+                message: `Failed to update: ${error.message || 'Unknown error'}`,
+                teacherId: existingTeacher.id,
+              });
+              failed++;
+              continue;
+            }
           }
         }
 
@@ -639,7 +776,12 @@ export class TeachersService {
 
         // Validate payout method if provided
         if (payoutMethod && payoutMethod.trim()) {
-          const validPayoutMethods = ['bank_transfer', 'cash', 'check', 'online'];
+          const validPayoutMethods = [
+            'bank_transfer',
+            'cash',
+            'check',
+            'online',
+          ];
           if (!validPayoutMethods.includes(payoutMethod.trim())) {
             results.push({
               row: rowNumber,

@@ -6,7 +6,9 @@ export abstract class BatchTermRepository {
 
   abstract findById(id: BatchTerm['id']): Promise<NullableType<BatchTerm>>;
 
-  abstract findByName(name: BatchTerm['name']): Promise<NullableType<BatchTerm>>;
+  abstract findByName(
+    name: BatchTerm['name'],
+  ): Promise<NullableType<BatchTerm>>;
 
   abstract findAll(activeOnly?: boolean): Promise<BatchTerm[]>;
 
@@ -17,4 +19,3 @@ export abstract class BatchTermRepository {
 
   abstract remove(id: BatchTerm['id']): Promise<void>;
 }
-

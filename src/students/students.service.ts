@@ -547,7 +547,12 @@ export class StudentsService {
 
   async bulkEnrollStudentInClasses(
     studentId: number,
-    body: { classIds: number[]; status?: string; enrollmentDate?: string },
+    body: { 
+      classIds: number[]; 
+      status?: string; 
+      enrollmentDate?: string;
+      customFees?: Array<{ classId: number; customFeePKR?: number | null; customFeeUSD?: number | null }>;
+    },
   ): Promise<{ count: number; enrollments: any[] }> {
     const student = await this.studentsRepository.findById(studentId);
     if (!student) {
@@ -564,6 +569,17 @@ export class StudentsService {
       ? new Date(body.enrollmentDate)
       : new Date();
 
+    // Create a map of custom fees by classId for quick lookup
+    const customFeesMap = new Map<number, { customFeePKR?: number | null; customFeeUSD?: number | null }>();
+    if (body.customFees) {
+      for (const fee of body.customFees) {
+        customFeesMap.set(fee.classId, {
+          customFeePKR: fee.customFeePKR,
+          customFeeUSD: fee.customFeeUSD,
+        });
+      }
+    }
+
     const enrollments: any[] = [];
     let created = 0;
 
@@ -578,11 +594,16 @@ export class StudentsService {
           continue; // Skip if already enrolled
         }
 
+        // Get custom fees for this class if available
+        const customFees = customFeesMap.get(classId);
+
         const enrollment = await this.enrollmentRepository.create({
           studentId,
           classId,
           enrollmentDate: date,
           status,
+          customFeePKR: customFees?.customFeePKR ?? null,
+          customFeeUSD: customFees?.customFeeUSD ?? null,
         });
 
         enrollments.push(enrollment);
@@ -592,17 +613,26 @@ export class StudentsService {
         try {
           await this.generateMonthlyInvoice(studentId, classId);
         } catch (error) {
-          console.error(`Error generating invoice for student ${studentId} in class ${classId}:`, error);
+          console.error(
+            `Error generating invoice for student ${studentId} in class ${classId}:`,
+            error,
+          );
         }
 
         // Send enrollment notification email
         try {
           await this.sendEnrollmentNotification(studentId, classId);
         } catch (error) {
-          console.error(`Error sending enrollment notification for student ${studentId} in class ${classId}:`, error);
+          console.error(
+            `Error sending enrollment notification for student ${studentId} in class ${classId}:`,
+            error,
+          );
         }
       } catch (error) {
-        console.error(`Error enrolling student ${studentId} in class ${classId}:`, error);
+        console.error(
+          `Error enrolling student ${studentId} in class ${classId}:`,
+          error,
+        );
         // Continue with other classes even if one fails
       }
     }
@@ -899,7 +929,10 @@ export class StudentsService {
     return { linked, notFound, errors };
   }
 
-  async bulkEnrollFromFile(file: Express.Multer.File): Promise<{
+  async bulkEnrollFromFile(
+    file: Express.Multer.File,
+    duplicateHandling: 'skip' | 'update' = 'skip',
+  ): Promise<{
     totalRows: number;
     successful: number;
     failed: number;
@@ -1093,6 +1126,20 @@ export class StudentsService {
           row['parent_2_relationship'] ||
           '';
 
+        // Custom fees
+        const customPKRStr =
+          row['Custom PKR'] ||
+          row['CustomPKR'] ||
+          row['custom_pkr'] ||
+          row['CustomPKR'] ||
+          '';
+        const customUSDStr =
+          row['Custom USD'] ||
+          row['CustomUSD'] ||
+          row['custom_usd'] ||
+          row['CustomUSD'] ||
+          '';
+
         // Validation
         if (!studentName || studentName.trim() === '') {
           results.push({
@@ -1116,15 +1163,39 @@ export class StudentsService {
           continue;
         }
 
-        // Parse class IDs (can be comma-separated)
+        // Parse class IDs (semicolon-separated)
         const classIdStrings = classIdsStr
           .toString()
-          .split(',')
+          .split(';')
           .map((id: string) => id.trim())
           .filter((id: string) => id !== '');
         const classIds = classIdStrings
           .map((id: string) => parseInt(id, 10))
           .filter((id: number) => !isNaN(id));
+
+        // Parse custom fees (semicolon-separated, 0 = use default = null)
+        const parseCustomFees = (feeStr: string, classCount: number): (number | null)[] => {
+          if (!feeStr || feeStr.toString().trim() === '') {
+            return new Array(classCount).fill(null);
+          }
+          const feeStrings = feeStr
+            .toString()
+            .split(';')
+            .map((fee: string) => fee.trim())
+            .filter((fee: string) => fee !== '');
+          
+          const fees: (number | null)[] = [];
+          for (let i = 0; i < classCount; i++) {
+            if (i < feeStrings.length && feeStrings[i] !== '') {
+              const feeValue = parseFloat(feeStrings[i]);
+              // 0 means use default, so store as null
+              fees.push(isNaN(feeValue) || feeValue === 0 ? null : feeValue);
+            } else {
+              fees.push(null);
+            }
+          }
+          return fees;
+        };
 
         if (classIds.length === 0) {
           results.push({
@@ -1140,14 +1211,25 @@ export class StudentsService {
         // Verify classes exist - omit invalid class IDs but continue if at least one is valid
         const validClassIds: number[] = [];
         const invalidClassIds: number[] = [];
-        for (const classId of classIds) {
+        const validClassIndices: number[] = []; // Track original indices of valid classes
+        for (let i = 0; i < classIds.length; i++) {
+          const classId = classIds[i];
           const classEntity = await this.classesService.findById(classId);
           if (!classEntity) {
             invalidClassIds.push(classId);
           } else {
             validClassIds.push(classId);
+            validClassIndices.push(i); // Store original index
           }
         }
+
+        // Parse custom fees based on original classIds array, then map to valid classes
+        const allCustomPKRs = parseCustomFees(customPKRStr, classIds.length);
+        const allCustomUSDs = parseCustomFees(customUSDStr, classIds.length);
+        
+        // Map custom fees to valid class IDs by their original indices
+        const customPKRs = validClassIndices.map((idx) => allCustomPKRs[idx]);
+        const customUSDs = validClassIndices.map((idx) => allCustomUSDs[idx]);
 
         // If no valid class IDs found, skip this row
         if (validClassIds.length === 0) {
@@ -1172,17 +1254,30 @@ export class StudentsService {
           );
         }
 
-        // Check if student already exists (by email if provided)
+        // Check if student already exists (by email OR phone number)
         let student: NullableType<Student> = null;
+        let duplicateReason: 'email' | 'phone' | null = null;
+        
+        // First check by email
         if (studentEmail && studentEmail.trim()) {
-          student = await this.studentsRepository.findByEmail(
-            studentEmail.trim(),
-          );
+          student = await this.studentsRepository.findByEmail(studentEmail.trim());
+          if (student) {
+            duplicateReason = 'email';
+          }
+        }
+        
+        // If not found by email, check by phone/contact
+        if (!student && studentContact && studentContact.trim()) {
+          student = await this.studentsRepository.findByContact(studentContact.trim());
+          if (student) {
+            duplicateReason = 'phone';
+          }
         }
 
         // Create or update student
         let studentTempPassword: string | null = null;
         if (!student) {
+          // Create student without classes first (we'll add enrollments with custom fees separately)
           const createStudentDto: CreateStudentDto = {
             name: studentName.trim(),
             email: studentEmail?.trim() || undefined,
@@ -1192,12 +1287,38 @@ export class StudentsService {
             state: studentState?.trim() || undefined,
             country: studentCountry?.trim() || undefined,
             dateOfBirth: studentDateOfBirth?.trim() || undefined,
-            classes: validClassIds.map((id) => ({ id })),
+            classes: [], // Don't create enrollments here, we'll do it with custom fees
           };
 
           const createResult = await this.create(createStudentDto);
           student = createResult.student;
           studentTempPassword = createResult.tempPassword;
+
+          // Create enrollments with custom fees
+          for (let i = 0; i < validClassIds.length; i++) {
+            const classId = validClassIds[i];
+            const customPKR = i < customPKRs.length ? customPKRs[i] : null;
+            const customUSD = i < customUSDs.length ? customUSDs[i] : null;
+            
+            try {
+              await this.enrollmentRepository.create({
+                studentId: student.id,
+                classId,
+                status: 'active',
+                enrollmentDate: new Date(),
+                customFeePKR: customPKR,
+                customFeeUSD: customUSD,
+              });
+
+              // Generate monthly invoice for each enrollment
+              await this.generateMonthlyInvoice(student.id, classId);
+            } catch (error) {
+              console.error(
+                `Error enrolling student ${student.id} in class ${classId}:`,
+                error,
+              );
+            }
+          }
 
           // Send account credentials email to student if email and password are available
           if (studentEmail && studentEmail.trim() && studentTempPassword) {
@@ -1218,8 +1339,48 @@ export class StudentsService {
             }
           }
         } else if (student) {
-          // Enroll existing student in classes
-          for (const classId of validClassIds) {
+          // Handle duplicate student based on duplicateHandling option
+          if (duplicateHandling === 'skip') {
+            const duplicateField = duplicateReason === 'phone' ? 'phone number' : 'email';
+            results.push({
+              row: rowNumber,
+              studentName: studentName.trim(),
+              status: 'skipped',
+              message: `Student with this ${duplicateField} already exists (ID: ${student.id}, Name: ${student.name})`,
+              studentId: student.id,
+            });
+            failed++;
+            continue;
+          } else {
+            // Update existing student information
+            try {
+              const updateStudentDto: UpdateStudentDto = {
+                name: studentName.trim(),
+                email: studentEmail?.trim() || undefined,
+                contact: studentContact?.trim() || undefined,
+                address: studentAddress?.trim() || undefined,
+                city: studentCity?.trim() || undefined,
+                state: studentState?.trim() || undefined,
+                country: studentCountry?.trim() || undefined,
+                dateOfBirth: studentDateOfBirth?.trim() || undefined,
+              };
+
+              student = await this.update(student.id, updateStudentDto);
+            } catch (updateError) {
+              console.error(
+                `Error updating student ${student.id}:`,
+                updateError,
+              );
+              // Continue with enrollment even if update fails
+            }
+          }
+
+          // Enroll existing student in classes with custom fees
+          for (let i = 0; i < validClassIds.length; i++) {
+            const classId = validClassIds[i];
+            const customPKR = i < customPKRs.length ? customPKRs[i] : null;
+            const customUSD = i < customUSDs.length ? customUSDs[i] : null;
+            
             try {
               const existingEnrollment =
                 await this.enrollmentRepository.findByStudentAndClass(
@@ -1232,7 +1393,12 @@ export class StudentsService {
                   classId,
                   status: 'active',
                   enrollmentDate: new Date(),
+                  customFeePKR: customPKR,
+                  customFeeUSD: customUSD,
                 });
+
+                // Generate monthly invoice for each enrollment
+                await this.generateMonthlyInvoice(student.id, classId);
               }
             } catch (error) {
               // Ignore duplicate enrollment errors

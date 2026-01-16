@@ -10,7 +10,9 @@ export class FixSubmissionAttachmentsOnly1758575840027
     await queryRunner.query(
       `ALTER TABLE "submission" DROP COLUMN IF EXISTS "attachments"`,
     );
-    await queryRunner.query(`ALTER TABLE "submission" ADD COLUMN IF NOT EXISTS "attachments" text`);
+    await queryRunner.query(
+      `ALTER TABLE "submission" ADD COLUMN IF NOT EXISTS "attachments" text`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
