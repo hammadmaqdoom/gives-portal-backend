@@ -379,6 +379,9 @@ jobs:
                             try {
                               execSync('git add -A', { stdio: 'inherit' });
                               execSync('git commit -m "chore: merge upstream with conflicts (requires manual resolution)"', { stdio: 'inherit' });
+                              // Successfully committed conflicted state - mark as handled
+                              hasUnmergedFiles = false;
+                              console.log('✅ Committed conflicted state for PR review.');
                             } catch (commitError) {
                               // If commit fails, conflicts might be too complex - will be handled later
                               console.log('⚠️  Could not commit conflicted state, will be handled in PR creation step.');
@@ -479,8 +482,14 @@ jobs:
                         hasUnmergedFiles = unmerged.length > 0;
                         if (hasUnmergedFiles) {
                           console.log('⚠️  Merge also has conflicts. Committing conflicted state for PR review...');
-                          execSync('git add -A', { stdio: 'inherit' });
-                          execSync('git commit -m "chore: merge upstream with conflicts (requires manual resolution)"', { stdio: 'inherit' });
+                          try {
+                            execSync('git add -A', { stdio: 'inherit' });
+                            execSync('git commit -m "chore: merge upstream with conflicts (requires manual resolution)"', { stdio: 'inherit' });
+                            hasUnmergedFiles = false; // Successfully committed, mark as handled
+                            console.log('✅ Committed conflicted state for PR review.');
+                          } catch (commitError) {
+                            console.log('⚠️  Could not commit conflicted state:', commitError.message);
+                          }
                         }
                       }
                     } catch (abortError) {
@@ -496,8 +505,14 @@ jobs:
                           const unmerged = execSync('git ls-files -u', { encoding: 'utf8' }).trim();
                           hasUnmergedFiles = unmerged.length > 0;
                           if (hasUnmergedFiles) {
-                            execSync('git add -A', { stdio: 'inherit' });
-                            execSync('git commit -m "chore: merge upstream with conflicts (requires manual resolution)"', { stdio: 'inherit' });
+                            try {
+                              execSync('git add -A', { stdio: 'inherit' });
+                              execSync('git commit -m "chore: merge upstream with conflicts (requires manual resolution)"', { stdio: 'inherit' });
+                              hasUnmergedFiles = false; // Successfully committed, mark as handled
+                              console.log('✅ Committed conflicted state for PR review.');
+                            } catch (commitError) {
+                              console.log('⚠️  Could not commit conflicted state:', commitError.message);
+                            }
                           }
                         }
                       } catch (cleanupError) {
@@ -506,27 +521,45 @@ jobs:
                       }
                     }
                   } else {
-                    // Not in rebase, just commit the conflicted state
-                    console.log('⚠️  Committing conflicted state for PR review...');
+                    // Not in rebase, check if we're actually in a merge state
+                    let inMergeState = false;
                     try {
-                      // Ensure we're on the syncing branch
-                      execSync(`git checkout ${syncBranch}`, { stdio: 'inherit' });
-                      // Add all files including conflicted ones
-                      execSync('git add -A', { stdio: 'inherit' });
-                      execSync('git commit -m "chore: merge upstream with conflicts (requires manual resolution)"', { stdio: 'inherit' });
-                    } catch (commitError) {
-                      console.warn('⚠️  Could not commit conflicted state:', commitError.message);
-                      // If commit fails, try to abort any merge to clean up
+                      const mergeHead = execSync('git rev-parse --verify MERGE_HEAD 2>/dev/null', { encoding: 'utf8' }).trim();
+                      inMergeState = mergeHead.length > 0;
+                    } catch (e) {
+                      // Not in merge state
+                      inMergeState = false;
+                    }
+                    
+                    if (inMergeState) {
+                      // We're in a merge state with conflicts, commit them
+                      console.log('⚠️  Committing conflicted state for PR review...');
                       try {
-                        execSync('git merge --abort', { stdio: 'inherit' });
-                        console.log('Aborted merge due to commit failure. Skipping sync for this repo.');
-                        hasUnmergedFiles = false; // Reset flag since we aborted
-                        shouldSkipSync = true; // Skip the rest of the sync process for this repo
-                      } catch (abortError) {
-                        // If abort also fails, we're in a bad state - skip this repo
-                        console.error('⚠️  Could not abort merge. Skipping sync for this repo.');
-                        shouldSkipSync = true;
+                        // Ensure we're on the syncing branch
+                        execSync(`git checkout ${syncBranch}`, { stdio: 'inherit' });
+                        // Add all files including conflicted ones
+                        execSync('git add -A', { stdio: 'inherit' });
+                        execSync('git commit -m "chore: merge upstream with conflicts (requires manual resolution)"', { stdio: 'inherit' });
+                        hasUnmergedFiles = false; // Successfully committed, mark as handled
+                        console.log('✅ Committed conflicted state for PR review.');
+                      } catch (commitError) {
+                        console.warn('⚠️  Could not commit conflicted state:', commitError.message);
+                        // If commit fails, try to abort merge to clean up
+                        try {
+                          execSync('git merge --abort', { stdio: 'inherit' });
+                          console.log('Aborted merge due to commit failure. Skipping sync for this repo.');
+                          hasUnmergedFiles = false; // Reset flag since we aborted
+                          shouldSkipSync = true; // Skip the rest of the sync process for this repo
+                        } catch (abortError) {
+                          // If abort also fails, we're in a bad state - skip this repo
+                          console.error('⚠️  Could not abort merge. Skipping sync for this repo.');
+                          shouldSkipSync = true;
+                        }
                       }
+                    } else {
+                      // Not in merge state - conflicts were already committed or resolved
+                      console.log('ℹ️  Conflicts already resolved or committed. Continuing with sync...');
+                      hasUnmergedFiles = false;
                     }
                   }
                 }
