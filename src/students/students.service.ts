@@ -476,7 +476,18 @@ export class StudentsService {
       });
     }
 
-    return this.enrollmentRepository.findByStudentId(studentId);
+    const enrollments = await this.enrollmentRepository.findByStudentId(studentId);
+    
+    // Enrich classes with image URLs
+    await Promise.all(
+      enrollments.map(async (enrollment) => {
+        if (enrollment.class) {
+          await this.classesService.enrichClassWithImageUrls(enrollment.class);
+        }
+      })
+    );
+
+    return enrollments;
   }
 
   async getEnrollmentHistory(studentId: number): Promise<any[]> {
@@ -490,13 +501,35 @@ export class StudentsService {
       });
     }
 
-    return this.enrollmentRepository.findEnrollmentHistoryByStudentId(
+    const enrollments = await this.enrollmentRepository.findEnrollmentHistoryByStudentId(
       studentId,
     );
+    
+    // Enrich classes with image URLs
+    await Promise.all(
+      enrollments.map(async (enrollment) => {
+        if (enrollment.class) {
+          await this.classesService.enrichClassWithImageUrls(enrollment.class);
+        }
+      })
+    );
+
+    return enrollments;
   }
 
   async getClassEnrollmentHistory(classId: number): Promise<any[]> {
-    return this.enrollmentRepository.findEnrollmentHistoryByClassId(classId);
+    const enrollments = await this.enrollmentRepository.findEnrollmentHistoryByClassId(classId);
+    
+    // Enrich classes with image URLs
+    await Promise.all(
+      enrollments.map(async (enrollment) => {
+        if (enrollment.class) {
+          await this.classesService.enrichClassWithImageUrls(enrollment.class);
+        }
+      })
+    );
+
+    return enrollments;
   }
 
   async getAllEnrollments(options?: {
@@ -515,6 +548,15 @@ export class StudentsService {
       }),
       this.enrollmentRepository.count(),
     ]);
+    
+    // Enrich classes with image URLs
+    await Promise.all(
+      enrollments.map(async (enrollment) => {
+        if (enrollment.class) {
+          await this.classesService.enrichClassWithImageUrls(enrollment.class);
+        }
+      })
+    );
 
     return {
       data: enrollments,

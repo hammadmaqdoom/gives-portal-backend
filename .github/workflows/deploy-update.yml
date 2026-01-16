@@ -379,7 +379,17 @@ jobs:
             
             # Login to GitHub Container Registry
             echo "=== Logging in to GitHub Container Registry ==="
-            echo "${{ secrets.GT_PAT }}" | sg docker -c "docker login ghcr.io -u ${{ github.actor }} --password-stdin"
+            # Create a temporary script to handle docker login with sg docker
+            # This avoids stdin issues when using sg docker in non-interactive environments
+            echo "${{ secrets.GT_PAT }}" > /tmp/ghcr_password.txt
+            chmod 600 /tmp/ghcr_password.txt
+            cat > /tmp/docker-login.sh << 'LOGIN_SCRIPT'
+            #!/bin/bash
+            docker login ghcr.io -u "$1" --password-stdin < /tmp/ghcr_password.txt
+            LOGIN_SCRIPT
+            chmod +x /tmp/docker-login.sh
+            sg docker -c "/tmp/docker-login.sh '${{ github.actor }}'"
+            rm -f /tmp/docker-login.sh /tmp/ghcr_password.txt
             
             # Pull the pre-built image
             echo "=== Pulling pre-built Docker image ==="
