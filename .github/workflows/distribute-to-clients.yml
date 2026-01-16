@@ -231,7 +231,8 @@ jobs:
                   // Use rebase for smaller histories
                   console.log(`🔄 Using rebase strategy for smaller history (${commitCount} commits)...`);
                   try {
-                    execSync(`git rebase upstream/main -X ours`, { stdio: 'inherit' });
+                    // Don't use strategy option - let conflicts be handled by our resolution logic
+                    execSync(`git rebase upstream/main`, { stdio: 'inherit' });
                   } catch (e) {
                     console.log('Rebase had conflicts or issues, checking status...');
                     
@@ -256,57 +257,60 @@ jobs:
                       
                       if (hasUnmergedFiles) {
                         console.log('⚠️  Rebase conflicts detected. Attempting to auto-resolve by preferring upstream code...');
-                        // For conflicts during rebase, prefer upstream code (ours = upstream/main in rebase context)
-                        // Handle modify/delete conflicts explicitly
+                        // Check for complex conflicts (modify/delete) that are hard to auto-resolve
+                        let modifyDeleteCount = 0;
                         try {
-                          // Get list of conflicted files
-                          const conflictedFiles = execSync('git diff --name-only --diff-filter=U', { encoding: 'utf8' }).trim().split('\n').filter(f => f);
                           const modifyDeleteFiles = execSync('git diff --name-only --diff-filter=UD', { encoding: 'utf8' }).trim().split('\n').filter(f => f);
-                          
-                          // For modify/delete conflicts, prefer upstream (keep the file)
-                          // For other conflicts, prefer upstream code
-                          execSync('git checkout --ours .', { stdio: 'inherit' });
-                          
-                          // Explicitly handle modify/delete: if upstream has it, keep it
-                          for (const file of modifyDeleteFiles) {
-                            try {
-                              // Check if file exists in upstream
-                              execSync(`git checkout --ours -- "${file}"`, { stdio: 'inherit' });
-                              execSync(`git add "${file}"`, { stdio: 'inherit' });
-                            } catch (fileError) {
-                              // If file doesn't exist in upstream, remove it
+                          modifyDeleteCount = modifyDeleteFiles.length;
+                          if (modifyDeleteCount > 10) {
+                            console.log(`⚠️  Detected ${modifyDeleteCount} modify/delete conflicts. Aborting rebase and using merge strategy for better conflict resolution.`);
+                            execSync('git rebase --abort', { stdio: 'inherit' });
+                            rebaseAborted = true;
+                          }
+                        } catch (e) {
+                          // Continue with conflict resolution
+                        }
+                        
+                        if (!rebaseAborted) {
+                          // For conflicts during rebase, prefer upstream code
+                          // In rebase context: --theirs = upstream (what we're rebasing onto), --ours = local commit being rebased
+                          try {
+                            // Get list of conflicted files
+                            const conflictedFiles = execSync('git diff --name-only --diff-filter=U', { encoding: 'utf8' }).trim().split('\n').filter(f => f);
+                            const modifyDeleteFiles = execSync('git diff --name-only --diff-filter=UD', { encoding: 'utf8' }).trim().split('\n').filter(f => f);
+                            
+                            // Prefer upstream (theirs) for all conflicts
+                            execSync('git checkout --theirs .', { stdio: 'inherit' });
+                            
+                            // For modify/delete conflicts, explicitly handle them
+                            // If upstream deleted it, remove it; if upstream modified it, keep the modified version
+                            for (const file of modifyDeleteFiles) {
                               try {
-                                execSync(`git rm "${file}"`, { stdio: 'inherit' });
-                              } catch (rmError) {
-                                // File might already be removed, continue
+                                // Check if file exists in upstream (theirs)
+                                execSync(`git checkout --theirs -- "${file}"`, { stdio: 'inherit' });
+                                execSync(`git add "${file}"`, { stdio: 'inherit' });
+                              } catch (fileError) {
+                                // If file doesn't exist in upstream, remove it
+                                try {
+                                  execSync(`git rm "${file}"`, { stdio: 'inherit' });
+                                } catch (rmError) {
+                                  // File might already be removed or not tracked, continue
+                                }
                               }
                             }
-                          }
-                          
-                          // Stage all resolved files
-                          execSync('git add -A', { stdio: 'inherit' });
-                          
-                          // Continue rebase with commit message
-                          execSync('git -c core.editor=true rebase --continue', { 
-                            stdio: 'inherit',
-                            env: { ...process.env, GIT_EDITOR: 'true' }
-                          });
-                          hasUnmergedFiles = false; // Conflicts resolved
-                          console.log('✅ Auto-resolved conflicts by preferring upstream code.');
-                        } catch (continueError) {
-                          console.log('⚠️  Could not auto-resolve all conflicts. Attempting alternative resolution...');
-                          // Try alternative: use theirs strategy for remaining conflicts
-                          try {
-                            execSync('git checkout --theirs .', { stdio: 'inherit' });
+                            
+                            // Stage all resolved files
                             execSync('git add -A', { stdio: 'inherit' });
+                            
+                            // Continue rebase with commit message
                             execSync('git -c core.editor=true rebase --continue', { 
                               stdio: 'inherit',
                               env: { ...process.env, GIT_EDITOR: 'true' }
                             });
-                            hasUnmergedFiles = false;
-                            console.log('✅ Resolved conflicts using alternative strategy.');
-                          } catch (altError) {
-                            console.log('⚠️  Could not auto-resolve conflicts. Aborting rebase and using merge fallback.');
+                            hasUnmergedFiles = false; // Conflicts resolved
+                            console.log('✅ Auto-resolved conflicts by preferring upstream code.');
+                          } catch (continueError) {
+                            console.log('⚠️  Could not auto-resolve all conflicts. Aborting rebase and using merge fallback.');
                             // Abort rebase and use merge instead
                             try {
                               execSync('git rebase --abort', { stdio: 'inherit' });
@@ -363,11 +367,25 @@ jobs:
                       try {
                         execSync(`git merge upstream/main --no-edit --allow-unrelated-histories -X theirs`, { stdio: 'inherit' });
                         hasUnmergedFiles = false;
+                        console.log('✅ Successfully merged upstream changes using merge strategy.');
                       } catch (mergeError) {
-                        const unmerged = execSync('git ls-files -u', { encoding: 'utf8' }).trim();
-                        hasUnmergedFiles = unmerged.length > 0;
-                        if (hasUnmergedFiles) {
-                          console.log('⚠️  Merge also has conflicts. Will create PR for manual resolution.');
+                        console.log('⚠️  Merge had conflicts, checking status...');
+                        try {
+                          const unmerged = execSync('git ls-files -u', { encoding: 'utf8' }).trim();
+                          hasUnmergedFiles = unmerged.length > 0;
+                          if (hasUnmergedFiles) {
+                            console.log('⚠️  Merge conflicts detected. Will commit conflicted state for PR review.');
+                            // Commit conflicted state so PR can be created
+                            try {
+                              execSync('git add -A', { stdio: 'inherit' });
+                              execSync('git commit -m "chore: merge upstream with conflicts (requires manual resolution)"', { stdio: 'inherit' });
+                            } catch (commitError) {
+                              // If commit fails, conflicts might be too complex - will be handled later
+                              console.log('⚠️  Could not commit conflicted state, will be handled in PR creation step.');
+                            }
+                          }
+                        } catch (statusError) {
+                          hasUnmergedFiles = false;
                         }
                       }
                     }
