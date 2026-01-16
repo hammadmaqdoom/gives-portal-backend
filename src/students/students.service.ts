@@ -829,7 +829,7 @@ export class StudentsService {
           .join(', ') || 'Schedule TBD';
 
       // Format fee based on student's country
-      const currency = this.currencyService.getCurrencyForCountry(student.country);
+      const currency = this.currencyService.getCurrencyForCountry(student.country ?? undefined);
       const fee =
         currency === 'PKR' ? classDetails.feePKR : classDetails.feeUSD;
       const formattedFee = `${fee} ${currency}`;
