@@ -10,6 +10,8 @@ export abstract class StudentRepository {
 
   abstract findByUserId(userId: number): Promise<NullableType<Student>>;
   abstract findByEmail(email: string): Promise<NullableType<Student>>;
+  abstract findByContact(contact: string): Promise<NullableType<Student>>;
+  abstract findByEmailOrContact(email?: string, contact?: string): Promise<NullableType<Student>>;
 
   abstract findByStudentId(
     studentId: Student['studentId'],

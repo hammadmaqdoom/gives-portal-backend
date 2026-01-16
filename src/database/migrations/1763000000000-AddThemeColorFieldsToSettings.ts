@@ -8,7 +8,7 @@ export class AddThemeColorFieldsToSettings1763000000000
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Check if columns already exist before adding
     const table = await queryRunner.getTable('settings');
-    
+
     if (table && !table.findColumnByName('themeColorPreset')) {
       await queryRunner.query(`
         ALTER TABLE "settings"
@@ -26,7 +26,7 @@ export class AddThemeColorFieldsToSettings1763000000000
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     const table = await queryRunner.getTable('settings');
-    
+
     if (table && table.findColumnByName('themeCustomColor')) {
       await queryRunner.query(`
         ALTER TABLE "settings" DROP COLUMN "themeCustomColor"
@@ -40,4 +40,3 @@ export class AddThemeColorFieldsToSettings1763000000000
     }
   }
 }
-

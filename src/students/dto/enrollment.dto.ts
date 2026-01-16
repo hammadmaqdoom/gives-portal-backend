@@ -5,6 +5,7 @@ import {
   IsString,
   IsEnum,
   IsDateString,
+  IsNumber,
 } from 'class-validator';
 
 export enum EnrollmentStatus {
@@ -29,6 +30,16 @@ export class CreateEnrollmentDto {
   @IsOptional()
   @IsDateString()
   enrollmentDate?: string;
+
+  @ApiPropertyOptional({ example: 5000, description: 'Custom fee in PKR' })
+  @IsOptional()
+  @IsNumber()
+  customFeePKR?: number | null;
+
+  @ApiPropertyOptional({ example: 50, description: 'Custom fee in USD' })
+  @IsOptional()
+  @IsNumber()
+  customFeeUSD?: number | null;
 }
 
 export class UpdateEnrollmentDto {

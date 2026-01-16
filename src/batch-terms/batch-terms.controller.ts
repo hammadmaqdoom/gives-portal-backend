@@ -111,4 +111,3 @@ export class BatchTermsController {
     return this.batchTermsService.remove(+id);
   }
 }
-

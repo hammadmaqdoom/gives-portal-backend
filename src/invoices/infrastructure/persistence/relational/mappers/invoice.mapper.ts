@@ -22,6 +22,14 @@ export class InvoiceMapper {
     domainEntity.description = raw.description;
     domainEntity.notes = raw.notes;
     domainEntity.paymentProofUrl = raw.paymentProofUrl;
+    domainEntity.originalPrice = raw.originalPrice
+      ? Number(raw.originalPrice)
+      : undefined;
+    domainEntity.discountAmount = raw.discountAmount
+      ? Number(raw.discountAmount)
+      : undefined;
+    domainEntity.discountType = raw.discountType;
+    domainEntity.classId = raw.classId;
     domainEntity.createdAt = raw.createdAt;
     domainEntity.updatedAt = raw.updatedAt;
     domainEntity.deletedAt = raw.deletedAt;
@@ -56,6 +64,10 @@ export class InvoiceMapper {
     persistenceEntity.description = domainEntity.description;
     persistenceEntity.notes = domainEntity.notes;
     persistenceEntity.paymentProofUrl = domainEntity.paymentProofUrl;
+    persistenceEntity.originalPrice = domainEntity.originalPrice;
+    persistenceEntity.discountAmount = domainEntity.discountAmount;
+    persistenceEntity.discountType = domainEntity.discountType;
+    persistenceEntity.classId = domainEntity.classId;
     persistenceEntity.createdAt = domainEntity.createdAt;
     persistenceEntity.updatedAt = domainEntity.updatedAt;
     persistenceEntity.deletedAt = domainEntity.deletedAt;

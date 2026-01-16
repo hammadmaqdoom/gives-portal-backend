@@ -17,4 +17,3 @@ import { CurrencyModule } from '../currency/currency.module';
   controllers: [PublicController],
 })
 export class PublicModule {}
-

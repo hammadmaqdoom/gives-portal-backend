@@ -18,3 +18,12 @@ uploads/*
 docker-compose*.yml
 Dockerfile.dev
 Dockerfile.prod
+test
+*.test.ts
+*.spec.ts
+*.md
+docs
+.husky
+.eslintcache
+tsconfig.build.tsbuildinfo
+*.tsbuildinfo

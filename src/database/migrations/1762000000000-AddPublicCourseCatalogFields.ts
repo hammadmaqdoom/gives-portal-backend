@@ -51,18 +51,13 @@ export class AddPublicCourseCatalogFields1762000000000
     );
 
     // Remove fields from class table
-    await queryRunner.query(
-      `ALTER TABLE "class" DROP COLUMN "features"`,
-    );
+    await queryRunner.query(`ALTER TABLE "class" DROP COLUMN "features"`);
     await queryRunner.query(
       `ALTER TABLE "class" DROP COLUMN "cover_image_url"`,
     );
-    await queryRunner.query(
-      `ALTER TABLE "class" DROP COLUMN "thumbnail_url"`,
-    );
+    await queryRunner.query(`ALTER TABLE "class" DROP COLUMN "thumbnail_url"`);
     await queryRunner.query(
       `ALTER TABLE "class" DROP COLUMN "is_public_for_sale"`,
     );
   }
 }
-

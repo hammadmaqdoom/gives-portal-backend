@@ -1,4 +1,9 @@
-import { Injectable, Logger, UnprocessableEntityException, HttpStatus } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  UnprocessableEntityException,
+  HttpStatus,
+} from '@nestjs/common';
 import { CartService } from '../cart/cart.service';
 import { StudentsService } from '../students/students.service';
 import { ParentsService } from '../parents/parents.service';
@@ -93,7 +98,9 @@ export class CheckoutService {
       studentId = student.id;
     } else if (dto.studentEmail) {
       // Check if student exists by email
-      const existingStudent = await this.studentsService.findByEmail(dto.studentEmail);
+      const existingStudent = await this.studentsService.findByEmail(
+        dto.studentEmail,
+      );
       if (existingStudent) {
         studentId = existingStudent.id;
       } else {
@@ -129,7 +136,9 @@ export class CheckoutService {
 
     // Handle parent creation if provided
     if (dto.parentEmail) {
-      const existingParent = await this.parentsService.findByEmail(dto.parentEmail);
+      const existingParent = await this.parentsService.findByEmail(
+        dto.parentEmail,
+      );
       if (existingParent) {
         parentId = existingParent.id;
       } else {
@@ -152,10 +161,11 @@ export class CheckoutService {
 
     for (const cartItem of cart.items) {
       // Check if already enrolled
-      const existingEnrollment = await this.enrollmentRepository.findByStudentAndClass(
-        studentId,
-        cartItem.classId,
-      );
+      const existingEnrollment =
+        await this.enrollmentRepository.findByStudentAndClass(
+          studentId,
+          cartItem.classId,
+        );
 
       if (existingEnrollment) {
         // Skip if already enrolled
@@ -185,6 +195,13 @@ export class CheckoutService {
         throw new Error(`Class ${cartItem.classId} not found`);
       }
 
+      // Calculate discount information
+      const originalPrice =
+        cartItem.currency === 'PKR' ? classEntity.feePKR : classEntity.feeUSD;
+      const discountAmount =
+        originalPrice > cartItem.price ? originalPrice - cartItem.price : 0;
+      const discountType = discountAmount > 0 ? 'manual' : undefined;
+
       // Create invoice
       const invoice = await this.invoicesService.create({
         studentId,
@@ -195,6 +212,10 @@ export class CheckoutService {
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
         description: `Course enrollment: ${cartItem.className}`,
         notes: 'Payment required to activate course access',
+        originalPrice: discountAmount > 0 ? originalPrice : undefined,
+        discountAmount: discountAmount > 0 ? discountAmount : undefined,
+        discountType,
+        classId: cartItem.classId,
         items: [
           {
             description: cartItem.className,
@@ -269,11 +290,12 @@ export class CheckoutService {
     // This will be called after payment is verified
     // The payment verification process will activate enrollments
     // This is mainly for tracking/logging
-    this.logger.log(`Checkout ${checkoutId} completed with transaction ${transactionId}`);
+    this.logger.log(
+      `Checkout ${checkoutId} completed with transaction ${transactionId}`,
+    );
     return {
       success: true,
       message: 'Checkout completed successfully',
     };
   }
 }
-

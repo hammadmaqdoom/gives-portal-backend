@@ -88,6 +88,44 @@ export class CreateInvoiceDto {
   @IsString()
   notes?: string;
 
+  @ApiPropertyOptional({
+    example: 100.0,
+    description: 'Original price before discount',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
+  originalPrice?: number;
+
+  @ApiPropertyOptional({
+    example: 20.0,
+    description: 'Discount amount applied',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
+  discountAmount?: number;
+
+  @ApiPropertyOptional({
+    example: 'manual',
+    description:
+      'Type of discount (e.g., manual, promotional, early_bird, referral)',
+  })
+  @IsOptional()
+  @IsString()
+  discountType?: string;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Class ID associated with this invoice',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
+  classId?: number;
+
   @ApiPropertyOptional({ type: [CreateInvoiceItemDto] })
   @IsOptional()
   @IsArray()

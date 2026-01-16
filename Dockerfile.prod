@@ -1,20 +1,40 @@
-FROM node:20-slim AS builder
+FROM node:20-slim AS deps
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (skip prepare script for production)
-RUN npm ci --only=production --ignore-scripts --legacy-peer-deps && npm cache clean --force
+# Install ALL dependencies (including dev) for building, with cache mount
+# Add network timeout and retry settings for reliability
+# Note: Don't clean cache - BuildKit manages it and cleaning causes corruption
+RUN --mount=type=cache,target=/root/.npm \
+    npm config set fetch-timeout 600000 && \
+    npm config set fetch-retries 5 && \
+    npm ci --ignore-scripts --legacy-peer-deps
 
-# Install NestJS CLI for building
-RUN npm install -g @nestjs/cli
+FROM node:20-slim AS builder
 
-# Copy source code
+WORKDIR /app
+
+# Copy dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy package files
+COPY package*.json ./
+
+# Install NestJS CLI globally (cached separately)
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g @nestjs/cli
+
+# Copy source code (this layer changes most frequently)
+# Use cache-busting build arg to ensure fresh builds when code changes
+ARG CACHE_BUST
+# Add cache-bust to a file to invalidate this layer when commit changes
+RUN echo "Cache bust: ${CACHE_BUST:-$(date +%s)}" > /tmp/cache-bust.txt
 COPY . .
 
-# Build the application
+# Build the application (incremental builds if tsconfig has incremental: true)
 RUN npm run build
 
 # Production stage
@@ -23,17 +43,34 @@ FROM node:20-slim AS production
 WORKDIR /app
 
 # Create non-root user
-RUN groupadd -g 1001 nodejs
-RUN useradd -r -u 1001 -g nodejs nestjs
+RUN groupadd -g 1001 nodejs && \
+    useradd -r -u 1001 -g nodejs nestjs
 
-# Install curl for health checks
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Install curl and timeout for health checks and build timeouts (single layer)
+RUN apt-get update && apt-get install -y --no-install-recommends curl coreutils && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
 
-# Install only production dependencies (skip prepare script for production)
-RUN npm ci --only=production --ignore-scripts --legacy-peer-deps && npm cache clean --force
+# Install only production dependencies with cache mount
+# Use npm install with better timeout and retry handling
+# Increased maxsockets for faster downloads, added timeout wrapper to prevent hangs
+RUN --mount=type=cache,target=/root/.npm \
+    npm config set fetch-timeout 300000 && \
+    npm config set fetch-retries 3 && \
+    npm config set progress=true && \
+    npm config set loglevel=info && \
+    npm config set maxsockets 5 && \
+    echo "Starting npm install for production dependencies..." && \
+    timeout 1200 npm install --omit=dev --ignore-scripts --legacy-peer-deps --no-audit --no-fund 2>&1 | tee /tmp/npm-install.log || \
+    (echo "First install attempt failed or timed out, checking logs..." && \
+     tail -50 /tmp/npm-install.log || true && \
+     echo "Clearing cache and retrying..." && \
+     npm cache clean --force && \
+     echo "Retrying npm install after cache clear..." && \
+     timeout 1200 npm install --omit=dev --ignore-scripts --legacy-peer-deps --no-audit --no-fund) && \
+    echo "npm install completed successfully"
 
 # Create crypto polyfill script
 RUN echo 'const crypto = require("crypto"); global.crypto = crypto; require("./dist/main.js");' > start.js
@@ -44,16 +81,14 @@ COPY --from=builder /app/dist ./dist
 # Copy mail templates (needed at runtime)
 COPY --from=builder /app/src/mail/mail-templates ./src/mail/mail-templates
 
-# Create necessary directories and set permissions
-RUN mkdir -p src/mail/mail-templates && chown -R nestjs:nodejs src
-
 # Copy wait-for-it script (embedded in repository for reliability)
 COPY scripts/wait-for-it.sh /usr/local/bin/wait-for-it
-RUN chmod +x /usr/local/bin/wait-for-it && \
-    ln -s /usr/local/bin/wait-for-it ./wait-for-it.sh
 
-# Create uploads directory
-RUN mkdir -p uploads && chown -R nestjs:nodejs uploads
+# Create necessary directories and set permissions (combined into single layer)
+RUN chmod +x /usr/local/bin/wait-for-it && \
+    ln -s /usr/local/bin/wait-for-it ./wait-for-it.sh && \
+    mkdir -p src/mail/mail-templates uploads && \
+    chown -R nestjs:nodejs src uploads
 
 # Switch to non-root user
 USER nestjs

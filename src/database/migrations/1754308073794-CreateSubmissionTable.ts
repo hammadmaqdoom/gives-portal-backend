@@ -65,6 +65,8 @@ export class CreateSubmissionTable1754308073794 implements MigrationInterface {
       `ALTER TABLE "submission" DROP CONSTRAINT IF EXISTS "FK_submission_student"`,
     );
     await queryRunner.query(`DROP TABLE IF EXISTS "submission"`);
-    await queryRunner.query(`DROP TYPE IF EXISTS "public"."submission_status_enum"`);
+    await queryRunner.query(
+      `DROP TYPE IF EXISTS "public"."submission_status_enum"`,
+    );
   }
 }

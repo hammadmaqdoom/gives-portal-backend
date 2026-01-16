@@ -120,7 +120,10 @@ export class CartService {
     }
 
     // Get price for currency
-    const price = this.classesService.getPriceForCurrency(classEntity, currency);
+    const price = this.classesService.getPriceForCurrency(
+      classEntity,
+      currency,
+    );
 
     // Create cart item
     const cartItem = this.cartItemRepo.create({
@@ -233,4 +236,3 @@ export class CartService {
     };
   }
 }
-

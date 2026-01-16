@@ -18,4 +18,3 @@ import { CurrencyModule } from '../currency/currency.module';
   exports: [CartService],
 })
 export class CartModule {}
-

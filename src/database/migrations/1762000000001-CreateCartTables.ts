@@ -70,4 +70,3 @@ export class CreateCartTables1762000000001 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS "cart"`);
   }
 }
-

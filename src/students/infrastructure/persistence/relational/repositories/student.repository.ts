@@ -172,6 +172,67 @@ export class StudentsRelationalRepository {
     return result;
   }
 
+  async findByContact(contact: string): Promise<NullableType<Student>> {
+    if (!contact || contact.trim() === '') {
+      return null;
+    }
+    
+    const trimmedContact = contact.trim();
+    
+    // Try exact match first
+    let student = await this.studentsRepository.findOne({
+      where: { contact: trimmedContact },
+      relations: [
+        'photo',
+        'user',
+        'classEnrollments',
+        'classEnrollments.class',
+        'parentStudents',
+        'parentStudents.parent',
+      ],
+    });
+
+    // If not found, try matching without common phone formatting characters
+    if (!student) {
+      // Normalize phone number - remove spaces, dashes, parentheses
+      const normalizedContact = trimmedContact.replace(/[\s\-\(\)]/g, '');
+      
+      // Use LIKE query to find potential matches
+      student = await this.studentsRepository
+        .createQueryBuilder('student')
+        .leftJoinAndSelect('student.photo', 'photo')
+        .leftJoinAndSelect('student.user', 'user')
+        .leftJoinAndSelect('student.classEnrollments', 'classEnrollments')
+        .leftJoinAndSelect('classEnrollments.class', 'class')
+        .leftJoinAndSelect('student.parentStudents', 'parentStudents')
+        .leftJoinAndSelect('parentStudents.parent', 'parent')
+        .where('REPLACE(REPLACE(REPLACE(REPLACE(student.contact, \' \', \'\'), \'-\', \'\'), \'(\', \'\'), \')\', \'\') = :normalizedContact', { normalizedContact })
+        .getOne();
+    }
+
+    return student ? this.studentMapper.toDomain(student) : null;
+  }
+
+  async findByEmailOrContact(email?: string, contact?: string): Promise<NullableType<Student>> {
+    // Check by email first if provided
+    if (email && email.trim() !== '') {
+      const studentByEmail = await this.findByEmail(email.trim());
+      if (studentByEmail) {
+        return studentByEmail;
+      }
+    }
+    
+    // Then check by contact/phone if provided
+    if (contact && contact.trim() !== '') {
+      const studentByContact = await this.findByContact(contact.trim());
+      if (studentByContact) {
+        return studentByContact;
+      }
+    }
+    
+    return null;
+  }
+
   async findByStudentId(
     studentId: Student['studentId'],
   ): Promise<NullableType<Student>> {

@@ -14,6 +14,8 @@ export class StudentClassEnrollmentMapper {
     enrollment.enrollmentDate = raw.enrollmentDate;
     enrollment.status = raw.status;
     enrollment.adminGrantedAccess = raw.adminGrantedAccess ?? false;
+    enrollment.customFeePKR = raw.customFeePKR ?? null;
+    enrollment.customFeeUSD = raw.customFeeUSD ?? null;
     enrollment.createdAt = raw.createdAt;
     enrollment.updatedAt = raw.updatedAt;
     enrollment.deletedAt = raw.deletedAt;
@@ -90,6 +92,12 @@ export class StudentClassEnrollmentMapper {
     }
     if (enrollment.adminGrantedAccess !== undefined) {
       enrollmentEntity.adminGrantedAccess = enrollment.adminGrantedAccess;
+    }
+    if (enrollment.customFeePKR !== undefined) {
+      enrollmentEntity.customFeePKR = enrollment.customFeePKR;
+    }
+    if (enrollment.customFeeUSD !== undefined) {
+      enrollmentEntity.customFeeUSD = enrollment.customFeeUSD;
     }
 
     return enrollmentEntity;

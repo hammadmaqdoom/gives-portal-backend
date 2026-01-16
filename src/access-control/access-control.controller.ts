@@ -43,7 +43,9 @@ export class AccessControlController {
   @Patch('toggle-admin-access/:studentId/:classId')
   @Roles(RoleEnum.admin)
   @HttpCode(HttpStatus.OK)
-  @ApiOkResponse({ description: 'Toggle admin-granted access for student course' })
+  @ApiOkResponse({
+    description: 'Toggle admin-granted access for student course',
+  })
   async toggleAdminAccess(
     @Param('studentId') studentId: string,
     @Param('classId') classId: string,
@@ -57,4 +59,3 @@ export class AccessControlController {
     return { data: result };
   }
 }
-

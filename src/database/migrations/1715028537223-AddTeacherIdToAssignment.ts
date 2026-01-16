@@ -7,7 +7,9 @@ export class AddTeacherIdToAssignment1715028537223
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Add teacherId column to assignment table
-    await queryRunner.query(`ALTER TABLE "assignment" ADD COLUMN IF NOT EXISTS "teacherId" integer`);
+    await queryRunner.query(
+      `ALTER TABLE "assignment" ADD COLUMN IF NOT EXISTS "teacherId" integer`,
+    );
 
     // Add foreign key constraint
     await queryRunner.query(`

@@ -149,6 +149,8 @@ export class CreateZoomTables1754308073797 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS "zoom_credentials"`);
 
     // Drop enum
-    await queryRunner.query(`DROP TYPE IF EXISTS "public"."zoom_meetings_status_enum"`);
+    await queryRunner.query(
+      `DROP TYPE IF EXISTS "public"."zoom_meetings_status_enum"`,
+    );
   }
 }

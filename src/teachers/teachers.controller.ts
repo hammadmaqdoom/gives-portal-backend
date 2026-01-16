@@ -31,6 +31,7 @@ import {
   ApiConsumes,
   ApiBody,
   ApiResponse,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { Roles } from '../roles/roles.decorator';
 import { RoleEnum } from '../roles/roles.enum';
@@ -46,6 +47,7 @@ import { TeachersService } from './teachers.service';
 import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
 import { BulkTeachersResultDto } from './dto/bulk-teachers-response.dto';
+import { PublicTeacherDto } from './dto/public-teacher.dto';
 
 @ApiTags('Teachers')
 @Controller({
@@ -59,9 +61,10 @@ export class TeachersController {
   @Get('public')
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({
-    type: [Teacher],
+    type: [PublicTeacherDto],
+    description: 'Returns public teacher information without sensitive data',
   })
-  findPublicTeachers(): Promise<Teacher[]> {
+  findPublicTeachers(): Promise<PublicTeacherDto[]> {
     return this.teachersService.findPublicTeachers();
   }
 
@@ -73,9 +76,12 @@ export class TeachersController {
     type: String,
   })
   @ApiOkResponse({
-    type: Teacher,
+    type: PublicTeacherDto,
+    description: 'Returns public teacher information without sensitive data',
   })
-  findPublicTeacherById(@Param('id') id: string): Promise<Teacher | null> {
+  findPublicTeacherById(
+    @Param('id') id: string,
+  ): Promise<PublicTeacherDto | null> {
     return this.teachersService.findPublicTeacherById(+id);
   }
 
@@ -216,6 +222,12 @@ export class TeachersController {
     description:
       'Upload an Excel or CSV file with teacher details to bulk create teachers. User accounts will be created for teachers with email addresses.',
   })
+  @ApiQuery({
+    name: 'duplicateHandling',
+    required: false,
+    enum: ['skip', 'update'],
+    description: 'How to handle duplicates: skip or update (default: skip)',
+  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -250,7 +262,8 @@ export class TeachersController {
       }),
     )
     file: Express.Multer.File,
+    @Query('duplicateHandling') duplicateHandling?: 'skip' | 'update',
   ): Promise<BulkTeachersResultDto> {
-    return this.teachersService.bulkCreateFromFile(file);
+    return this.teachersService.bulkCreateFromFile(file, duplicateHandling || 'skip');
   }
 }

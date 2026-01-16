@@ -182,7 +182,9 @@ export class CreateSchoolEntities1715028537218 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop foreign key constraints
-    await queryRunner.query(`ALTER TABLE "fee" DROP CONSTRAINT IF EXISTS "FK_fee_class"`);
+    await queryRunner.query(
+      `ALTER TABLE "fee" DROP CONSTRAINT IF EXISTS "FK_fee_class"`,
+    );
     await queryRunner.query(
       `ALTER TABLE "fee" DROP CONSTRAINT IF EXISTS "FK_fee_student"`,
     );
@@ -219,7 +221,9 @@ export class CreateSchoolEntities1715028537218 implements MigrationInterface {
 
     // Drop indexes
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_fee_payment_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_attendance_student_date"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_attendance_student_date"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_attendance_date"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_class_name"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_subject_name"`);

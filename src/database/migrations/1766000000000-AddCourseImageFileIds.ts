@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddCourseImageFileIds1766000000000
-  implements MigrationInterface
-{
+export class AddCourseImageFileIds1766000000000 implements MigrationInterface {
   name = 'AddCourseImageFileIds1766000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -57,4 +55,3 @@ export class AddCourseImageFileIds1766000000000
     );
   }
 }
-

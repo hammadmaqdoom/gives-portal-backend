@@ -26,6 +26,7 @@ import {
   ApiOperation,
   ApiConsumes,
   ApiBody,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
@@ -357,7 +358,6 @@ export class StudentsController {
     return this.studentsService.getEnrollmentHistory(+id);
   }
 
-
   @Post(':id/enrollments/bulk')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -368,7 +368,13 @@ export class StudentsController {
   })
   bulkEnrollStudentInClasses(
     @Param('id') id: string,
-    @Body() body: { classIds: number[]; status?: string; enrollmentDate?: string },
+    @Body()
+    body: { 
+      classIds: number[]; 
+      status?: string; 
+      enrollmentDate?: string;
+      customFees?: Array<{ classId: number; customFeePKR?: number | null; customFeeUSD?: number | null }>;
+    },
   ) {
     return this.studentsService.bulkEnrollStudentInClasses(+id, body);
   }
@@ -414,6 +420,12 @@ export class StudentsController {
     description:
       'Upload an Excel or CSV file with student and parent details to bulk enroll students in classes',
   })
+  @ApiQuery({
+    name: 'duplicateHandling',
+    required: false,
+    enum: ['skip', 'update'],
+    description: 'How to handle duplicates: skip or update (default: skip)',
+  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -448,7 +460,8 @@ export class StudentsController {
       }),
     )
     file: Express.Multer.File,
+    @Query('duplicateHandling') duplicateHandling?: 'skip' | 'update',
   ): Promise<BulkEnrollmentResultDto> {
-    return this.studentsService.bulkEnrollFromFile(file);
+    return this.studentsService.bulkEnrollFromFile(file, duplicateHandling || 'skip');
   }
 }

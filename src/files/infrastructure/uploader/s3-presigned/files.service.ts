@@ -75,9 +75,11 @@ export class FilesS3PresignedService {
     }
     const prefix = prefixParts.length > 0 ? `${prefixParts.join('/')}/` : '';
     const key = `${prefix}${baseName}`;
-    
+
     // Get file storage settings from DB first, fallback to env
-    let driver: FileDriver = this.configService.get('file.driver', { infer: true }) || FileDriver.LOCAL;
+    let driver: FileDriver =
+      this.configService.get('file.driver', { infer: true }) ||
+      FileDriver.LOCAL;
     let storageConfig: {
       fileDriver?: string | null;
       accessKeyId?: string | null;

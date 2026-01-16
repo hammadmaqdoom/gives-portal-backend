@@ -259,7 +259,9 @@ export class CreatePaymentGatewayTables1754308080007
 
     // Drop tables
     await queryRunner.query(`DROP TABLE IF EXISTS "payment_transaction"`);
-    await queryRunner.query(`DROP TABLE IF EXISTS "payment_gateway_credentials"`);
+    await queryRunner.query(
+      `DROP TABLE IF EXISTS "payment_gateway_credentials"`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "payment_gateway"`);
   }
 }

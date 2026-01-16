@@ -35,6 +35,7 @@ import { Fee } from './domain/fee';
 import { FeesService } from './fees.service';
 import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
+import { DiscountAnalyticsDto } from './dto/discount-analytics.dto';
 
 @ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -283,15 +284,19 @@ export class FeesController {
   @Get('reports')
   @Roles(RoleEnum.admin, RoleEnum.teacher)
   @ApiOkResponse({
-    type: Object,
+    type: DiscountAnalyticsDto,
   })
-  getFinancialReports(@Query() query: any): Promise<any> {
-    // TODO: Implement financial reports
-    return Promise.resolve({
-      totalFees: 0,
-      paidFees: 0,
-      pendingFees: 0,
-      overdueFees: 0,
-    });
+  async getFinancialReports(
+    @Query() query: any,
+  ): Promise<DiscountAnalyticsDto> {
+    const startDate = query.startDate ? new Date(query.startDate) : undefined;
+    const endDate = query.endDate ? new Date(query.endDate) : undefined;
+    const discountType = query.discountType || undefined;
+
+    return this.feesService.getFinancialReports(
+      startDate,
+      endDate,
+      discountType,
+    );
   }
 }

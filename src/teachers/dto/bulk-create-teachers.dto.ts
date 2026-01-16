@@ -1,5 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, ValidateNested, IsNotEmpty, IsNumber, IsString, IsOptional, IsEmail, Min, Max } from 'class-validator';
+import {
+  IsArray,
+  ValidateNested,
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  IsOptional,
+  IsEmail,
+  Min,
+  Max,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class BulkCreateTeacherItemDto {
@@ -88,4 +98,3 @@ export class BulkCreateTeachersDto {
   @Type(() => BulkCreateTeacherItemDto)
   teachers: BulkCreateTeacherItemDto[];
 }
-

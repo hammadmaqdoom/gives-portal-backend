@@ -27,7 +27,8 @@ export class CheckoutController {
   @ApiOkResponse({ description: 'Create checkout session' })
   async createCheckout(@Body() dto: CreateCheckoutDto, @Req() req: any) {
     const userId = req.user?.id ? Number(req.user.id) : undefined;
-    const sessionId = req.cookies?.cartSessionId || req.headers['x-cart-session-id'];
+    const sessionId =
+      req.cookies?.cartSessionId || req.headers['x-cart-session-id'];
     const currency = req.currency || 'USD';
 
     const checkoutSession = await this.checkoutService.createCheckout(
@@ -55,4 +56,3 @@ export class CheckoutController {
     return { data: result };
   }
 }
-

@@ -24,4 +24,3 @@ import { NotificationModule } from '../notifications/notification.module';
   exports: [CheckoutService],
 })
 export class CheckoutModule {}
-

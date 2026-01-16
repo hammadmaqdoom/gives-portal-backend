@@ -16,7 +16,7 @@ export class BatchTermEntity extends EntityRelationalHelper {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Index({ unique: true, where: '"deletedAt" IS NULL' })
+  @Index({ unique: true, where: '"deleted_at" IS NULL' })
   @Column({ type: String })
   name: string;
 
@@ -38,4 +38,3 @@ export class BatchTermEntity extends EntityRelationalHelper {
   @DeleteDateColumn({ name: 'deleted_at' })
   deletedAt: Date;
 }
-

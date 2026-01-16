@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsBoolean, IsNumber } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsBoolean,
+  IsNumber,
+} from 'class-validator';
 
 export class CreateBatchTermDto {
   @ApiProperty({ example: 'Aug 2025 – April 2026' })
@@ -22,4 +28,3 @@ export class CreateBatchTermDto {
   @IsNumber()
   displayOrder?: number;
 }
-
