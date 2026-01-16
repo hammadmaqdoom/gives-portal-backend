@@ -513,7 +513,7 @@ export class ClassesService {
    * Enrich class with proper image URLs (presigned for S3, serve endpoint for local)
    * Also sets thumbnailUrl and coverImageUrl from file URLs for frontend compatibility
    */
-  private async enrichClassWithImageUrls(classEntity: Class): Promise<void> {
+  async enrichClassWithImageUrls(classEntity: Class): Promise<void> {
     const fileDriver = await this.fileStorageService.getDriver();
     const baseUrl = this.getBaseUrl();
 

@@ -48,6 +48,31 @@ export class StudentClassEnrollmentMapper {
         deletedAt: raw.class.deletedAt,
       } as Class;
 
+      // Map file entities if available (for URL enrichment)
+      if (raw.class.thumbnailFile) {
+        (enrollment.class as any).thumbnailFile = {
+          id: raw.class.thumbnailFile.id,
+          filename: raw.class.thumbnailFile.filename,
+          originalName: raw.class.thumbnailFile.originalName,
+          path: raw.class.thumbnailFile.path,
+          url: raw.class.thumbnailFile.url,
+          size: raw.class.thumbnailFile.size,
+          mimeType: raw.class.thumbnailFile.mimeType,
+        };
+      }
+
+      if (raw.class.coverImageFile) {
+        (enrollment.class as any).coverImageFile = {
+          id: raw.class.coverImageFile.id,
+          filename: raw.class.coverImageFile.filename,
+          originalName: raw.class.coverImageFile.originalName,
+          path: raw.class.coverImageFile.path,
+          url: raw.class.coverImageFile.url,
+          size: raw.class.coverImageFile.size,
+          mimeType: raw.class.coverImageFile.mimeType,
+        };
+      }
+
       // Map teacher if available
       if (raw.class.teacher) {
         (enrollment.class as any).teacher = {
