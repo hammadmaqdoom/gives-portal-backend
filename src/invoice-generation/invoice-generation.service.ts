@@ -6,6 +6,7 @@ import { InvoicesService } from '../invoices/invoices.service';
 import { StudentsService } from '../students/students.service';
 import { ClassesService } from '../classes/classes.service';
 import { ParentsService } from '../parents/parents.service';
+import { CurrencyService } from '../currency/currency.service';
 import { InvoiceGenerationLogEntity } from './infrastructure/persistence/relational/entities/invoice-generation-log.entity';
 import { InvoiceStatus } from '../invoices/domain/invoice';
 
@@ -44,6 +45,7 @@ export class InvoiceGenerationService {
     private readonly studentsService: StudentsService,
     private readonly classesService: ClassesService,
     private readonly parentsService: ParentsService,
+    private readonly currencyService: CurrencyService,
   ) {}
 
   // Run daily at 2 AM to check for invoice generation needs
@@ -298,8 +300,8 @@ export class InvoiceGenerationService {
       const parents = await this.parentsService.findByStudentId(studentId);
       parent = parents && parents.length > 0 ? parents[0] : null;
 
-      // Determine currency based on student's country
-      const currency = student.country === 'Pakistan' ? 'PKR' : 'USD';
+      // Determine currency based on student's country using utility function
+      const currency = this.currencyService.getCurrencyForCountry(student.country);
 
       // Get the appropriate fee based on currency
       const classFee =
