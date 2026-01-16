@@ -730,7 +730,7 @@ export class StudentsService {
       }
 
       // Determine currency based on student's country using utility function
-      const currency = this.currencyService.getCurrencyForCountry(student.country);
+      const currency = this.currencyService.getCurrencyForCountry(student.country ?? undefined);
 
       // Get the appropriate fee based on currency
       const classFee =
