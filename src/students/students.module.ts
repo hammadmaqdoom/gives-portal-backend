@@ -15,6 +15,7 @@ import { ParentsModule } from '../parents/parents.module';
 import { InvoicesModule } from '../invoices/invoices.module';
 import { ClassesModule } from '../classes/classes.module';
 import { NotificationModule } from '../notifications/notification.module';
+import { CurrencyModule } from '../currency/currency.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { NotificationModule } from '../notifications/notification.module';
     FilesModule,
     UsersModule,
     NotificationModule,
+    CurrencyModule,
     forwardRef(() => ParentsModule),
     forwardRef(() => InvoicesModule),
     forwardRef(() => ClassesModule),
