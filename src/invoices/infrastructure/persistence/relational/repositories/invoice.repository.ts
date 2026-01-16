@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { InvoiceEntity } from '../entities/invoice.entity';
+import { InvoiceItemEntity } from '../entities/invoice-item.entity';
 import { InvoiceRepository } from '../../invoice.repository';
 import { Invoice } from '../../../../domain/invoice';
 import {
@@ -9,20 +10,52 @@ import {
   SortInvoiceDto,
 } from '../../../../dto/query-invoice.dto';
 import { InvoiceMapper } from '../mappers/invoice.mapper';
+import { InvoiceItemMapper } from '../mappers/invoice-item.mapper';
 
 @Injectable()
 export class InvoiceRepositoryImpl implements InvoiceRepository {
   constructor(
     @InjectRepository(InvoiceEntity)
     private readonly invoiceRepository: Repository<InvoiceEntity>,
+    @InjectRepository(InvoiceItemEntity)
+    private readonly invoiceItemRepository: Repository<InvoiceItemEntity>,
   ) {}
 
   async create(data: Partial<Invoice>): Promise<Invoice> {
     const persistenceModel = InvoiceMapper.toPersistence(data as Invoice);
-    const newEntity = await this.invoiceRepository.save(
-      this.invoiceRepository.create(persistenceModel),
-    );
-    return InvoiceMapper.toDomain(newEntity);
+    
+    // Create invoice entity first (without items)
+    const invoiceEntity = this.invoiceRepository.create({
+      ...persistenceModel,
+      items: undefined, // Remove items temporarily
+    });
+    
+    // Save invoice first to get the ID
+    const savedInvoice = await this.invoiceRepository.save(invoiceEntity);
+    
+    // Now create and save items if they exist
+    if (data.items && data.items.length > 0) {
+      const itemEntities = data.items.map((item) => {
+        const itemEntity = this.invoiceItemRepository.create({
+          invoice: savedInvoice,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.total,
+        });
+        return itemEntity;
+      });
+      
+      await this.invoiceItemRepository.save(itemEntities);
+    }
+    
+    // Fetch the complete invoice with items
+    const completeInvoice = await this.invoiceRepository.findOne({
+      where: { id: savedInvoice.id },
+      relations: ['student', 'parent', 'items'],
+    });
+    
+    return InvoiceMapper.toDomain(completeInvoice!);
   }
 
   async findById(id: Invoice['id']): Promise<Invoice | null> {
