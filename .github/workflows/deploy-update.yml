@@ -379,17 +379,19 @@ jobs:
             
             # Login to GitHub Container Registry
             echo "=== Logging in to GitHub Container Registry ==="
-            # Create a temporary script to handle docker login with sg docker
-            # This avoids stdin issues when using sg docker in non-interactive environments
-            echo "${{ secrets.GT_PAT }}" > /tmp/ghcr_password.txt
-            chmod 600 /tmp/ghcr_password.txt
-            cat > /tmp/docker-login.sh << 'LOGIN_SCRIPT'
-            #!/bin/bash
-            docker login ghcr.io -u "$1" --password-stdin < /tmp/ghcr_password.txt
-            LOGIN_SCRIPT
-            chmod +x /tmp/docker-login.sh
-            sg docker -c "/tmp/docker-login.sh '${{ github.actor }}'"
-            rm -f /tmp/docker-login.sh /tmp/ghcr_password.txt
+            # Write Docker credentials directly to config file to avoid TTY issues
+            # This works reliably with sg docker in non-interactive environments
+            export AUTH_STRING="${{ github.actor }}:${{ secrets.GT_PAT }}"
+            DOCKER_CONFIG_DIR="$HOME/.docker"
+            mkdir -p "$DOCKER_CONFIG_DIR"
+            DOCKER_CONFIG_FILE="$DOCKER_CONFIG_DIR/config.json"
+            
+            # Create or update docker config JSON using Python one-liner
+            python3 -c "import json, base64, os; config_file = os.path.expanduser('~/.docker/config.json'); auth_string = os.environ.get('AUTH_STRING'); auth_b64 = base64.b64encode(auth_string.encode()).decode(); config = json.load(open(config_file)) if os.path.exists(config_file) else {}; config.setdefault('auths', {})['ghcr.io'] = {'auth': auth_b64}; os.makedirs(os.path.dirname(config_file), exist_ok=True); json.dump(config, open(config_file, 'w'), indent=2)"
+            
+            chmod 600 "$DOCKER_CONFIG_FILE" 2>/dev/null || true
+            echo "Docker credentials configured for ghcr.io"
+            unset AUTH_STRING
             
             # Pull the pre-built image
             echo "=== Pulling pre-built Docker image ==="
