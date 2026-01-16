@@ -36,7 +36,7 @@ export class ClassesRelationalRepository implements ClassRepository {
     // Fetch the complete class with schedules
     const completeClass = await this.classesRepository.findOne({
       where: { id: newClass.id },
-      relations: ['subject', 'teacher', 'schedules'],
+      relations: ['subject', 'teacher', 'schedules', 'thumbnailFile', 'coverImageFile'],
     });
 
     return this.classMapper.toDomain(completeClass!);
@@ -45,7 +45,7 @@ export class ClassesRelationalRepository implements ClassRepository {
   async findById(id: Class['id']): Promise<NullableType<Class>> {
     const classObj = await this.classesRepository.findOne({
       where: { id },
-      relations: ['subject', 'teacher', 'schedules'],
+      relations: ['subject', 'teacher', 'schedules', 'thumbnailFile', 'coverImageFile'],
     });
     return classObj ? this.classMapper.toDomain(classObj) : null;
   }
@@ -70,7 +70,9 @@ export class ClassesRelationalRepository implements ClassRepository {
       .createQueryBuilder('class')
       .leftJoinAndSelect('class.subject', 'subject')
       .leftJoinAndSelect('class.teacher', 'teacher')
-      .leftJoinAndSelect('class.schedules', 'schedules');
+      .leftJoinAndSelect('class.schedules', 'schedules')
+      .leftJoinAndSelect('class.thumbnailFile', 'thumbnailFile')
+      .leftJoinAndSelect('class.coverImageFile', 'coverImageFile');
 
     if (filterOptions?.name) {
       queryBuilder.andWhere('class.name ILIKE :name', {
@@ -124,7 +126,7 @@ export class ClassesRelationalRepository implements ClassRepository {
   async update(id: Class['id'], data: Partial<Class>): Promise<Class | null> {
     const classObj = await this.classesRepository.findOne({
       where: { id },
-      relations: ['subject', 'teacher', 'schedules'],
+      relations: ['subject', 'teacher', 'schedules', 'thumbnailFile', 'coverImageFile'],
     });
 
     if (!classObj) {
@@ -152,7 +154,7 @@ export class ClassesRelationalRepository implements ClassRepository {
     // Fetch the complete updated class with schedules
     const completeClass = await this.classesRepository.findOne({
       where: { id },
-      relations: ['subject', 'teacher', 'schedules'],
+      relations: ['subject', 'teacher', 'schedules', 'thumbnailFile', 'coverImageFile'],
     });
 
     return this.classMapper.toDomain(completeClass!);
