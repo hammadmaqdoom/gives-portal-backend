@@ -331,6 +331,28 @@ export class InvoicesService {
     return this.invoiceRepository.remove(id);
   }
 
+  async removeMany(ids: number[]): Promise<{ deleted: number; failed: number }> {
+    let deleted = 0;
+    let failed = 0;
+
+    for (const id of ids) {
+      try {
+        const invoice = await this.invoiceRepository.findById(id);
+        if (invoice) {
+          await this.invoiceRepository.remove(id);
+          deleted++;
+        } else {
+          failed++;
+        }
+      } catch (error) {
+        console.error(`Error deleting invoice ${id}:`, error);
+        failed++;
+      }
+    }
+
+    return { deleted, failed };
+  }
+
   async generateInvoiceNumber(): Promise<string> {
     return this.invoiceRepository.generateInvoiceNumber();
   }
