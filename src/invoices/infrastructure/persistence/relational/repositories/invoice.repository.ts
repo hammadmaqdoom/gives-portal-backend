@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { Repository, SelectQueryBuilder, IsNull } from 'typeorm';
 import { InvoiceEntity } from '../entities/invoice.entity';
+import { InvoiceItemEntity } from '../entities/invoice-item.entity';
 import { InvoiceRepository } from '../../invoice.repository';
 import { Invoice } from '../../../../domain/invoice';
 import {
@@ -9,20 +10,52 @@ import {
   SortInvoiceDto,
 } from '../../../../dto/query-invoice.dto';
 import { InvoiceMapper } from '../mappers/invoice.mapper';
+import { InvoiceItemMapper } from '../mappers/invoice-item.mapper';
 
 @Injectable()
 export class InvoiceRepositoryImpl implements InvoiceRepository {
   constructor(
     @InjectRepository(InvoiceEntity)
     private readonly invoiceRepository: Repository<InvoiceEntity>,
+    @InjectRepository(InvoiceItemEntity)
+    private readonly invoiceItemRepository: Repository<InvoiceItemEntity>,
   ) {}
 
   async create(data: Partial<Invoice>): Promise<Invoice> {
     const persistenceModel = InvoiceMapper.toPersistence(data as Invoice);
-    const newEntity = await this.invoiceRepository.save(
-      this.invoiceRepository.create(persistenceModel),
-    );
-    return InvoiceMapper.toDomain(newEntity);
+    
+    // Create invoice entity first (without items)
+    const invoiceEntity = this.invoiceRepository.create({
+      ...persistenceModel,
+      items: undefined, // Remove items temporarily
+    });
+    
+    // Save invoice first to get the ID
+    const savedInvoice = await this.invoiceRepository.save(invoiceEntity);
+    
+    // Now create and save items if they exist
+    if (data.items && data.items.length > 0) {
+      const itemEntities = data.items.map((item) => {
+        const itemEntity = this.invoiceItemRepository.create({
+          invoice: savedInvoice,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.total,
+        });
+        return itemEntity;
+      });
+      
+      await this.invoiceItemRepository.save(itemEntities);
+    }
+    
+    // Fetch the complete invoice with items
+    const completeInvoice = await this.invoiceRepository.findOne({
+      where: { id: savedInvoice.id },
+      relations: ['student', 'parent', 'items'],
+    });
+    
+    return InvoiceMapper.toDomain(completeInvoice!);
   }
 
   async findById(id: Invoice['id']): Promise<Invoice | null> {
@@ -86,7 +119,10 @@ export class InvoiceRepositoryImpl implements InvoiceRepository {
     );
 
     const entities = await this.invoiceRepository.find({
-      where: { student: { id: studentId } },
+      where: { 
+        student: { id: studentId },
+        deletedAt: IsNull(), // Exclude soft-deleted invoices
+      },
       relations: ['student', 'parent', 'items'],
       order: { createdAt: 'DESC' },
     });
@@ -142,21 +178,47 @@ export class InvoiceRepositoryImpl implements InvoiceRepository {
     const year = new Date().getFullYear();
     const prefix = `INV-${year}`;
 
-    const lastInvoice = await this.invoiceRepository
-      .createQueryBuilder('invoice')
-      .where('invoice.invoiceNumber LIKE :prefix', { prefix: `${prefix}%` })
-      .orderBy('invoice.invoiceNumber', 'DESC')
-      .getOne();
+    // Use a transaction with row-level locking to prevent race conditions
+    // This ensures that only one process can generate an invoice number at a time
+    const queryRunner = this.invoiceRepository.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    let nextNumber = 1;
-    if (lastInvoice) {
-      const lastNumber = parseInt(
-        lastInvoice.invoiceNumber.split('-').pop() || '0',
+    try {
+      // Find the maximum invoice number INCLUDING soft-deleted ones
+      // This is important because soft-deleted invoices still hold their invoice numbers
+      // and we need to avoid duplicate key violations
+      // Lock the table to prevent concurrent access during number generation
+      const result = await queryRunner.manager.query(
+        `SELECT "invoiceNumber"
+         FROM invoice
+         WHERE "invoiceNumber" LIKE $1
+         ORDER BY CAST(SUBSTRING("invoiceNumber" FROM '-(\\d+)$') AS INTEGER) DESC
+         LIMIT 1
+         FOR UPDATE`,
+        [`${prefix}-%`]
       );
-      nextNumber = lastNumber + 1;
-    }
 
-    return `${prefix}-${nextNumber.toString().padStart(4, '0')}`;
+      let nextNumber = 1;
+      if (result && result.length > 0 && result[0].invoiceNumber) {
+        // Extract the numeric part from the invoice number (e.g., "INV-2026-0001" -> 1)
+        const lastInvoiceNumber = result[0].invoiceNumber;
+        const numericPart = lastInvoiceNumber.split('-').pop();
+        const lastNumber = parseInt(numericPart || '0', 10);
+        nextNumber = lastNumber + 1;
+      }
+
+      // Generate the invoice number
+      const invoiceNumber = `${prefix}-${nextNumber.toString().padStart(4, '0')}`;
+      
+      await queryRunner.commitTransaction();
+      return invoiceNumber;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   private createSelectQueryBuilder(

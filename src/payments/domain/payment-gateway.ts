@@ -15,6 +15,7 @@ export class PaymentGateway {
   processingFeeType: 'percentage' | 'fixed';
   sortOrder: number;
   configSchema?: any;
+  feeStructure?: any;
   webhookUrl?: string;
   testMode: boolean;
   createdAt: Date;
