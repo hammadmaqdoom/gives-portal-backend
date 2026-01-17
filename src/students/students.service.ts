@@ -29,6 +29,8 @@ import { Parent } from '../parents/domain/parent';
 import { InvoicesService } from '../invoices/invoices.service';
 import { ClassesService } from '../classes/classes.service';
 import { NotificationService } from '../notifications/notification.service';
+import { CurrencyService } from '../currency/currency.service';
+import { MailService } from '../mail/mail.service';
 import { randomStringGenerator } from '../utils/random-string-generator';
 import { RoleEnum } from '../roles/roles.enum';
 import { StatusEnum } from '../statuses/statuses.enum';
@@ -47,6 +49,8 @@ export class StudentsService {
     @Inject(forwardRef(() => ClassesService))
     private readonly classesService: ClassesService,
     private readonly notificationService: NotificationService,
+    private readonly currencyService: CurrencyService,
+    private readonly mailService: MailService,
   ) {}
 
   async create(
@@ -110,6 +114,26 @@ export class StudentsService {
       console.log(
         `Student user account created: ${createStudentDto.email} with role: ${user.role?.name}`,
       );
+
+      // Send account credentials email to the student
+      try {
+        await this.mailService.sendAccountCredentials({
+          to: createStudentDto.email,
+          userName: createStudentDto.name,
+          email: createStudentDto.email,
+          tempPassword,
+          isParent: false,
+        });
+        console.log(
+          `Account credentials email sent to student: ${createStudentDto.email}`,
+        );
+      } catch (emailError) {
+        console.error(
+          `Failed to send account credentials email to student ${createStudentDto.email}:`,
+          emailError,
+        );
+        // Don't throw - user account is created, email failure shouldn't block the process
+      }
     }
 
     const student = await this.studentsRepository.create({
@@ -727,8 +751,8 @@ export class StudentsService {
         return;
       }
 
-      // Determine currency based on student's country
-      const currency = student.country === 'Pakistan' ? 'PKR' : 'USD';
+      // Determine currency based on student's country using utility function
+      const currency = this.currencyService.getCurrencyForCountry(student.country ?? undefined);
 
       // Get the appropriate fee based on currency
       const classFee =
@@ -826,8 +850,8 @@ export class StudentsService {
           )
           .join(', ') || 'Schedule TBD';
 
-      // Format fee
-      const currency = student.country === 'Pakistan' ? 'PKR' : 'USD';
+      // Format fee based on student's country
+      const currency = this.currencyService.getCurrencyForCountry(student.country ?? undefined);
       const fee =
         currency === 'PKR' ? classDetails.feePKR : classDetails.feeUSD;
       const formattedFee = `${fee} ${currency}`;

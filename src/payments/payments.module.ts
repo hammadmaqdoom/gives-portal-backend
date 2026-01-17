@@ -7,6 +7,9 @@ import { WebhooksController } from './webhooks.controller';
 import { PaymentsService } from './payments.service';
 import { PaymentGatewayFactory } from './payment-gateway.factory';
 import { SafepayService } from './gateways/safepay/safepay.service';
+import { PayFastService } from './gateways/payfast/payfast.service';
+import { AbhiPayService } from './gateways/abhipay/abhipay.service';
+import { StripeService } from './gateways/stripe/stripe.service';
 import { EncryptionService } from './infrastructure/encryption/encryption.service';
 import { WebhookService } from './infrastructure/webhooks/webhook.service';
 import { PaymentLoggerService } from './infrastructure/logging/payment-logger.service';
@@ -52,6 +55,9 @@ import { PaymentTransactionRepositoryImpl } from './infrastructure/persistence/r
     PaymentsService,
     PaymentGatewayFactory,
     SafepayService,
+    PayFastService,
+    AbhiPayService,
+    StripeService,
     EncryptionService,
     WebhookService,
     PaymentLoggerService,

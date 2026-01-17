@@ -146,4 +146,141 @@ export class WebhooksController {
       return { success: false, message: error.message };
     }
   }
+
+  @Post('payfast')
+  @ApiOperation({ summary: 'PayFast webhook endpoint' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Webhook processed successfully',
+  })
+  async handlePayFastWebhook(
+    @Body() webhookData: any,
+    @Headers() headers: any,
+    @Request() req: any,
+  ): Promise<{ success: boolean; message: string }> {
+    // Log incoming webhook request
+    this.logger.log('=== PAYFAST WEBHOOK REQUEST RECEIVED ===');
+    this.logger.log('Timestamp:', new Date().toISOString());
+    this.logger.log('IP Address:', req.ip || req.connection?.remoteAddress);
+    this.logger.log('User Agent:', req.headers['user-agent']);
+    this.logger.log('Headers:', JSON.stringify(headers, null, 2));
+    this.logger.log('Body:', JSON.stringify(webhookData, null, 2));
+    this.logger.log('==========================================');
+
+    try {
+      // Get PayFast gateway
+      const gateway = await this.paymentsService.findByName('payfast');
+      if (!gateway) {
+        this.logger.error('❌ PayFast gateway not found');
+        return { success: false, message: 'PayFast gateway not found' };
+      }
+
+      // Get active credentials
+      const credentials = await this.paymentsService.getActiveCredentials(
+        gateway.id,
+      );
+      if (!credentials) {
+        this.logger.error('❌ PayFast credentials not found');
+        return { success: false, message: 'PayFast credentials not found' };
+      }
+
+      this.logger.log(
+        '✅ PayFast gateway and credentials found, processing webhook',
+      );
+      this.logger.log('Credentials details:', {
+        id: credentials.id,
+        environment: credentials.environment,
+        hasApiKey: !!credentials.apiKey,
+        hasSecretKey: !!credentials.secretKey,
+        hasWebhookSecret: !!credentials.webhookSecret,
+      });
+
+      // Process the webhook
+      // PayFast may use different header names for signature - adjust as needed
+      const payfastSignature =
+        headers['x-payfast-signature'] ||
+        headers['signature'];
+
+      this.logger.log('Available headers:', Object.keys(headers));
+      this.logger.log('Signature found:', payfastSignature);
+
+      return await this.webhookService.processPayFastWebhook(
+        webhookData,
+        payfastSignature,
+        credentials,
+      );
+    } catch (error) {
+      this.logger.error('💥 ERROR processing PayFast webhook:', error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  @Post('abhipay')
+  @ApiOperation({ summary: 'ABHI Pay webhook endpoint' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Webhook processed successfully',
+  })
+  async handleAbhiPayWebhook(
+    @Body() webhookData: any,
+    @Headers() headers: any,
+    @Request() req: any,
+  ): Promise<{ success: boolean; message: string }> {
+    // Log incoming webhook request
+    this.logger.log('=== ABHI PAY WEBHOOK REQUEST RECEIVED ===');
+    this.logger.log('Timestamp:', new Date().toISOString());
+    this.logger.log('IP Address:', req.ip || req.connection?.remoteAddress);
+    this.logger.log('User Agent:', req.headers['user-agent']);
+    this.logger.log('Headers:', JSON.stringify(headers, null, 2));
+    this.logger.log('Body:', JSON.stringify(webhookData, null, 2));
+    this.logger.log('==========================================');
+
+    try {
+      // Get ABHI Pay gateway
+      const gateway = await this.paymentsService.findByName('abhipay');
+      if (!gateway) {
+        this.logger.error('❌ ABHI Pay gateway not found');
+        return { success: false, message: 'ABHI Pay gateway not found' };
+      }
+
+      // Get active credentials
+      const credentials = await this.paymentsService.getActiveCredentials(
+        gateway.id,
+      );
+      if (!credentials) {
+        this.logger.error('❌ ABHI Pay credentials not found');
+        return { success: false, message: 'ABHI Pay credentials not found' };
+      }
+
+      this.logger.log(
+        '✅ ABHI Pay gateway and credentials found, processing webhook',
+      );
+      this.logger.log('Credentials details:', {
+        id: credentials.id,
+        environment: credentials.environment,
+        hasApiKey: !!credentials.apiKey,
+        hasSecretKey: !!credentials.secretKey,
+        hasWebhookSecret: !!credentials.webhookSecret,
+      });
+
+      // Process the webhook
+      // ABHI Pay may use different header names for signature - adjust as needed
+      const abhipaySignature =
+        headers['x-abhipay-signature'] ||
+        headers['signature'] ||
+        headers['authorization'];
+
+      this.logger.log('Available headers:', Object.keys(headers));
+      this.logger.log('Signature found:', abhipaySignature);
+
+      return await this.webhookService.processAbhiPayWebhook(
+        webhookData,
+        abhipaySignature,
+        credentials,
+      );
+    } catch (error) {
+      this.logger.error('💥 ERROR processing ABHI Pay webhook:', error);
+      return { success: false, message: error.message };
+    }
+  }
 }

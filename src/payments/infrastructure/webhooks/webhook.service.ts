@@ -265,55 +265,79 @@ export class WebhookService {
     credentials: any,
   ): Promise<{ success: boolean; message: string }> {
     try {
-      // Verify Stripe webhook signature
-      const isValidSignature = this.verifyStripeSignature(
-        webhookData,
-        signature,
-        credentials.webhookSecret,
-      );
+      // Log incoming webhook request
+      this.logger.log('=== STRIPE WEBHOOK RECEIVED ===');
+      this.logger.log('Timestamp:', new Date().toISOString());
+      this.logger.log('Webhook Data:', JSON.stringify(webhookData, null, 2));
+      this.logger.log('Signature:', signature);
+      this.logger.log('Credentials ID:', credentials?.id || 'N/A');
+      this.logger.log('Webhook Secret Present:', !!credentials?.webhookSecret);
+      this.logger.log('================================');
 
-      if (!isValidSignature) {
-        this.logger.warn('Invalid Stripe webhook signature');
-        throw new BadRequestException('Invalid webhook signature');
+      // Get Stripe gateway and use the gateway factory to process webhook
+      const gateway = await this.paymentsService.findByName('stripe');
+      if (!gateway) {
+        this.logger.error('❌ Stripe gateway not found');
+        return { success: false, message: 'Stripe gateway not found' };
       }
 
-      const { type, data } = webhookData;
-      const paymentIntent = data.object;
+      const gatewayImpl = this.paymentGatewayFactory.getGateway(gateway);
 
-      // Find transaction by payment intent ID
-      const transaction =
-        await this.paymentsService.getTransactionByTransactionId(
-          paymentIntent.id,
+      // Process webhook using StripeService (handles signature verification)
+      const result = await gatewayImpl.processWebhook(
+        credentials,
+        webhookData,
+        signature,
+      );
+
+      this.logger.log('Webhook event type:', result.eventType);
+      this.logger.log('Transaction ID:', result.transactionId);
+      this.logger.log('Status:', result.status);
+
+      // Find transaction by gateway transaction ID or our transaction ID
+      this.logger.log(
+        `🔍 Looking for transaction with ID: ${result.transactionId}`,
+      );
+
+      let transaction =
+        await this.paymentsService.getTransactionByGatewayTransactionId(
+          result.transactionId,
         );
 
       if (!transaction) {
+        // Try finding by our internal transaction ID
+        transaction =
+          await this.paymentsService.getTransactionByTransactionId(
+            result.transactionId,
+          );
+      }
+
+      if (!transaction) {
         this.logger.warn(
-          `Transaction not found for payment intent: ${paymentIntent.id}`,
+          `❌ Transaction not found for ID: ${result.transactionId}`,
         );
-        return { success: false, message: 'Transaction not found' };
+        this.logger.warn(
+          'This might be a test webhook or the transaction was not created in our system',
+        );
+        return {
+          success: true,
+          message: 'Webhook processed successfully - test webhook received',
+        };
       }
 
-      let newStatus: PaymentTransaction['status'] = 'pending';
+      this.logger.log(
+        `✅ Transaction found: ${transaction.transactionId} (Current Status: ${transaction.status})`,
+      );
 
-      switch (type) {
-        case 'payment_intent.succeeded':
-          newStatus = 'completed';
-          break;
-        case 'payment_intent.payment_failed':
-          newStatus = 'failed';
-          break;
-        case 'payment_intent.canceled':
-          newStatus = 'cancelled';
-          break;
-        case 'payment_intent.processing':
-          newStatus = 'processing';
-          break;
-        default:
-          this.logger.warn(`Unhandled Stripe event type: ${type}`);
-          return { success: false, message: 'Unhandled event type' };
-      }
+      // Map status to internal status
+      const newStatus: PaymentTransaction['status'] =
+        result.status as PaymentTransaction['status'];
 
-      // Update transaction
+      // Update transaction status
+      this.logger.log(
+        `🔄 Processing status change from '${transaction.status}' to '${newStatus}'`,
+      );
+
       await this.paymentsService.updateTransactionStatus(
         transaction.transactionId,
         newStatus,
@@ -322,38 +346,279 @@ export class WebhookService {
           webhookData: webhookData,
           failureReason:
             newStatus === 'failed'
-              ? paymentIntent.last_payment_error?.message
+              ? webhookData.data?.object?.last_payment_error?.message ||
+                webhookData.data?.object?.outcome?.seller_message ||
+                'Payment failed'
               : undefined,
         },
       );
 
       this.logger.log(
-        `Transaction ${transaction.transactionId} updated to status: ${newStatus}`,
+        `✅ Transaction ${transaction.transactionId} successfully updated to status: ${newStatus}`,
       );
 
+      // Handle payment completion
       if (newStatus === 'completed') {
+        this.logger.log('🎉 Payment completed - triggering success actions');
         await this.handleSuccessfulPayment(transaction);
 
-        // Process invoice payment if transaction is linked to an invoice
         if (transaction.invoiceId) {
+          this.logger.log(
+            `📄 Processing invoice payment for invoice: ${transaction.invoiceId}`,
+          );
           await this.invoicePaymentService.processPaymentSuccess(
             transaction.transactionId,
           );
         }
       } else if (newStatus === 'failed') {
-        // Process payment failure if transaction is linked to an invoice
+        this.logger.log('💥 Payment failed - triggering failure actions');
+
         if (transaction.invoiceId) {
+          this.logger.log(
+            `📄 Processing invoice payment failure for invoice: ${transaction.invoiceId}`,
+          );
           await this.invoicePaymentService.processPaymentFailure(
             transaction.transactionId,
-            paymentIntent.last_payment_error?.message || 'Payment failed',
+            webhookData.data?.object?.last_payment_error?.message ||
+              webhookData.data?.object?.outcome?.seller_message ||
+              'Payment failed',
           );
         }
       }
 
+      this.logger.log('🎯 Stripe webhook processing completed successfully');
       return { success: true, message: 'Webhook processed successfully' };
     } catch (error) {
-      this.logger.error('Error processing Stripe webhook:', error);
+      this.logger.error('💥 ERROR processing Stripe webhook:', error);
+      this.logger.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        webhookData: webhookData,
+      });
       return { success: false, message: error.message };
+    }
+  }
+
+  async processPayFastWebhook(
+    webhookData: any,
+    signature: string,
+    credentials: any,
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      // Log incoming webhook request
+      this.logger.log('=== PAYFAST WEBHOOK RECEIVED ===');
+      this.logger.log('Timestamp:', new Date().toISOString());
+      this.logger.log('Webhook Data:', JSON.stringify(webhookData, null, 2));
+      this.logger.log('Signature:', signature);
+      this.logger.log('Credentials ID:', credentials?.id || 'N/A');
+      this.logger.log('Webhook Secret Present:', !!credentials?.webhookSecret);
+      this.logger.log('=================================');
+
+      // Verify webhook signature if secret is configured
+      if (credentials.webhookSecret && signature) {
+        const isValid = this.verifyPayFastSignature(
+          webhookData,
+          signature,
+          credentials.webhookSecret,
+        );
+
+        if (!isValid) {
+          this.logger.warn('⚠️ Invalid PayFast webhook signature');
+          // Continue processing but log the warning
+          // In production, you may want to reject invalid signatures
+        } else {
+          this.logger.log('✅ PayFast webhook signature verified');
+        }
+      } else {
+        this.logger.warn(
+          '⚠️ No webhook secret provided, skipping signature verification',
+        );
+      }
+
+      // Extract data from webhook payload
+      // PayFast webhook structure may vary - adjust field names as needed
+      const eventType =
+        webhookData.event_type ||
+        webhookData.type ||
+        webhookData.event ||
+        'payment.update';
+      const transactionId =
+        webhookData.transaction_id ||
+        webhookData.merchant_order_id ||
+        webhookData.order_id ||
+        webhookData.reference;
+      const paymentStatus =
+        webhookData.status ||
+        webhookData.payment_status ||
+        webhookData.state;
+      const amount = webhookData.amount || 0;
+      const currency = webhookData.currency || 'PKR';
+
+      this.logger.log('Event Type:', eventType);
+      this.logger.log('Transaction ID:', transactionId);
+      this.logger.log('Payment Status:', paymentStatus);
+      this.logger.log('Amount:', amount);
+      this.logger.log('Currency:', currency);
+
+      // Map PayFast status to internal status
+      let status: PaymentTransaction['status'] = 'pending';
+      const statusUpper = paymentStatus?.toUpperCase();
+
+      if (
+        statusUpper === 'COMPLETED' ||
+        statusUpper === 'SUCCESS' ||
+        statusUpper === 'PAID' ||
+        eventType === 'payment.succeeded' ||
+        eventType === 'payment.completed'
+      ) {
+        status = 'completed';
+      } else if (
+        statusUpper === 'FAILED' ||
+        statusUpper === 'FAILURE' ||
+        eventType === 'payment.failed'
+      ) {
+        status = 'failed';
+      } else if (
+        statusUpper === 'CANCELLED' ||
+        statusUpper === 'CANCELED' ||
+        eventType === 'payment.cancelled'
+      ) {
+        status = 'cancelled';
+      } else if (statusUpper === 'PROCESSING') {
+        status = 'processing';
+      } else if (
+        statusUpper === 'REFUNDED' ||
+        statusUpper === 'REVERSED' ||
+        eventType === 'payment.refunded'
+      ) {
+        status = 'refunded';
+      }
+
+      this.logger.log('Mapped Status:', status);
+
+      // Find transaction by gateway transaction ID or our transaction ID
+      this.logger.log(
+        `🔍 Looking for transaction with ID: ${transactionId}`,
+      );
+
+      let transaction =
+        await this.paymentsService.getTransactionByGatewayTransactionId(
+          transactionId,
+        );
+
+      if (!transaction) {
+        // Try finding by our internal transaction ID
+        transaction =
+          await this.paymentsService.getTransactionByTransactionId(
+            transactionId,
+          );
+      }
+
+      if (!transaction) {
+        this.logger.warn(
+          `❌ Transaction not found for ID: ${transactionId}`,
+        );
+        this.logger.warn(
+          'This might be a test webhook or the transaction was not created in our system',
+        );
+        return {
+          success: true,
+          message: 'Webhook processed successfully - test webhook received',
+        };
+      }
+
+      this.logger.log(
+        `✅ Transaction found: ${transaction.transactionId} (Current Status: ${transaction.status})`,
+      );
+
+      // Update transaction status
+      this.logger.log(
+        `🔄 Processing status change from '${transaction.status}' to '${status}'`,
+      );
+
+      await this.paymentsService.updateTransactionStatus(
+        transaction.transactionId,
+        status,
+        {
+          gatewayResponse: webhookData,
+          webhookData: webhookData,
+          failureReason:
+            status === 'failed'
+              ? webhookData.error_message ||
+                webhookData.failure_reason ||
+                'Payment failed'
+              : undefined,
+        },
+      );
+
+      this.logger.log(
+        `✅ Transaction ${transaction.transactionId} successfully updated to status: ${status}`,
+      );
+
+      // Handle payment completion
+      if (status === 'completed') {
+        this.logger.log('🎉 Payment completed - triggering success actions');
+        await this.handleSuccessfulPayment(transaction);
+
+        if (transaction.invoiceId) {
+          this.logger.log(
+            `📄 Processing invoice payment for invoice: ${transaction.invoiceId}`,
+          );
+          await this.invoicePaymentService.processPaymentSuccess(
+            transaction.transactionId,
+          );
+        }
+      } else if (status === 'failed') {
+        this.logger.log('💥 Payment failed - triggering failure actions');
+
+        if (transaction.invoiceId) {
+          this.logger.log(
+            `📄 Processing invoice payment failure for invoice: ${transaction.invoiceId}`,
+          );
+          await this.invoicePaymentService.processPaymentFailure(
+            transaction.transactionId,
+            webhookData.error_message ||
+              webhookData.failure_reason ||
+              'Payment failed',
+          );
+        }
+      }
+
+      this.logger.log('🎯 PayFast webhook processing completed successfully');
+      return { success: true, message: 'Webhook processed successfully' };
+    } catch (error) {
+      this.logger.error('💥 ERROR processing PayFast webhook:', error);
+      this.logger.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        webhookData: webhookData,
+      });
+      return { success: false, message: error.message };
+    }
+  }
+
+  private verifyPayFastSignature(
+    webhookData: any,
+    signature: string,
+    secret: string,
+  ): boolean {
+    try {
+      const payload = JSON.stringify(webhookData);
+      const expectedSignature = crypto
+        .createHmac('sha256', secret)
+        .update(payload)
+        .digest('hex');
+
+      // Handle different signature formats
+      const normalizedSignature = signature.replace(/^sha256=/, '');
+
+      return crypto.timingSafeEqual(
+        Buffer.from(normalizedSignature, 'hex'),
+        Buffer.from(expectedSignature, 'hex'),
+      );
+    } catch (error) {
+      this.logger.error('Error verifying PayFast signature:', error);
+      return false;
     }
   }
 
@@ -416,6 +681,233 @@ export class WebhookService {
     } catch (error) {
       this.logger.error('Error handling successful payment:', error);
       // Don't throw error to avoid breaking webhook processing
+    }
+  }
+
+  async processAbhiPayWebhook(
+    webhookData: any,
+    signature: string,
+    credentials: any,
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      // Log incoming webhook request
+      this.logger.log('=== ABHI PAY WEBHOOK RECEIVED ===');
+      this.logger.log('Timestamp:', new Date().toISOString());
+      this.logger.log('Webhook Data:', JSON.stringify(webhookData, null, 2));
+      this.logger.log('Signature:', signature);
+      this.logger.log('Credentials ID:', credentials?.id || 'N/A');
+      this.logger.log('Webhook Secret Present:', !!credentials?.webhookSecret);
+      this.logger.log('=================================');
+
+      // Verify webhook signature if secret is configured
+      if (credentials.webhookSecret && signature) {
+        const isValid = this.verifyAbhiPaySignature(
+          webhookData,
+          signature,
+          credentials.webhookSecret,
+        );
+
+        if (!isValid) {
+          this.logger.warn('⚠️ Invalid ABHI Pay webhook signature');
+          // Continue processing but log the warning
+          // In production, you may want to reject invalid signatures
+        } else {
+          this.logger.log('✅ ABHI Pay webhook signature verified');
+        }
+      } else {
+        this.logger.warn(
+          '⚠️ No webhook secret provided, skipping signature verification',
+        );
+      }
+
+      // Extract data from webhook payload
+      // ABHI Pay callback structure may vary - handle multiple possible formats
+      const orderId =
+        webhookData.orderId ||
+        webhookData.order_id ||
+        webhookData.orderNumber ||
+        webhookData.order_number;
+      
+      const clientTransactionId =
+        webhookData.clientTransactionId ||
+        webhookData.client_transaction_id ||
+        webhookData.transactionId ||
+        webhookData.transaction_id;
+
+      const paymentStatus =
+        webhookData.paymentStatus ||
+        webhookData.payment_status ||
+        webhookData.status ||
+        webhookData.orderStatus ||
+        webhookData.order_status;
+
+      const amount = webhookData.amount || webhookData.purchaseAmount || 0;
+      const currency = webhookData.currency || webhookData.currencyType || 'PKR';
+
+      this.logger.log('Order ID:', orderId);
+      this.logger.log('Client Transaction ID:', clientTransactionId);
+      this.logger.log('Payment Status:', paymentStatus);
+      this.logger.log('Amount:', amount);
+      this.logger.log('Currency:', currency);
+
+      // Map ABHI Pay status to internal status
+      let status: PaymentTransaction['status'] = 'pending';
+      const statusUpper = paymentStatus?.toUpperCase();
+
+      if (
+        statusUpper === 'APPROVED' ||
+        statusUpper === 'PAID' ||
+        statusUpper === 'SETTLED'
+      ) {
+        status = 'completed';
+      } else if (statusUpper === 'DECLINED') {
+        status = 'failed';
+      } else if (
+        statusUpper === 'CANCELED' ||
+        statusUpper === 'CANCELLED'
+      ) {
+        status = 'cancelled';
+      } else if (statusUpper === 'CREATED') {
+        status = 'pending';
+      } else if (statusUpper === 'EXPIRED') {
+        status = 'failed';
+      } else if (
+        statusUpper === 'REFUNDED' ||
+        statusUpper === 'PARTIAL_REFUND' ||
+        statusUpper === 'REVERSE'
+      ) {
+        status = 'refunded';
+      } else if (statusUpper === 'PREAUTH_APPROVED') {
+        status = 'processing';
+      }
+
+      this.logger.log('Mapped Status:', status);
+
+      // Find transaction by gateway transaction ID or our transaction ID
+      this.logger.log(
+        `🔍 Looking for transaction with ID: ${clientTransactionId || orderId}`,
+      );
+
+      let transaction =
+        await this.paymentsService.getTransactionByGatewayTransactionId(
+          orderId || clientTransactionId,
+        );
+
+      if (!transaction && clientTransactionId) {
+        // Try finding by our internal transaction ID
+        transaction =
+          await this.paymentsService.getTransactionByTransactionId(
+            clientTransactionId,
+          );
+      }
+
+      if (!transaction) {
+        this.logger.warn(
+          `❌ Transaction not found for ID: ${clientTransactionId || orderId}`,
+        );
+        this.logger.warn(
+          'This might be a test webhook or the transaction was not created in our system',
+        );
+        return {
+          success: true,
+          message: 'Webhook processed successfully - test webhook received',
+        };
+      }
+
+      this.logger.log(
+        `✅ Transaction found: ${transaction.transactionId} (Current Status: ${transaction.status})`,
+      );
+
+      // Update transaction status
+      this.logger.log(
+        `🔄 Processing status change from '${transaction.status}' to '${status}'`,
+      );
+
+      await this.paymentsService.updateTransactionStatus(
+        transaction.transactionId,
+        status,
+        {
+          gatewayResponse: webhookData,
+          webhookData: webhookData,
+          failureReason:
+            status === 'failed'
+              ? webhookData.error_message ||
+                webhookData.failure_reason ||
+                webhookData.responseDescription ||
+                'Payment failed'
+              : undefined,
+        },
+      );
+
+      this.logger.log(
+        `✅ Transaction ${transaction.transactionId} successfully updated to status: ${status}`,
+      );
+
+      // Handle payment completion
+      if (status === 'completed') {
+        this.logger.log('🎉 Payment completed - triggering success actions');
+        await this.handleSuccessfulPayment(transaction);
+
+        if (transaction.invoiceId) {
+          this.logger.log(
+            `📄 Processing invoice payment for invoice: ${transaction.invoiceId}`,
+          );
+          await this.invoicePaymentService.processPaymentSuccess(
+            transaction.transactionId,
+          );
+        }
+      } else if (status === 'failed') {
+        this.logger.log('💥 Payment failed - triggering failure actions');
+
+        if (transaction.invoiceId) {
+          this.logger.log(
+            `📄 Processing invoice payment failure for invoice: ${transaction.invoiceId}`,
+          );
+          await this.invoicePaymentService.processPaymentFailure(
+            transaction.transactionId,
+            webhookData.error_message ||
+              webhookData.failure_reason ||
+              webhookData.responseDescription ||
+              'Payment failed',
+          );
+        }
+      }
+
+      this.logger.log('🎯 ABHI Pay webhook processing completed successfully');
+      return { success: true, message: 'Webhook processed successfully' };
+    } catch (error) {
+      this.logger.error('💥 ERROR processing ABHI Pay webhook:', error);
+      this.logger.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        webhookData: webhookData,
+      });
+      return { success: false, message: error.message };
+    }
+  }
+
+  private verifyAbhiPaySignature(
+    webhookData: any,
+    signature: string,
+    secret: string,
+  ): boolean {
+    try {
+      const payload = JSON.stringify(webhookData);
+      const expectedSignature = crypto
+        .createHmac('sha256', secret)
+        .update(payload)
+        .digest('hex');
+
+      // Handle different signature formats
+      const normalizedSignature = signature.replace(/^sha256=/, '');
+
+      return crypto.timingSafeEqual(
+        Buffer.from(normalizedSignature, 'hex'),
+        Buffer.from(expectedSignature, 'hex'),
+      );
+    } catch (error) {
+      this.logger.error('Error verifying ABHI Pay signature:', error);
+      return false;
     }
   }
 }

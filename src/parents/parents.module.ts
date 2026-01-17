@@ -11,6 +11,7 @@ import { ParentStudentMapper } from './infrastructure/persistence/relational/map
 import { ParentRepository } from './infrastructure/persistence/parent.repository';
 import { UsersModule } from '../users/users.module';
 import { StudentsModule } from '../students/students.module';
+import { MailModule } from '../mail/mail.module';
 
 const infrastructure = [
   {
@@ -26,6 +27,7 @@ const infrastructure = [
   imports: [
     TypeOrmModule.forFeature([ParentEntity, ParentStudentEntity]),
     UsersModule,
+    MailModule,
     forwardRef(() => StudentsModule),
   ],
   providers: [ParentsService, ...infrastructure],

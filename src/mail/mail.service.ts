@@ -291,4 +291,41 @@ export class MailService {
       },
     });
   }
+
+  async sendAccountCredentials(data: {
+    to: string;
+    userName: string;
+    email: string;
+    tempPassword: string;
+    isParent?: boolean;
+  }): Promise<void> {
+    const frontendDomain = this.configService.getOrThrow('app.frontendDomain', {
+      infer: true,
+    });
+
+    const loginUrl = createUrl(frontendDomain, '/login').toString();
+
+    await this.mailerService.sendMail({
+      to: data.to,
+      subject: `Your Account Credentials - ${this.configService.get('app.name', { infer: true })}`,
+      text: `Welcome ${data.userName}! Your account has been created. Email: ${data.email}, Temporary Password: ${data.tempPassword}. Please login at ${loginUrl} and change your password immediately.`,
+      templatePath: path.join(
+        this.configService.getOrThrow('app.workingDirectory', {
+          infer: true,
+        }),
+        'src',
+        'mail',
+        'mail-templates',
+        'account-credentials.hbs',
+      ),
+      context: {
+        app_name: this.configService.get('app.name', { infer: true }),
+        userName: data.userName,
+        email: data.email,
+        tempPassword: data.tempPassword,
+        loginUrl,
+        isParent: data.isParent || false,
+      },
+    });
+  }
 }
