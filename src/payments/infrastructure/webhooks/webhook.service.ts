@@ -265,55 +265,79 @@ export class WebhookService {
     credentials: any,
   ): Promise<{ success: boolean; message: string }> {
     try {
-      // Verify Stripe webhook signature
-      const isValidSignature = this.verifyStripeSignature(
-        webhookData,
-        signature,
-        credentials.webhookSecret,
-      );
+      // Log incoming webhook request
+      this.logger.log('=== STRIPE WEBHOOK RECEIVED ===');
+      this.logger.log('Timestamp:', new Date().toISOString());
+      this.logger.log('Webhook Data:', JSON.stringify(webhookData, null, 2));
+      this.logger.log('Signature:', signature);
+      this.logger.log('Credentials ID:', credentials?.id || 'N/A');
+      this.logger.log('Webhook Secret Present:', !!credentials?.webhookSecret);
+      this.logger.log('================================');
 
-      if (!isValidSignature) {
-        this.logger.warn('Invalid Stripe webhook signature');
-        throw new BadRequestException('Invalid webhook signature');
+      // Get Stripe gateway and use the gateway factory to process webhook
+      const gateway = await this.paymentsService.findByName('stripe');
+      if (!gateway) {
+        this.logger.error('❌ Stripe gateway not found');
+        return { success: false, message: 'Stripe gateway not found' };
       }
 
-      const { type, data } = webhookData;
-      const paymentIntent = data.object;
+      const gatewayImpl = this.paymentGatewayFactory.getGateway(gateway);
 
-      // Find transaction by payment intent ID
-      const transaction =
-        await this.paymentsService.getTransactionByTransactionId(
-          paymentIntent.id,
+      // Process webhook using StripeService (handles signature verification)
+      const result = await gatewayImpl.processWebhook(
+        credentials,
+        webhookData,
+        signature,
+      );
+
+      this.logger.log('Webhook event type:', result.eventType);
+      this.logger.log('Transaction ID:', result.transactionId);
+      this.logger.log('Status:', result.status);
+
+      // Find transaction by gateway transaction ID or our transaction ID
+      this.logger.log(
+        `🔍 Looking for transaction with ID: ${result.transactionId}`,
+      );
+
+      let transaction =
+        await this.paymentsService.getTransactionByGatewayTransactionId(
+          result.transactionId,
         );
 
       if (!transaction) {
+        // Try finding by our internal transaction ID
+        transaction =
+          await this.paymentsService.getTransactionByTransactionId(
+            result.transactionId,
+          );
+      }
+
+      if (!transaction) {
         this.logger.warn(
-          `Transaction not found for payment intent: ${paymentIntent.id}`,
+          `❌ Transaction not found for ID: ${result.transactionId}`,
         );
-        return { success: false, message: 'Transaction not found' };
+        this.logger.warn(
+          'This might be a test webhook or the transaction was not created in our system',
+        );
+        return {
+          success: true,
+          message: 'Webhook processed successfully - test webhook received',
+        };
       }
 
-      let newStatus: PaymentTransaction['status'] = 'pending';
+      this.logger.log(
+        `✅ Transaction found: ${transaction.transactionId} (Current Status: ${transaction.status})`,
+      );
 
-      switch (type) {
-        case 'payment_intent.succeeded':
-          newStatus = 'completed';
-          break;
-        case 'payment_intent.payment_failed':
-          newStatus = 'failed';
-          break;
-        case 'payment_intent.canceled':
-          newStatus = 'cancelled';
-          break;
-        case 'payment_intent.processing':
-          newStatus = 'processing';
-          break;
-        default:
-          this.logger.warn(`Unhandled Stripe event type: ${type}`);
-          return { success: false, message: 'Unhandled event type' };
-      }
+      // Map status to internal status
+      const newStatus: PaymentTransaction['status'] =
+        result.status as PaymentTransaction['status'];
 
-      // Update transaction
+      // Update transaction status
+      this.logger.log(
+        `🔄 Processing status change from '${transaction.status}' to '${newStatus}'`,
+      );
+
       await this.paymentsService.updateTransactionStatus(
         transaction.transactionId,
         newStatus,
@@ -322,37 +346,55 @@ export class WebhookService {
           webhookData: webhookData,
           failureReason:
             newStatus === 'failed'
-              ? paymentIntent.last_payment_error?.message
+              ? webhookData.data?.object?.last_payment_error?.message ||
+                webhookData.data?.object?.outcome?.seller_message ||
+                'Payment failed'
               : undefined,
         },
       );
 
       this.logger.log(
-        `Transaction ${transaction.transactionId} updated to status: ${newStatus}`,
+        `✅ Transaction ${transaction.transactionId} successfully updated to status: ${newStatus}`,
       );
 
+      // Handle payment completion
       if (newStatus === 'completed') {
+        this.logger.log('🎉 Payment completed - triggering success actions');
         await this.handleSuccessfulPayment(transaction);
 
-        // Process invoice payment if transaction is linked to an invoice
         if (transaction.invoiceId) {
+          this.logger.log(
+            `📄 Processing invoice payment for invoice: ${transaction.invoiceId}`,
+          );
           await this.invoicePaymentService.processPaymentSuccess(
             transaction.transactionId,
           );
         }
       } else if (newStatus === 'failed') {
-        // Process payment failure if transaction is linked to an invoice
+        this.logger.log('💥 Payment failed - triggering failure actions');
+
         if (transaction.invoiceId) {
+          this.logger.log(
+            `📄 Processing invoice payment failure for invoice: ${transaction.invoiceId}`,
+          );
           await this.invoicePaymentService.processPaymentFailure(
             transaction.transactionId,
-            paymentIntent.last_payment_error?.message || 'Payment failed',
+            webhookData.data?.object?.last_payment_error?.message ||
+              webhookData.data?.object?.outcome?.seller_message ||
+              'Payment failed',
           );
         }
       }
 
+      this.logger.log('🎯 Stripe webhook processing completed successfully');
       return { success: true, message: 'Webhook processed successfully' };
     } catch (error) {
-      this.logger.error('Error processing Stripe webhook:', error);
+      this.logger.error('💥 ERROR processing Stripe webhook:', error);
+      this.logger.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        webhookData: webhookData,
+      });
       return { success: false, message: error.message };
     }
   }

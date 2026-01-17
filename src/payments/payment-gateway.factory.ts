@@ -4,6 +4,7 @@ import { PaymentGatewayCredentials } from './domain/payment-gateway-credentials'
 import { SafepayService } from './gateways/safepay/safepay.service';
 import { PayFastService } from './gateways/payfast/payfast.service';
 import { AbhiPayService } from './gateways/abhipay/abhipay.service';
+import { StripeService } from './gateways/stripe/stripe.service';
 
 export interface PaymentGatewayInterface {
   createPaymentSession(
@@ -46,6 +47,7 @@ export class PaymentGatewayFactory {
     private safepayService: SafepayService,
     private payFastService: PayFastService,
     private abhiPayService: AbhiPayService,
+    private stripeService: StripeService,
   ) {}
 
   getGateway(gateway: PaymentGateway): PaymentGatewayInterface {
@@ -188,9 +190,55 @@ export class PaymentGatewayFactory {
           },
         };
 
+      case 'stripe':
+        return {
+          createPaymentSession: async (
+            credentials,
+            transaction,
+            customerInfo,
+          ) => {
+            const result = await this.stripeService.createPaymentSession(
+              transaction,
+              credentials,
+              customerInfo,
+            );
+            return {
+              sessionToken: result.sessionToken,
+              authToken: result.authToken,
+              checkoutUrl: result.checkoutUrl,
+            };
+          },
+          verifyPayment: async (credentials, trackerToken) => {
+            const paymentDetails = await this.stripeService.getPaymentDetails(
+              trackerToken,
+              credentials,
+            );
+            return {
+              status: paymentDetails.status,
+              transactionId: trackerToken,
+              amount: paymentDetails.paymentData?.amount
+                ? paymentDetails.paymentData.amount / 100
+                : 0,
+              currency: paymentDetails.paymentData?.currency?.toUpperCase() || 'USD',
+            };
+          },
+          processWebhook: async (credentials, webhookData, signature) => {
+            const result = await this.stripeService.processWebhook(
+              credentials,
+              webhookData,
+              signature,
+            );
+            return {
+              eventType: result.eventType,
+              transactionId: result.transactionId,
+              status: result.status,
+              amount: result.amount,
+              currency: result.currency,
+            };
+          },
+        };
+
       // Add more gateways here as they are implemented
-      // case 'stripe':
-      //   return this.stripeService;
       // case 'paypal':
       //   return this.paypalService;
 
@@ -200,6 +248,6 @@ export class PaymentGatewayFactory {
   }
 
   getSupportedGateways(): string[] {
-    return ['safepay', 'payfast', 'abhipay', 'bank_transfer'];
+    return ['safepay', 'payfast', 'abhipay', 'stripe', 'bank_transfer'];
   }
 }
