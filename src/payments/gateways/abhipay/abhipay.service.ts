@@ -431,7 +431,6 @@ export class AbhiPayService {
       SETTLED: 'completed',
       DECLINED: 'failed',
       CANCELED: 'cancelled',
-      CANCELED: 'cancelled',
       CREATED: 'pending',
       EXPIRED: 'failed',
       REFUNDED: 'refunded',
