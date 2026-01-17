@@ -99,10 +99,11 @@ export class FileStorageService {
             this.configService.get('file.b2Region') ||
             'us-west-001'
           : storage?.awsS3Region || this.configService.get('file.awsS3Region');
+        const resolvedRegion = region || 'us-east-1';
 
         if (accessKeyId && secretAccessKey && bucket) {
           const clientConfig: any = {
-            region,
+            region: resolvedRegion,
             credentials: { accessKeyId, secretAccessKey },
           };
 
@@ -114,7 +115,7 @@ export class FileStorageService {
 
           this.s3Client = new S3Client(clientConfig);
           this.s3Bucket = bucket;
-          this.s3Region = region;
+          this.s3Region = resolvedRegion;
           if (isB2Driver && endpointUrl) {
             this.b2EndpointUrl = endpointUrl;
           }

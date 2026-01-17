@@ -10,6 +10,8 @@ import { FileMapper } from './infrastructure/persistence/relational/mappers/file
 import { FileRepository } from './infrastructure/persistence/relational/repositories/file.repository';
 import { AccessControlModule } from '../access-control/access-control.module';
 import { ClassesModule } from '../classes/classes.module';
+import { LearningModulesModule } from '../learning-modules/learning-modules.module';
+import { LearningModuleEntity } from '../learning-modules/infrastructure/persistence/relational/entities/learning-module.entity';
 
 @Module({
   imports: [
