@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PaymentGateway } from './domain/payment-gateway';
 import { PaymentGatewayCredentials } from './domain/payment-gateway-credentials';
 import { SafepayService } from './gateways/safepay/safepay.service';
+import { PayFastService } from './gateways/payfast/payfast.service';
+import { AbhiPayService } from './gateways/abhipay/abhipay.service';
 
 export interface PaymentGatewayInterface {
   createPaymentSession(
@@ -40,7 +42,11 @@ export interface PaymentGatewayInterface {
 
 @Injectable()
 export class PaymentGatewayFactory {
-  constructor(private safepayService: SafepayService) {}
+  constructor(
+    private safepayService: SafepayService,
+    private payFastService: PayFastService,
+    private abhiPayService: AbhiPayService,
+  ) {}
 
   getGateway(gateway: PaymentGateway): PaymentGatewayInterface {
     switch (gateway.name) {
@@ -90,6 +96,98 @@ export class PaymentGatewayFactory {
           },
         };
 
+      case 'payfast':
+        return {
+          createPaymentSession: async (
+            credentials,
+            transaction,
+            customerInfo,
+          ) => {
+            const result = await this.payFastService.createPaymentSession(
+              transaction,
+              credentials,
+              customerInfo,
+            );
+            return {
+              sessionToken: result.sessionToken,
+              authToken: result.authToken,
+              checkoutUrl: result.checkoutUrl,
+            };
+          },
+          verifyPayment: async (credentials, trackerToken) => {
+            const isCompleted = await this.payFastService.verifyPayment(
+              trackerToken,
+              credentials,
+            );
+            return {
+              status: isCompleted ? 'completed' : 'failed',
+              transactionId: trackerToken,
+              amount: 0,
+              currency: 'PKR',
+            };
+          },
+          processWebhook: async (credentials, webhookData, signature) => {
+            const result = await this.payFastService.processWebhook(
+              credentials,
+              webhookData,
+              signature,
+            );
+            return {
+              eventType: result.eventType,
+              transactionId: result.transactionId,
+              status: result.status,
+              amount: result.amount,
+              currency: result.currency,
+            };
+          },
+        };
+
+      case 'abhipay':
+        return {
+          createPaymentSession: async (
+            credentials,
+            transaction,
+            customerInfo,
+          ) => {
+            const result = await this.abhiPayService.createPaymentSession(
+              transaction,
+              credentials,
+              customerInfo,
+            );
+            return {
+              sessionToken: result.sessionToken,
+              authToken: result.authToken,
+              checkoutUrl: result.checkoutUrl,
+            };
+          },
+          verifyPayment: async (credentials, trackerToken) => {
+            const isCompleted = await this.abhiPayService.verifyPayment(
+              trackerToken,
+              credentials,
+            );
+            return {
+              status: isCompleted ? 'completed' : 'failed',
+              transactionId: trackerToken,
+              amount: 0,
+              currency: 'PKR',
+            };
+          },
+          processWebhook: async (credentials, webhookData, signature) => {
+            const result = await this.abhiPayService.processWebhook(
+              credentials,
+              webhookData,
+              signature,
+            );
+            return {
+              eventType: result.eventType,
+              transactionId: result.transactionId,
+              status: result.status,
+              amount: result.amount,
+              currency: result.currency,
+            };
+          },
+        };
+
       // Add more gateways here as they are implemented
       // case 'stripe':
       //   return this.stripeService;
@@ -102,6 +200,6 @@ export class PaymentGatewayFactory {
   }
 
   getSupportedGateways(): string[] {
-    return ['safepay', 'bank_transfer']; // Add more as implemented
+    return ['safepay', 'payfast', 'abhipay', 'bank_transfer'];
   }
 }
