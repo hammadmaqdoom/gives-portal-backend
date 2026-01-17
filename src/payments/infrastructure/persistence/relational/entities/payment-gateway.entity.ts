@@ -63,6 +63,9 @@ export class PaymentGatewayEntity extends EntityRelationalHelper {
   @Column({ type: 'jsonb', nullable: true })
   configSchema?: any;
 
+  @Column({ type: 'jsonb', nullable: true })
+  feeStructure?: any;
+
   @Column({ type: 'varchar', length: 500, nullable: true })
   webhookUrl?: string;
 
