@@ -10,19 +10,34 @@ class EnvironmentVariablesValidator {
   FILE_DRIVER?: FileDriver;
 
   @ValidateIf((envValues) =>
-    [FileDriver.S3, FileDriver.S3_PRESIGNED].includes(envValues.FILE_DRIVER),
+    [
+      FileDriver.S3,
+      FileDriver.S3_PRESIGNED,
+      FileDriver.B2,
+      FileDriver.B2_PRESIGNED,
+    ].includes(envValues.FILE_DRIVER),
   )
   @IsString()
   ACCESS_KEY_ID: string;
 
   @ValidateIf((envValues) =>
-    [FileDriver.S3, FileDriver.S3_PRESIGNED].includes(envValues.FILE_DRIVER),
+    [
+      FileDriver.S3,
+      FileDriver.S3_PRESIGNED,
+      FileDriver.B2,
+      FileDriver.B2_PRESIGNED,
+    ].includes(envValues.FILE_DRIVER),
   )
   @IsString()
   SECRET_ACCESS_KEY: string;
 
   @ValidateIf((envValues) =>
-    [FileDriver.S3, FileDriver.S3_PRESIGNED].includes(envValues.FILE_DRIVER),
+    [
+      FileDriver.S3,
+      FileDriver.S3_PRESIGNED,
+      FileDriver.B2,
+      FileDriver.B2_PRESIGNED,
+    ].includes(envValues.FILE_DRIVER),
   )
   @IsString()
   AWS_DEFAULT_S3_BUCKET: string;
@@ -32,6 +47,18 @@ class EnvironmentVariablesValidator {
   )
   @IsString()
   AWS_S3_REGION: string;
+
+  @ValidateIf((envValues) =>
+    [FileDriver.B2, FileDriver.B2_PRESIGNED].includes(envValues.FILE_DRIVER),
+  )
+  @IsString()
+  B2_ENDPOINT_URL: string;
+
+  @ValidateIf((envValues) =>
+    [FileDriver.B2, FileDriver.B2_PRESIGNED].includes(envValues.FILE_DRIVER),
+  )
+  @IsString()
+  B2_REGION: string;
 
   @ValidateIf(
     (envValues) => envValues.FILE_DRIVER === FileDriver.AZURE_BLOB_SAS,
@@ -69,6 +96,11 @@ export default registerAs<FileConfig>('file', () => {
       ? Number(process.env.AZURE_BLOB_SAS_EXPIRY_SECONDS)
       : undefined,
     azureBlobPublicBaseUrl: process.env.AZURE_BLOB_PUBLIC_BASE_URL,
+    b2EndpointUrl: process.env.B2_ENDPOINT_URL,
+    b2Region: process.env.B2_REGION,
     maxFileSize: 5242880, // 5mb
+    maxVideoFileSize: 5368709120, // 5GB for video files
+    videoChunkSize: 10485760, // 10MB per chunk
+    enableChunkedUpload: true,
   };
 });

@@ -546,6 +546,94 @@ export class FilesController {
     };
   }
 
+  @Post('upload/video/:classId')
+  @ApiOperation({ summary: 'Upload a video file for a class' })
+  @ApiParam({ name: 'classId', description: 'Class ID' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  async uploadClassVideo(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5368709120 }), // 5GB for videos
+          new FileTypeValidator({
+            fileType: '.(mp4|webm|mov|avi|mkv|flv|wmv|m4v)',
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+    @Param('classId') classId: string,
+    @Req() req: any,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const context: FileUploadContext = {
+      type: 'class',
+      id: classId,
+      userId: req.user?.id || 'unknown',
+    };
+
+    const uploadedFile = await this.filesService.uploadFileWithContext(
+      file,
+      context,
+    );
+
+    // Generate proper URL for the uploaded file
+    const fileUrl = await this.generateFileUrl(uploadedFile.id, uploadedFile.path);
+
+    return {
+      id: uploadedFile.id,
+      filename: uploadedFile.filename,
+      originalName: uploadedFile.originalName,
+      path: uploadedFile.path,
+      size: uploadedFile.size,
+      mimeType: uploadedFile.mimeType,
+      uploadedAt: uploadedFile.uploadedAt,
+      url: fileUrl,
+    };
+  }
+
+  @Get('class/:classId')
+  @ApiOperation({ summary: 'Get all files for a class' })
+  @ApiParam({ name: 'classId', description: 'Class ID' })
+  async getClassFiles(@Param('classId') classId: string) {
+    const files = await this.filesService.getFilesByClass(Number(classId));
+
+    // Generate proper URLs for all files
+    const filesWithUrls = await Promise.all(
+      files.map(async (file) => ({
+        id: file.id,
+        filename: file.filename,
+        originalName: file.originalName,
+        path: file.path,
+        size: file.size,
+        mimeType: file.mimeType,
+        uploadedBy: file.uploadedBy,
+        uploadedAt: file.uploadedAt,
+        url: await this.generateFileUrl(file.id, file.path),
+      })),
+    );
+
+    return {
+      files: filesWithUrls,
+    };
+  }
+
   @Get('context/:contextType/:contextId')
   @ApiOperation({ summary: 'Get files by context' })
   @ApiParam({

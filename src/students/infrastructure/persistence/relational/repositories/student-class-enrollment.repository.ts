@@ -169,9 +169,10 @@ export class StudentClassEnrollmentRepository {
       },
     });
 
-    return enrollments.map((enrollment) =>
-      this.enrollmentMapper.toDomain(enrollment),
-    );
+    // Filter out enrollments with soft-deleted students
+    return enrollments
+      .filter((enrollment) => !enrollment.student?.deletedAt)
+      .map((enrollment) => this.enrollmentMapper.toDomain(enrollment));
   }
 
   async count(): Promise<number> {

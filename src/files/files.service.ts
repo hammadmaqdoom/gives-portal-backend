@@ -198,4 +198,32 @@ export class FilesService {
   async updateFile(id: string, fileData: Partial<File>): Promise<File | null> {
     return this.fileRepository.update(id, fileData);
   }
+
+  /**
+   * Get files by class ID
+   */
+  async getFilesByClass(classId: number): Promise<File[]> {
+    return this.getFilesByContext('class', classId.toString());
+  }
+
+  /**
+   * Delete a class file
+   */
+  async deleteClassFile(fileId: string, classId: number): Promise<void> {
+    const file = await this.fileRepository.findById(fileId);
+    if (!file) {
+      throw new BadRequestException('File not found');
+    }
+
+    // Verify the file belongs to the specified class
+    if (file.contextType !== 'class' || file.contextId !== classId.toString()) {
+      throw new BadRequestException('File does not belong to this class');
+    }
+
+    // Delete from storage
+    await this.fileStorageService.deleteFile(file.path);
+
+    // Delete from database
+    await this.fileRepository.delete(fileId);
+  }
 }
