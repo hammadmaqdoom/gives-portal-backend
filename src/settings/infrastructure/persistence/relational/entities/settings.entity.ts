@@ -131,7 +131,7 @@ export class SettingsEntity extends EntityRelationalHelper {
 
   // File Storage Configuration
   @Column({ type: 'varchar', length: 32, nullable: true, default: 'local' })
-  fileDriver: string | null; // local | s3 | s3-presigned | azure-blob-sas
+  fileDriver: string | null; // local | s3 | s3-presigned | azure-blob-sas | b2 | b2-presigned
 
   // AWS S3
   @Column({ type: 'varchar', length: 255, nullable: true })
@@ -161,6 +161,13 @@ export class SettingsEntity extends EntityRelationalHelper {
 
   @Column({ type: 'varchar', length: 500, nullable: true })
   azureBlobPublicBaseUrl: string | null;
+
+  // Backblaze B2
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  b2EndpointUrl: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  b2Region: string | null;
 
   // SMS Configuration
   @Column({ type: 'boolean', default: false })
