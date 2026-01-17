@@ -47,13 +47,17 @@ export class StudentClassEnrollmentRepository {
 
   async findByClassId(classId: number): Promise<StudentClassEnrollment[]> {
     const enrollments = await this.enrollmentRepository.find({
-      where: { classId },
+      where: { 
+        classId,
+        deletedAt: IsNull(), // Exclude soft-deleted enrollments
+      },
       relations: ['student', 'class', 'class.teacher', 'class.subject', 'class.thumbnailFile', 'class.coverImageFile'],
     });
 
-    return enrollments.map((enrollment) =>
-      this.enrollmentMapper.toDomain(enrollment),
-    );
+    // Filter out enrollments with soft-deleted students
+    return enrollments
+      .filter((enrollment) => !enrollment.student?.deletedAt)
+      .map((enrollment) => this.enrollmentMapper.toDomain(enrollment));
   }
 
   async findByStudentAndClass(

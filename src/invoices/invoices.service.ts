@@ -6,6 +6,7 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
+import { QueryFailedError } from 'typeorm';
 import { InvoiceRepositoryImpl } from './infrastructure/persistence/relational/repositories/invoice.repository';
 import { Invoice } from './domain/invoice';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
@@ -63,52 +64,100 @@ export class InvoicesService {
       }
     }
 
-    // Generate invoice number if not provided
-    const invoiceNumber =
-      createInvoiceDto.invoiceNumber ||
-      (await this.invoiceRepository.generateInvoiceNumber());
+    // Retry logic to handle duplicate invoice number race conditions
+    const maxRetries = 5;
+    let retryCount = 0;
+    let lastError: any;
 
-    const invoiceData: Partial<Invoice> = {
-      invoiceNumber,
-      studentId: student.id,
-      studentName: student.name,
-      parentId: parent?.id,
-      parentName: parent?.fullName,
-      amount: createInvoiceDto.amount,
-      currency: createInvoiceDto.currency,
-      status: createInvoiceDto.status,
-      dueDate: new Date(createInvoiceDto.dueDate),
-      generatedDate: new Date(),
-      description: createInvoiceDto.description,
-      notes: createInvoiceDto.notes,
-      originalPrice: createInvoiceDto.originalPrice,
-      discountAmount: createInvoiceDto.discountAmount,
-      discountType: createInvoiceDto.discountType,
-      classId: createInvoiceDto.classId,
-      items:
-        createInvoiceDto.items?.map((item) => ({
-          id: 0, // Will be set by database
-          invoiceId: 0, // Will be set by database
-          description: item.description,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          total: item.total,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })) || [],
-    };
+    while (retryCount < maxRetries) {
+      try {
+        // Generate invoice number if not provided
+        const invoiceNumber =
+          createInvoiceDto.invoiceNumber ||
+          (await this.invoiceRepository.generateInvoiceNumber());
 
-    const invoice = await this.invoiceRepository.create(invoiceData);
+        const invoiceData: Partial<Invoice> = {
+          invoiceNumber,
+          studentId: student.id,
+          studentName: student.name,
+          parentId: parent?.id,
+          parentName: parent?.fullName,
+          amount: createInvoiceDto.amount,
+          currency: createInvoiceDto.currency,
+          status: createInvoiceDto.status,
+          dueDate: new Date(createInvoiceDto.dueDate),
+          generatedDate: new Date(),
+          description: createInvoiceDto.description,
+          notes: createInvoiceDto.notes,
+          originalPrice: createInvoiceDto.originalPrice,
+          discountAmount: createInvoiceDto.discountAmount,
+          discountType: createInvoiceDto.discountType,
+          classId: createInvoiceDto.classId,
+          items:
+            createInvoiceDto.items?.map((item) => ({
+              id: 0, // Will be set by database
+              invoiceId: 0, // Will be set by database
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              total: item.total,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            })) || [],
+        };
 
-    // Send invoice notification email
-    try {
-      await this.sendInvoiceNotification(invoice);
-    } catch (error) {
-      console.error('Error sending invoice notification:', error);
-      // Don't fail the invoice creation if notification fails
+        const invoice = await this.invoiceRepository.create(invoiceData);
+
+        // Send invoice notification email
+        try {
+          await this.sendInvoiceNotification(invoice);
+        } catch (error) {
+          console.error('Error sending invoice notification:', error);
+          // Don't fail the invoice creation if notification fails
+        }
+
+        return invoice;
+      } catch (error: any) {
+        // Check if it's a duplicate key error (PostgreSQL error code 23505)
+        // Check multiple possible error structures
+        const errorCode = error?.code || error?.driverError?.code;
+        const errorConstraint = error?.constraint || error?.driverError?.constraint;
+        const errorMessage = error?.message || error?.driverError?.message || '';
+        
+        const isDuplicateKeyError =
+          (error instanceof QueryFailedError || error?.name === 'QueryFailedError') &&
+          errorCode === '23505' &&
+          (errorConstraint === 'invoice_invoiceNumber_key' || 
+           errorMessage.toLowerCase().includes('invoice_invoicenumber_key') ||
+           errorMessage.toLowerCase().includes('duplicate key value violates unique constraint'));
+
+        if (isDuplicateKeyError && retryCount < maxRetries - 1) {
+          // If invoice number was provided, we need to generate a new one
+          if (createInvoiceDto.invoiceNumber) {
+            // Clear the provided invoice number so a new one will be generated
+            createInvoiceDto.invoiceNumber = undefined;
+          }
+          retryCount++;
+          lastError = error;
+          console.warn(`Duplicate invoice number detected, retrying with new number (attempt ${retryCount + 1}/${maxRetries})`);
+          // Add a small delay before retrying to reduce contention
+          await new Promise((resolve) => setTimeout(resolve, 50 * retryCount));
+          continue;
+        }
+
+        // If it's not a duplicate key error or we've exhausted retries, throw
+        throw error;
+      }
     }
 
-    return invoice;
+    // If we've exhausted all retries, throw the last error
+    throw new UnprocessableEntityException({
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      message: 'Failed to create invoice after multiple attempts due to duplicate invoice number',
+      errors: {
+        invoiceNumber: 'duplicateInvoiceNumber',
+      },
+    });
   }
 
   async findManyWithPagination({
