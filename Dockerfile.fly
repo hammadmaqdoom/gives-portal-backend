@@ -7,7 +7,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies (skip prepare script for production)
-RUN npm ci --only=production --ignore-scripts && npm cache clean --force
+# Note: Don't clean cache - it can cause corruption with concurrent builds
+RUN npm ci --omit=dev --ignore-scripts --legacy-peer-deps
 
 # Install NestJS CLI for building
 RUN npm install -g @nestjs/cli
@@ -44,7 +45,8 @@ RUN mkdir -p /var/lib/postgresql/data && \
 COPY package*.json ./
 
 # Install only production dependencies (skip prepare script for production)
-RUN npm ci --only=production --ignore-scripts && npm cache clean --force
+# Note: Don't clean cache - it can cause corruption with concurrent builds
+RUN npm ci --omit=dev --ignore-scripts --legacy-peer-deps
 
 # Create crypto polyfill script
 RUN echo 'const crypto = require("crypto"); global.crypto = crypto; require("./dist/main.js");' > start.js
@@ -57,13 +59,16 @@ COPY --from=builder /app/src/mail/mail-templates ./src/mail/mail-templates
 
 # Copy PostgreSQL configuration
 COPY postgresql-fly.conf /etc/postgresql/15/main/postgresql.conf
+COPY pg_hba.conf /etc/postgresql/15/main/pg_hba.conf
 
 # Copy initialization and startup scripts
+COPY scripts/init-postgres-simple.sh /usr/local/bin/init-postgres-simple.sh
 COPY scripts/init-postgres-fly.sh /usr/local/bin/init-postgres-fly.sh
 COPY scripts/start-fly.sh /usr/local/bin/start-fly.sh
 
 # Make scripts executable
-RUN chmod +x /usr/local/bin/init-postgres-fly.sh && \
+RUN chmod +x /usr/local/bin/init-postgres-simple.sh && \
+    chmod +x /usr/local/bin/init-postgres-fly.sh && \
     chmod +x /usr/local/bin/start-fly.sh
 
 # Configure sudo for nestjs user to run PostgreSQL commands

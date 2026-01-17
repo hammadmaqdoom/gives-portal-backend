@@ -164,6 +164,29 @@ export class CurrencyService implements OnModuleInit {
   }
 
   /**
+   * Determines the appropriate currency based on a country name
+   * Returns 'PKR' for Pakistan (and its variations), 'USD' for all others
+   */
+  getCurrencyForCountry(country?: string): 'PKR' | 'USD' {
+    if (!country) {
+      return 'USD'; // Default to USD if no country specified
+    }
+
+    // Normalize country name for comparison
+    const normalizedCountry = country.toLowerCase().trim();
+
+    // Pakistan and its variations
+    const pakistanVariations = [
+      'pakistan',
+      'pk',
+      'pak',
+      'islamic republic of pakistan',
+    ];
+
+    return pakistanVariations.includes(normalizedCountry) ? 'PKR' : 'USD';
+  }
+
+  /**
    * Detect currency based on IP geolocation
    * Returns 'PKR' for Pakistan IPs, 'USD' for all others
    */

@@ -8,6 +8,7 @@ import { ClassesModule } from '../classes/classes.module';
 import { InvoicesModule } from '../invoices/invoices.module';
 import { FeesModule } from '../fees/fees.module';
 import { ParentsModule } from '../parents/parents.module';
+import { CurrencyModule } from '../currency/currency.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ParentsModule } from '../parents/parents.module';
     InvoicesModule,
     FeesModule,
     ParentsModule,
+    CurrencyModule,
   ],
   providers: [InvoiceGenerationService],
   controllers: [InvoiceGenerationController],
