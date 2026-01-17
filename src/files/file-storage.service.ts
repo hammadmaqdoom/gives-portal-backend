@@ -23,7 +23,8 @@ export interface FileUploadContext {
     | 'payment-proof'
     | 'general'
     | 'profile'
-    | 'course';
+    | 'course'
+    | 'class';
   id: string | number;
   userId: string | number;
 }

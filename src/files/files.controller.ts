@@ -38,6 +38,8 @@ import { FileStorageService, FileUploadContext } from './file-storage.service';
 import { FileDriver } from './config/file-config.type';
 import { User } from '../users/domain/user';
 import * as path from 'path';
+import { AccessControlService } from '../access-control/access-control.service';
+import { ClassesService } from '../classes/classes.service';
 
 @ApiTags('File Management')
 @ApiBearerAuth()
@@ -51,6 +53,8 @@ export class FilesController {
     private readonly filesService: FilesService,
     private readonly fileStorageService: FileStorageService,
     private readonly configService: ConfigService,
+    private readonly accessControlService: AccessControlService,
+    private readonly classesService: ClassesService,
   ) {}
 
   /**
@@ -611,8 +615,33 @@ export class FilesController {
   @Get('class/:classId')
   @ApiOperation({ summary: 'Get all files for a class' })
   @ApiParam({ name: 'classId', description: 'Class ID' })
-  async getClassFiles(@Param('classId') classId: string) {
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.user)
+  async getClassFiles(@Param('classId') classId: string, @Req() req: any) {
     const files = await this.filesService.getFilesByClass(Number(classId));
+
+    // Check authorization - verify user has access to this class
+    const user = req.user;
+    const userRole = user?.role?.name?.toLowerCase();
+
+    if (userRole !== 'admin' && userRole !== 'teacher') {
+      // For students, check if they have access to the class
+      if (userRole === 'user' || !userRole) {
+        const studentId = user?.id;
+        if (studentId) {
+          const accessStatus = await this.accessControlService.checkCourseAccess(
+            studentId,
+            Number(classId),
+          );
+          if (!accessStatus.hasAccess) {
+            throw new BadRequestException(
+              'You do not have access to this class',
+            );
+          }
+        } else {
+          throw new BadRequestException('Authentication required');
+        }
+      }
+    }
 
     // Generate proper URLs for all files
     const filesWithUrls = await Promise.all(
@@ -739,11 +768,43 @@ export class FilesController {
   @Get('serve/:id')
   @ApiOperation({ summary: 'Serve file content by ID' })
   @ApiParam({ name: 'id', description: 'File ID' })
-  async serveFile(@Param('id') id: string, @Res() res: any) {
+  @UseGuards(AuthGuard('jwt'))
+  async serveFile(@Param('id') id: string, @Req() req: any, @Res() res: any) {
     try {
       const file = await this.filesService.getFileById(id);
       if (!file) {
         throw new BadRequestException('File not found');
+      }
+
+      // Check authorization for class files
+      if (file.contextType === 'class') {
+        const classId = parseInt(file.contextId, 10);
+        const user = req.user;
+        const userRole = user?.role?.name?.toLowerCase();
+
+        // Admins and teachers always have access
+        if (userRole !== 'admin' && userRole !== 'teacher') {
+          // For students, check if they have access to the class
+          if (userRole === 'user' || !userRole) {
+            const studentId = user?.id;
+            if (studentId) {
+              const accessStatus = await this.accessControlService.checkCourseAccess(
+                studentId,
+                classId,
+              );
+              if (!accessStatus.hasAccess) {
+                throw new BadRequestException(
+                  'You do not have access to this file',
+                );
+              }
+            } else {
+              throw new BadRequestException('Authentication required');
+            }
+          }
+        }
+
+        // Verify the class exists (skip if we can't verify - authorization check is sufficient)
+        // The class existence will be validated by the access control check above
       }
 
       console.log(`Serving file: ${file.filename} from path: ${file.path}`);
@@ -1190,6 +1251,7 @@ export class FilesController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a file' })
   @ApiParam({ name: 'id', description: 'File ID' })
+  @Roles(RoleEnum.teacher, RoleEnum.admin)
   async deleteFile(@Param('id') id: string, @Req() req: any) {
     const file = await this.filesService.getFileById(id);
     if (!file) {
@@ -1202,6 +1264,20 @@ export class FilesController {
       req.user?.role?.name !== RoleEnum.admin
     ) {
       throw new BadRequestException('You can only delete your own files');
+    }
+
+    // Check if file is being used by any learning module
+    if (file.contextType === 'class') {
+      const { InjectRepository } = require('@nestjs/typeorm');
+      const { Repository } = require('typeorm');
+      const { LearningModuleEntity } = require('../learning-modules/infrastructure/persistence/relational/entities/learning-module.entity');
+      // We'll need to inject this properly, but for now check via service
+      const modulesUsingFile = await this.filesService.checkFileUsageInModules(id);
+      if (modulesUsingFile.length > 0) {
+        throw new BadRequestException(
+          `Cannot delete file: It is being used by ${modulesUsingFile.length} learning module(s)`,
+        );
+      }
     }
 
     await this.filesService.deleteFile(id);

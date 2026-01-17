@@ -8,12 +8,17 @@ import { FileStorageService } from './file-storage.service';
 import { FileEntity } from './infrastructure/persistence/relational/entities/file.entity';
 import { FileMapper } from './infrastructure/persistence/relational/mappers/file.mapper';
 import { FileRepository } from './infrastructure/persistence/relational/repositories/file.repository';
+import { AccessControlModule } from '../access-control/access-control.module';
+import { ClassesModule } from '../classes/classes.module';
 
 @Module({
   imports: [
     RelationalFilePersistenceModule,
-    TypeOrmModule.forFeature([FileEntity]),
+    TypeOrmModule.forFeature([FileEntity, LearningModuleEntity]),
     forwardRef(() => SettingsModule),
+    forwardRef(() => AccessControlModule),
+    forwardRef(() => ClassesModule),
+    forwardRef(() => LearningModulesModule),
   ],
   controllers: [FilesController],
   providers: [FilesService, FileStorageService, FileMapper, FileRepository],
