@@ -23,7 +23,8 @@ export interface FileUploadContext {
     | 'payment-proof'
     | 'general'
     | 'profile'
-    | 'course';
+    | 'course'
+    | 'class';
   id: string | number;
   userId: string | number;
 }
@@ -48,6 +49,7 @@ export class FileStorageService {
   private uploadBasePath: string;
   private s3Bucket: string;
   private s3Region: string;
+  private b2EndpointUrl: string;
   private configLoaded = false;
 
   constructor(
@@ -72,10 +74,10 @@ export class FileStorageService {
 
       if (
         this.fileDriver === FileDriver.S3 ||
-        this.fileDriver === FileDriver.S3_PRESIGNED
+        this.fileDriver === FileDriver.S3_PRESIGNED ||
+        this.fileDriver === FileDriver.B2 ||
+        this.fileDriver === FileDriver.B2_PRESIGNED
       ) {
-        const region =
-          storage?.awsS3Region || this.configService.get('file.awsS3Region');
         const accessKeyId =
           storage?.accessKeyId || this.configService.get('file.accessKeyId');
         const secretAccessKey =
@@ -85,13 +87,37 @@ export class FileStorageService {
           storage?.awsDefaultS3Bucket ||
           this.configService.get('file.awsDefaultS3Bucket');
 
-        if (region && accessKeyId && secretAccessKey && bucket) {
-          this.s3Client = new S3Client({
+        // B2-specific configuration
+        const isB2Driver =
+          this.fileDriver === FileDriver.B2 ||
+          this.fileDriver === FileDriver.B2_PRESIGNED;
+        const endpointUrl = isB2Driver
+          ? storage?.b2EndpointUrl || this.configService.get('file.b2EndpointUrl')
+          : undefined;
+        const region = isB2Driver
+          ? storage?.b2Region ||
+            this.configService.get('file.b2Region') ||
+            'us-west-001'
+          : storage?.awsS3Region || this.configService.get('file.awsS3Region');
+
+        if (accessKeyId && secretAccessKey && bucket) {
+          const clientConfig: any = {
             region,
             credentials: { accessKeyId, secretAccessKey },
-          });
+          };
+
+          // Add endpoint for B2
+          if (isB2Driver && endpointUrl) {
+            clientConfig.endpoint = endpointUrl;
+            clientConfig.forcePathStyle = false; // B2 supports virtual-host style
+          }
+
+          this.s3Client = new S3Client(clientConfig);
           this.s3Bucket = bucket;
           this.s3Region = region;
+          if (isB2Driver && endpointUrl) {
+            this.b2EndpointUrl = endpointUrl;
+          }
         }
       } else if (this.fileDriver === FileDriver.AZURE_BLOB_SAS) {
         // Azure blob storage configuration is handled dynamically when needed
@@ -188,7 +214,9 @@ export class FileStorageService {
       await this.ensureLocalFolderExists(folderPath);
     } else if (
       this.fileDriver === FileDriver.S3 ||
-      this.fileDriver === FileDriver.S3_PRESIGNED
+      this.fileDriver === FileDriver.S3_PRESIGNED ||
+      this.fileDriver === FileDriver.B2 ||
+      this.fileDriver === FileDriver.B2_PRESIGNED
     ) {
       await this.ensureS3FolderExists(folderPath);
     }
@@ -234,7 +262,9 @@ export class FileStorageService {
       return this.uploadToLocal(file, folderPath, filename);
     } else if (
       this.fileDriver === FileDriver.S3 ||
-      this.fileDriver === FileDriver.S3_PRESIGNED
+      this.fileDriver === FileDriver.S3_PRESIGNED ||
+      this.fileDriver === FileDriver.B2 ||
+      this.fileDriver === FileDriver.B2_PRESIGNED
     ) {
       return this.uploadToS3(file, folderPath, filename);
     }
@@ -309,8 +339,11 @@ export class FileStorageService {
    * Validate file based on context
    */
   private validateFile(file: Express.Multer.File, contextType: string): void {
-    // Check file size
-    const maxSize = this.configService.get('file.maxFileSize') || 5242880; // 5MB default
+    // Check file size - use video file size limit for class context
+    const isVideoContext = contextType === 'class';
+    const maxSize = isVideoContext
+      ? this.configService.get('file.maxVideoFileSize') || 5368709120 // 5GB for videos
+      : this.configService.get('file.maxFileSize') || 5242880; // 5MB default
     if (file.size > maxSize) {
       throw new BadRequestException(
         `File size ${(file.size / 1024 / 1024).toFixed(2)}MB exceeds maximum allowed size of ${(maxSize / 1024 / 1024).toFixed(2)}MB`,
@@ -384,6 +417,17 @@ export class FileStorageService {
           'zip',
           'rar',
         ];
+      case 'class':
+        return [
+          'mp4',
+          'webm',
+          'mov',
+          'avi',
+          'mkv',
+          'flv',
+          'wmv',
+          'm4v',
+        ];
       case 'profile':
         return ['jpg', 'jpeg', 'png', 'gif', 'webp'];
       case 'course':
@@ -401,7 +445,9 @@ export class FileStorageService {
       await this.deleteFromLocal(filePath);
     } else if (
       this.fileDriver === FileDriver.S3 ||
-      this.fileDriver === FileDriver.S3_PRESIGNED
+      this.fileDriver === FileDriver.S3_PRESIGNED ||
+      this.fileDriver === FileDriver.B2 ||
+      this.fileDriver === FileDriver.B2_PRESIGNED
     ) {
       await this.deleteFromS3(filePath);
     }
@@ -438,6 +484,14 @@ export class FileStorageService {
     ) {
       // For S3 files, construct the full S3 URL
       return `https://${this.s3Bucket}.s3.${this.s3Region}.amazonaws.com/${filePath}`;
+    } else if (
+      this.fileDriver === FileDriver.B2 ||
+      this.fileDriver === FileDriver.B2_PRESIGNED
+    ) {
+      // For B2 files, construct URL using endpoint format
+      const endpointBase = this.b2EndpointUrl || 
+        `https://s3.${this.s3Region}.backblazeb2.com`;
+      return `${endpointBase}/${this.s3Bucket}/${filePath}`;
     }
 
     return filePath;
@@ -454,7 +508,9 @@ export class FileStorageService {
       return filePath;
     } else if (
       this.fileDriver === FileDriver.S3 ||
-      this.fileDriver === FileDriver.S3_PRESIGNED
+      this.fileDriver === FileDriver.S3_PRESIGNED ||
+      this.fileDriver === FileDriver.B2 ||
+      this.fileDriver === FileDriver.B2_PRESIGNED
     ) {
       if (!this.s3Client) {
         throw new Error('S3 client not initialized');
@@ -507,7 +563,11 @@ export class FileStorageService {
       };
     }
 
-    // S3 and s3-presigned
+    // S3, s3-presigned, B2, and b2-presigned (all use S3Client)
+    await this.ensureConfigLoaded();
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
     const key = filePath.replace(/\\/g, '/');
     const obj = await this.s3Client.send(
       new GetObjectCommand({ Bucket: this.s3Bucket, Key: key }),
@@ -535,6 +595,11 @@ export class FileStorageService {
       return { contentLength: stats.size };
     }
 
+    // S3, s3-presigned, B2, and b2-presigned (all use S3Client)
+    await this.ensureConfigLoaded();
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
     const key = filePath.replace(/\\/g, '/');
     const head = await this.s3Client.send(
       new HeadObjectCommand({ Bucket: this.s3Bucket, Key: key }),

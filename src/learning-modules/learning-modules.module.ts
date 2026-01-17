@@ -5,6 +5,7 @@ import { LearningModuleSectionEntity } from './infrastructure/persistence/relati
 import { ModuleCompletionEntity } from './infrastructure/persistence/relational/entities/module-completion.entity';
 import { LearningModulesService } from './learning-modules.service';
 import { AccessControlModule } from '../access-control/access-control.module';
+import { FilesModule } from '../files/files.module';
 import {
   LearningModulesController,
   LearningModuleSectionsController,
@@ -21,6 +22,7 @@ import { ModuleCompletionRepository } from './infrastructure/persistence/relatio
       ModuleCompletionEntity,
     ]),
     forwardRef(() => AccessControlModule),
+    forwardRef(() => FilesModule),
   ],
   controllers: [
     LearningModulesController,

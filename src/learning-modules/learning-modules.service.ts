@@ -10,6 +10,8 @@ import { LearningModuleEntity } from './infrastructure/persistence/relational/en
 import { LearningModuleSectionEntity } from './infrastructure/persistence/relational/entities/learning-module-section.entity';
 import { ModuleCompletionEntity } from './infrastructure/persistence/relational/entities/module-completion.entity';
 import { AccessControlService } from '../access-control/access-control.service';
+import { FilesService } from '../files/files.service';
+import { BadRequestException } from '@nestjs/common';
 
 @Injectable()
 export class LearningModulesService {
@@ -22,6 +24,8 @@ export class LearningModulesService {
     private readonly completionRepo: Repository<ModuleCompletionEntity>,
     @Inject(forwardRef(() => AccessControlService))
     private readonly accessControlService: AccessControlService,
+    @Inject(forwardRef(() => FilesService))
+    private readonly filesService: FilesService,
   ) {}
 
   async list({ classId }: { classId?: number }) {
@@ -52,13 +56,61 @@ export class LearningModulesService {
   }
 
   async create(payload: Partial<LearningModuleEntity>) {
+    // Validate videoFileId if provided
+    if (payload.videoFileId) {
+      await this.validateVideoFile(payload.videoFileId, payload.classId);
+    }
+
     const entity = this.repo.create(payload);
     return this.repo.save(entity);
   }
 
   async update(id: number, payload: Partial<LearningModuleEntity>) {
+    // Get existing module to check classId
+    const existingModule = await this.get(id);
+    if (!existingModule) {
+      throw new BadRequestException('Module not found');
+    }
+
+    // Validate videoFileId if provided
+    if (payload.videoFileId) {
+      const classId = payload.classId || existingModule.classId;
+      await this.validateVideoFile(payload.videoFileId, classId);
+    }
+
     await this.repo.update({ id }, payload);
     return this.get(id);
+  }
+
+  /**
+   * Validate that a video file exists, belongs to the class, and is a video file
+   */
+  private async validateVideoFile(
+    videoFileId: string,
+    classId?: number | null,
+  ): Promise<void> {
+    if (!videoFileId) {
+      return;
+    }
+
+    const file = await this.filesService.getFileById(videoFileId);
+    if (!file) {
+      throw new BadRequestException('Video file not found');
+    }
+
+    // Check if it's a video file
+    if (!file.mimeType.startsWith('video/')) {
+      throw new BadRequestException('File is not a video file');
+    }
+
+    // If classId is provided, verify the file belongs to that class
+    if (classId) {
+      if (file.contextType !== 'class' || file.contextId !== classId.toString()) {
+        throw new BadRequestException(
+          'Video file does not belong to this class',
+        );
+      }
+    }
   }
 
   async remove(id: number) {

@@ -177,6 +177,13 @@ export class Settings {
   @ApiProperty({ example: 'https://cdn.example.com' })
   azureBlobPublicBaseUrl?: string | null;
 
+  // Backblaze B2
+  @ApiProperty({ example: 'https://s3.us-west-001.backblazeb2.com' })
+  b2EndpointUrl?: string | null;
+
+  @ApiProperty({ example: 'us-west-001' })
+  b2Region?: string | null;
+
   // Theme Configuration
   @ApiProperty({ example: 'brand' })
   themeColorPreset?: string | null;
