@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FileRepository } from './infrastructure/persistence/relational/repositories/file.repository';
 import { File } from './domain/file';
@@ -7,6 +7,9 @@ import {
   FileUploadContext,
   UploadedFileInfo,
 } from './file-storage.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { LearningModuleEntity } from '../learning-modules/infrastructure/persistence/relational/entities/learning-module.entity';
 
 @Injectable()
 export class FilesService {
@@ -14,6 +17,8 @@ export class FilesService {
     private readonly fileRepository: FileRepository,
     private readonly fileStorageService: FileStorageService,
     private readonly configService: ConfigService,
+    @InjectRepository(LearningModuleEntity)
+    private readonly learningModuleRepo: Repository<LearningModuleEntity>,
   ) {}
 
   /**
@@ -225,5 +230,14 @@ export class FilesService {
 
     // Delete from database
     await this.fileRepository.delete(fileId);
+  }
+
+  /**
+   * Check if a file is being used by any learning modules
+   */
+  async checkFileUsageInModules(fileId: string): Promise<LearningModuleEntity[]> {
+    return this.learningModuleRepo.find({
+      where: { videoFileId: fileId },
+    });
   }
 }
