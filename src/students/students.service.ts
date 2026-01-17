@@ -30,6 +30,7 @@ import { InvoicesService } from '../invoices/invoices.service';
 import { ClassesService } from '../classes/classes.service';
 import { NotificationService } from '../notifications/notification.service';
 import { CurrencyService } from '../currency/currency.service';
+import { MailService } from '../mail/mail.service';
 import { randomStringGenerator } from '../utils/random-string-generator';
 import { RoleEnum } from '../roles/roles.enum';
 import { StatusEnum } from '../statuses/statuses.enum';
@@ -49,6 +50,7 @@ export class StudentsService {
     private readonly classesService: ClassesService,
     private readonly notificationService: NotificationService,
     private readonly currencyService: CurrencyService,
+    private readonly mailService: MailService,
   ) {}
 
   async create(
@@ -112,6 +114,26 @@ export class StudentsService {
       console.log(
         `Student user account created: ${createStudentDto.email} with role: ${user.role?.name}`,
       );
+
+      // Send account credentials email to the student
+      try {
+        await this.mailService.sendAccountCredentials({
+          to: createStudentDto.email,
+          userName: createStudentDto.name,
+          email: createStudentDto.email,
+          tempPassword,
+          isParent: false,
+        });
+        console.log(
+          `Account credentials email sent to student: ${createStudentDto.email}`,
+        );
+      } catch (emailError) {
+        console.error(
+          `Failed to send account credentials email to student ${createStudentDto.email}:`,
+          emailError,
+        );
+        // Don't throw - user account is created, email failure shouldn't block the process
+      }
     }
 
     const student = await this.studentsRepository.create({

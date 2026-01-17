@@ -16,6 +16,7 @@ import { IPaginationOptions } from '../utils/types/pagination-options';
 import { User } from '../users/domain/user';
 import { UpdateParentDto } from './dto/update-parent.dto';
 import { StudentsService } from '../students/students.service';
+import { MailService } from '../mail/mail.service';
 import { randomStringGenerator } from '../utils/random-string-generator';
 import { RoleEnum } from '../roles/roles.enum';
 import { StatusEnum } from '../statuses/statuses.enum';
@@ -28,6 +29,7 @@ export class ParentsService {
     private readonly usersService: UsersService,
     @Inject(forwardRef(() => StudentsService))
     private readonly studentsService: StudentsService,
+    private readonly mailService: MailService,
   ) {}
 
   async create(
@@ -77,6 +79,26 @@ export class ParentsService {
         console.log(
           `Parent user account created: ${createParentDto.email} with role: ${user.role?.name}`,
         );
+
+        // Send account credentials email to the parent
+        try {
+          await this.mailService.sendAccountCredentials({
+            to: createParentDto.email,
+            userName: createParentDto.fullName,
+            email: createParentDto.email,
+            tempPassword,
+            isParent: true,
+          });
+          console.log(
+            `Account credentials email sent to parent: ${createParentDto.email}`,
+          );
+        } catch (emailError) {
+          console.error(
+            `Failed to send account credentials email to parent ${createParentDto.email}:`,
+            emailError,
+          );
+          // Don't throw - user account is created, email failure shouldn't block the process
+        }
       } catch (error) {
         console.error('Error creating parent user account:', error);
         throw error;
