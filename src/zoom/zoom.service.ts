@@ -544,4 +544,14 @@ export class ZoomService {
       return false;
     }
   }
+
+  // Get teacher Zoom statistics for admin
+  async getTeacherZoomStatistics(): Promise<{
+    totalTeachers: number;
+    connectedTeachers: number;
+    notConnectedTeachers: number;
+  }> {
+    const stats = await this.zoomCredentialsRepository.getTeacherStatistics();
+    return stats;
+  }
 }

@@ -45,7 +45,7 @@ export class ZoomController {
 
   // OAuth (Authorization Code) endpoints
   @Get('oauth/authorize')
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Redirect to Zoom OAuth (Authorization Code)' })
   async oauthAuthorize(@Request() req: any) {
     const url = await this.zoomService.getOAuthAuthorizeUrl(req.user.id);
@@ -64,7 +64,7 @@ export class ZoomController {
 
   // Zoom Credentials Management
   @Post('credentials')
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Create Zoom credentials for teacher' })
   @ApiResponse({ status: 201, description: 'Credentials created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
@@ -81,7 +81,7 @@ export class ZoomController {
   }
 
   @Get('credentials')
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Get teacher Zoom credentials' })
   @ApiResponse({
     status: 200,
@@ -89,12 +89,12 @@ export class ZoomController {
   })
   async getCredentials(@Request() req: any) {
     const teacherId =
-      req.user.role === RoleEnum.admin ? req.query.teacherId : req.user.id;
+      req.user.role === RoleEnum.admin || req.user.role === RoleEnum.superAdmin ? req.query.teacherId : req.user.id;
     return this.zoomService.getCredentials(teacherId);
   }
 
   @Put('credentials')
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Update Zoom credentials' })
   @ApiResponse({ status: 200, description: 'Credentials updated successfully' })
   async updateCredentials(
@@ -102,35 +102,35 @@ export class ZoomController {
     @Request() req: any,
   ) {
     const teacherId =
-      req.user.role === RoleEnum.admin ? req.query.teacherId : req.user.id;
+      req.user.role === RoleEnum.admin || req.user.role === RoleEnum.superAdmin ? req.query.teacherId : req.user.id;
     return this.zoomService.updateCredentials(teacherId, updateDto);
   }
 
   @Delete('credentials')
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete Zoom credentials' })
   @ApiResponse({ status: 204, description: 'Credentials deleted successfully' })
   async deleteCredentials(@Request() req: any) {
     const teacherId =
-      req.user.role === RoleEnum.admin ? req.query.teacherId : req.user.id;
+      req.user.role === RoleEnum.admin || req.user.role === RoleEnum.superAdmin ? req.query.teacherId : req.user.id;
     await this.zoomService.deleteCredentials(teacherId);
   }
 
   @Post('credentials/test')
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Test Zoom API connection' })
   @ApiResponse({ status: 200, description: 'Connection test completed' })
   async testConnection(@Request() req: any) {
     const teacherId =
-      req.user.role === RoleEnum.admin ? req.query.teacherId : req.user.id;
+      req.user.role === RoleEnum.admin || req.user.role === RoleEnum.superAdmin ? req.query.teacherId : req.user.id;
     const isConnected = await this.zoomService.testZoomConnection(teacherId);
     return { isConnected };
   }
 
   // Zoom Meeting Management
   @Post('meetings')
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Create a new Zoom meeting' })
   @ApiResponse({ status: 201, description: 'Meeting created successfully' })
   async createMeeting(
@@ -146,7 +146,7 @@ export class ZoomController {
   }
 
   @Get('meetings/class/:classId')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Get meetings for a specific class' })
   @ApiResponse({ status: 200, description: 'Meetings retrieved successfully' })
   async getMeetingsByClass(@Param('classId') classId: string) {
@@ -154,7 +154,7 @@ export class ZoomController {
   }
 
   @Get('meetings/class/:classId/upcoming')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Get upcoming meetings for a class' })
   @ApiResponse({
     status: 200,
@@ -165,7 +165,7 @@ export class ZoomController {
   }
 
   @Get('meetings/class/:classId/active')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Get active meetings for a class' })
   @ApiResponse({
     status: 200,
@@ -176,7 +176,7 @@ export class ZoomController {
   }
 
   @Get('meetings/:meetingId')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Get meeting by meeting ID' })
   @ApiResponse({ status: 200, description: 'Meeting retrieved successfully' })
   async getMeetingByMeetingId(@Param('meetingId') meetingId: string) {
@@ -184,7 +184,7 @@ export class ZoomController {
   }
 
   @Get('meetings/id/:id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Get meeting by database ID' })
   @ApiResponse({ status: 200, description: 'Meeting retrieved successfully' })
   async getMeetingById(@Param('id') id: string) {
@@ -194,7 +194,7 @@ export class ZoomController {
   // Signature endpoint removed (no Web SDK embedding)
 
   @Put('meetings/:meetingId')
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Update a Zoom meeting' })
   @ApiResponse({ status: 200, description: 'Meeting updated successfully' })
   async updateMeeting(
@@ -205,7 +205,7 @@ export class ZoomController {
   }
 
   @Post('meetings/:meetingId/start')
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Start a Zoom meeting' })
   @ApiResponse({ status: 204, description: 'Meeting started successfully' })
@@ -214,7 +214,7 @@ export class ZoomController {
   }
 
   @Post('meetings/:meetingId/end')
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'End a Zoom meeting' })
   @ApiResponse({ status: 204, description: 'Meeting ended successfully' })
@@ -223,7 +223,7 @@ export class ZoomController {
   }
 
   @Post('meetings/:meetingId/cancel')
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Cancel a Zoom meeting' })
   @ApiResponse({ status: 204, description: 'Meeting cancelled successfully' })
@@ -232,7 +232,7 @@ export class ZoomController {
   }
 
   @Post('meetings/:meetingId/join')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Join a Zoom meeting' })
   @ApiResponse({ status: 200, description: 'Meeting join details retrieved' })
   async joinMeeting(
@@ -244,7 +244,7 @@ export class ZoomController {
 
   // Teacher-specific endpoints
   @Get('meetings/teacher')
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Get meetings for a specific teacher' })
   @ApiResponse({
     status: 200,
@@ -252,7 +252,19 @@ export class ZoomController {
   })
   async getMeetingsByTeacher(@Request() req: any) {
     const teacherId =
-      req.user.role === RoleEnum.admin ? req.query.teacherId : req.user.id;
+      req.user.role === RoleEnum.admin || req.user.role === RoleEnum.superAdmin ? req.query.teacherId : req.user.id;
     return this.zoomService.getMeetingsByTeacher(teacherId);
+  }
+
+  // Admin statistics endpoint
+  @Get('statistics/teachers')
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
+  @ApiOperation({ summary: 'Get Zoom connection statistics for all teachers' })
+  @ApiResponse({
+    status: 200,
+    description: 'Teacher Zoom statistics retrieved successfully',
+  })
+  async getTeacherStatistics() {
+    return this.zoomService.getTeacherZoomStatistics();
   }
 }

@@ -34,7 +34,7 @@ export class DashboardController {
   @Get('admin/stats')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.OK)
   @ApiResponse({
     status: HttpStatus.OK,
@@ -48,7 +48,7 @@ export class DashboardController {
   @Get('admin/analytics')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.OK)
   @ApiResponse({
     status: HttpStatus.OK,
