@@ -12,6 +12,8 @@ import { AccessControlModule } from '../access-control/access-control.module';
 import { ClassesModule } from '../classes/classes.module';
 import { LearningModulesModule } from '../learning-modules/learning-modules.module';
 import { LearningModuleEntity } from '../learning-modules/infrastructure/persistence/relational/entities/learning-module.entity';
+import { AssignmentsModule } from '../assignments/assignments.module';
+import { StudentsModule } from '../students/students.module';
 
 @Module({
   imports: [
@@ -21,6 +23,8 @@ import { LearningModuleEntity } from '../learning-modules/infrastructure/persist
     forwardRef(() => AccessControlModule),
     forwardRef(() => ClassesModule),
     forwardRef(() => LearningModulesModule),
+    forwardRef(() => AssignmentsModule),
+    forwardRef(() => StudentsModule),
   ],
   controllers: [FilesController],
   providers: [FilesService, FileStorageService, FileMapper, FileRepository],

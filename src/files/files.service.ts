@@ -10,6 +10,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { LearningModuleEntity } from '../learning-modules/infrastructure/persistence/relational/entities/learning-module.entity';
+import { AssignmentsService } from '../assignments/assignments.service';
+import { SubmissionsService } from '../assignments/submissions.service';
 
 @Injectable()
 export class FilesService {
@@ -19,6 +21,10 @@ export class FilesService {
     private readonly configService: ConfigService,
     @InjectRepository(LearningModuleEntity)
     private readonly learningModuleRepo: Repository<LearningModuleEntity>,
+    @Inject(forwardRef(() => AssignmentsService))
+    private readonly assignmentsService: AssignmentsService,
+    @Inject(forwardRef(() => SubmissionsService))
+    private readonly submissionsService: SubmissionsService,
   ) {}
 
   /**
@@ -209,6 +215,116 @@ export class FilesService {
    */
   async getFilesByClass(classId: number): Promise<File[]> {
     return this.getFilesByContext('class', classId.toString());
+  }
+
+  /**
+   * Get files by class ID filtered by user role
+   * - For students: Only returns files from assignments and their own submissions
+   * - For admins/teachers/superadmins: Returns all files for the class
+   */
+  async getFilesByClassFilteredByRole(
+    classId: number,
+    userRole: string,
+    studentId?: number,
+  ): Promise<File[]> {
+    const normalizedRole = userRole?.toLowerCase();
+
+    // For admins, teachers, and superadmins, return all files
+    if (
+      normalizedRole === 'admin' ||
+      normalizedRole === 'teacher' ||
+      normalizedRole === 'superadmin'
+    ) {
+      // Get all files with different context types for the class
+      const classFiles = await this.getFilesByContext('class', classId.toString());
+      
+      // Get assignment files
+      const assignments = await this.assignmentsService.findByClass(classId);
+      const assignmentContexts = assignments.map((assignment) => ({
+        contextType: 'assignment',
+        contextId: assignment.id.toString(),
+      }));
+      const assignmentFiles =
+        assignmentContexts.length > 0
+          ? await this.fileRepository.findByMultipleContexts(assignmentContexts)
+          : [];
+
+      // Get submission files
+      const allSubmissions: any[] = [];
+      for (const assignment of assignments) {
+        const submissions = await this.submissionsService.findByAssignment(
+          assignment.id,
+        );
+        allSubmissions.push(...submissions);
+      }
+      const submissionContexts = allSubmissions.map((submission) => ({
+        contextType: 'submission',
+        contextId: submission.id.toString(),
+      }));
+      const submissionFiles =
+        submissionContexts.length > 0
+          ? await this.fileRepository.findByMultipleContexts(submissionContexts)
+          : [];
+
+      // Get module files
+      const moduleFiles = await this.getFilesByContext('module', classId.toString());
+
+      // Combine all files and remove duplicates
+      const allFiles = [
+        ...classFiles,
+        ...assignmentFiles,
+        ...submissionFiles,
+        ...moduleFiles,
+      ];
+      const uniqueFiles = Array.from(
+        new Map(allFiles.map((file) => [file.id, file])).values(),
+      );
+      return uniqueFiles;
+    }
+
+    // For students, only return assignment files and their own submission files
+    if (normalizedRole === 'user' && studentId) {
+      // Get assignments for the class
+      const assignments = await this.assignmentsService.findByClass(classId);
+      const assignmentContexts = assignments.map((assignment) => ({
+        contextType: 'assignment',
+        contextId: assignment.id.toString(),
+      }));
+      const assignmentFiles =
+        assignmentContexts.length > 0
+          ? await this.fileRepository.findByMultipleContexts(assignmentContexts)
+          : [];
+
+      // Get student's own submissions for assignments in this class
+      const studentSubmissions = await this.submissionsService.findByStudent(
+        studentId,
+      );
+      const classAssignmentIds = new Set(assignments.map((a) => a.id));
+      const relevantSubmissions = studentSubmissions.filter(
+        (submission) =>
+          submission.assignment &&
+          classAssignmentIds.has(submission.assignment.id),
+      );
+
+      const submissionContexts = relevantSubmissions.map((submission) => ({
+        contextType: 'submission',
+        contextId: submission.id.toString(),
+      }));
+      const submissionFiles =
+        submissionContexts.length > 0
+          ? await this.fileRepository.findByMultipleContexts(submissionContexts)
+          : [];
+
+      // Combine assignment and submission files
+      const allFiles = [...assignmentFiles, ...submissionFiles];
+      const uniqueFiles = Array.from(
+        new Map(allFiles.map((file) => [file.id, file])).values(),
+      );
+      return uniqueFiles;
+    }
+
+    // Default: return empty array for unknown roles
+    return [];
   }
 
   /**

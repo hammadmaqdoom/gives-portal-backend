@@ -40,6 +40,7 @@ import { User } from '../users/domain/user';
 import * as path from 'path';
 import { AccessControlService } from '../access-control/access-control.service';
 import { ClassesService } from '../classes/classes.service';
+import { StudentsService } from '../students/students.service';
 
 @ApiTags('File Management')
 @ApiBearerAuth()
@@ -55,6 +56,7 @@ export class FilesController {
     private readonly configService: ConfigService,
     private readonly accessControlService: AccessControlService,
     private readonly classesService: ClassesService,
+    private readonly studentsService: StudentsService,
   ) {}
 
   /**
@@ -617,16 +619,17 @@ export class FilesController {
   @ApiParam({ name: 'classId', description: 'Class ID' })
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.user, RoleEnum.superAdmin)
   async getClassFiles(@Param('classId') classId: string, @Req() req: any) {
-    const files = await this.filesService.getFilesByClass(Number(classId));
-
-    // Check authorization - verify user has access to this class
     const user = req.user;
     const userRole = user?.role?.name?.toLowerCase();
 
+    // Check authorization - verify user has access to this class
     if (userRole !== 'admin' && userRole !== 'teacher' && userRole !== 'superadmin') {
       // For students, check if they have access to the class
       if (userRole === 'user' || !userRole) {
-        const studentId = user?.id;
+        // Get student ID from user ID
+        const student = await this.studentsService.findByUserId(user?.id);
+        const studentId = student?.id;
+        
         if (studentId) {
           const accessStatus = await this.accessControlService.checkCourseAccess(
             studentId,
@@ -638,9 +641,31 @@ export class FilesController {
             );
           }
         } else {
-          throw new BadRequestException('Authentication required');
+          throw new BadRequestException('Student profile not found');
         }
       }
+    }
+
+    // Get files filtered by user role
+    let files: any[];
+    if (userRole === 'admin' || userRole === 'teacher' || userRole === 'superadmin') {
+      // Admins, teachers, and superadmins see all files
+      files = await this.filesService.getFilesByClassFilteredByRole(
+        Number(classId),
+        userRole,
+      );
+    } else {
+      // Students see only assignment and their own submission files
+      const student = await this.studentsService.findByUserId(user?.id);
+      const studentId = student?.id;
+      if (!studentId) {
+        throw new BadRequestException('Student profile not found');
+      }
+      files = await this.filesService.getFilesByClassFilteredByRole(
+        Number(classId),
+        userRole,
+        studentId,
+      );
     }
 
     // Generate proper URLs for all files
