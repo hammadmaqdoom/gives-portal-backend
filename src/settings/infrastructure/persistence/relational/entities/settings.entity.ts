@@ -208,6 +208,16 @@ export class SettingsEntity extends EntityRelationalHelper {
   @Column({ type: 'varchar', length: 7, nullable: true })
   themeCustomColor: string | null; // Hex color code (e.g., #00C7AB)
 
+  // Zoom Configuration
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  zoomClientId: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  zoomClientSecret: string | null;
+
+  @Column({ type: 'boolean', default: false })
+  zoomAdminAccess: boolean; // Allow admins to access Zoom settings (superadmin always has access)
+
   @CreateDateColumn()
   createdAt: Date;
 

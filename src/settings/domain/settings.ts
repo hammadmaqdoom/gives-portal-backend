@@ -191,6 +191,16 @@ export class Settings {
   @ApiProperty({ example: '#00C7AB' })
   themeCustomColor?: string | null;
 
+  // Zoom Configuration
+  @ApiProperty({ example: 'your_zoom_client_id' })
+  zoomClientId?: string | null;
+
+  @ApiProperty({ example: 'your_zoom_client_secret' })
+  zoomClientSecret?: string | null;
+
+  @ApiProperty({ example: false })
+  zoomAdminAccess: boolean;
+
   @ApiProperty()
   createdAt: Date;
 

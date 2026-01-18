@@ -3,6 +3,8 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import {
   CreateZoomCredentialsDto,
@@ -17,6 +19,7 @@ import {
 } from './domain/zoom-meeting';
 import { ZoomCredentialsRepository } from './infrastructure/persistence/zoom-credentials.repository';
 import { ZoomMeetingRepository } from './infrastructure/persistence/zoom-meeting.repository';
+import { SettingsService } from '../settings/settings.service';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -26,6 +29,8 @@ export class ZoomService {
   constructor(
     private readonly zoomCredentialsRepository: ZoomCredentialsRepository,
     private readonly zoomMeetingRepository: ZoomMeetingRepository,
+    @Inject(forwardRef(() => SettingsService))
+    private readonly settingsService: SettingsService,
   ) {}
 
   // Encryption/Decryption methods for sensitive data
@@ -216,25 +221,37 @@ export class ZoomService {
   }
 
   // --- OAuth (Authorization Code) ---
-  private getAppOAuthConfig() {
-    const clientId = process.env.ZOOM_OAUTH_CLIENT_ID;
-    const clientSecret = process.env.ZOOM_OAUTH_CLIENT_SECRET;
-    const redirectUri = process.env.ZOOM_OAUTH_REDIRECT_URI;
-    if (!clientId || !clientSecret || !redirectUri) {
-      throw new BadRequestException('Zoom OAuth env not configured');
+  private async getAppOAuthConfig() {
+    // First try to get from settings
+    const settings = await this.settingsService.getSettings();
+    
+    let clientId = settings?.zoomClientId;
+    let clientSecret = settings?.zoomClientSecret;
+    
+    // Fall back to environment variables if not in settings
+    if (!clientId || !clientSecret) {
+      clientId = process.env.ZOOM_OAUTH_CLIENT_ID;
+      clientSecret = process.env.ZOOM_OAUTH_CLIENT_SECRET;
     }
+    
+    const redirectUri = process.env.ZOOM_OAUTH_REDIRECT_URI;
+    
+    if (!clientId || !clientSecret || !redirectUri) {
+      throw new BadRequestException('Zoom OAuth configuration not found in settings or environment variables');
+    }
+    
     return { clientId, clientSecret, redirectUri };
   }
 
   async getOAuthAuthorizeUrl(teacherId: number): Promise<string> {
-    const { clientId, redirectUri } = this.getAppOAuthConfig();
+    const { clientId, redirectUri } = await this.getAppOAuthConfig();
     const state = String(teacherId);
     const url = `https://zoom.us/oauth/authorize?response_type=code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
     return url;
   }
 
   async exchangeOAuthCode(code: string, state: string): Promise<void> {
-    const { clientId, clientSecret, redirectUri } = this.getAppOAuthConfig();
+    const { clientId, clientSecret, redirectUri } = await this.getAppOAuthConfig();
     const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
     const tokenUrl = 'https://zoom.us/oauth/token';
     const body = new URLSearchParams({
@@ -263,7 +280,7 @@ export class ZoomService {
   }
 
   private async refreshOAuthToken(teacherId: number): Promise<string> {
-    const { clientId, clientSecret } = this.getAppOAuthConfig();
+    const { clientId, clientSecret } = await this.getAppOAuthConfig();
     const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
     const current =
       await this.zoomCredentialsRepository.getOAuthTokens(teacherId);
