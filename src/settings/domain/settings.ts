@@ -177,12 +177,29 @@ export class Settings {
   @ApiProperty({ example: 'https://cdn.example.com' })
   azureBlobPublicBaseUrl?: string | null;
 
+  // Backblaze B2
+  @ApiProperty({ example: 'https://s3.us-west-001.backblazeb2.com' })
+  b2EndpointUrl?: string | null;
+
+  @ApiProperty({ example: 'us-west-001' })
+  b2Region?: string | null;
+
   // Theme Configuration
   @ApiProperty({ example: 'brand' })
   themeColorPreset?: string | null;
 
   @ApiProperty({ example: '#00C7AB' })
   themeCustomColor?: string | null;
+
+  // Zoom Configuration
+  @ApiProperty({ example: 'your_zoom_client_id' })
+  zoomClientId?: string | null;
+
+  @ApiProperty({ example: 'your_zoom_client_secret' })
+  zoomClientSecret?: string | null;
+
+  @ApiProperty({ example: false })
+  zoomAdminAccess: boolean;
 
   @ApiProperty()
   createdAt: Date;

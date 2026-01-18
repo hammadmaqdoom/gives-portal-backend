@@ -5,10 +5,15 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
-import { Transform, Type, plainToInstance } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { Class } from '../domain/class';
 
 export class FilterClassDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  search?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -55,20 +60,14 @@ export class QueryClassDto {
   @IsOptional()
   limit?: number;
 
-  @ApiPropertyOptional({ type: String })
+  @ApiPropertyOptional()
   @IsOptional()
-  @Transform(({ value }) =>
-    value ? plainToInstance(FilterClassDto, JSON.parse(value)) : undefined,
-  )
   @ValidateNested()
   @Type(() => FilterClassDto)
   filters?: FilterClassDto | null;
 
-  @ApiPropertyOptional({ type: String })
+  @ApiPropertyOptional()
   @IsOptional()
-  @Transform(({ value }) => {
-    return value ? plainToInstance(SortClassDto, JSON.parse(value)) : undefined;
-  })
   @ValidateNested({ each: true })
   @Type(() => SortClassDto)
   sort?: SortClassDto[] | null;

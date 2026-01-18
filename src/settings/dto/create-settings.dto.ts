@@ -285,6 +285,19 @@ export class CreateSettingsDto {
   @IsString()
   azureBlobPublicBaseUrl?: string;
 
+  // Backblaze B2
+  @ApiPropertyOptional({ example: 'https://s3.us-west-001.backblazeb2.com' })
+  @IsOptional()
+  @IsUrl()
+  @MaxLength(500)
+  b2EndpointUrl?: string;
+
+  @ApiPropertyOptional({ example: 'us-west-001' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  b2Region?: string;
+
   // SMS Configuration
   @ApiPropertyOptional({ example: false })
   @IsOptional()
@@ -366,4 +379,31 @@ export class CreateSettingsDto {
   @IsString()
   @MaxLength(7)
   themeCustomColor?: string;
+
+  // Zoom Configuration
+  @ApiPropertyOptional({
+    example: 'your_zoom_client_id',
+    description: 'Zoom OAuth Client ID for app-level integration',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  zoomClientId?: string;
+
+  @ApiPropertyOptional({
+    example: 'your_zoom_client_secret',
+    description: 'Zoom OAuth Client Secret for app-level integration',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  zoomClientSecret?: string;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Allow admins to access and configure Zoom settings (superadmin always has access)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  zoomAdminAccess?: boolean;
 }
