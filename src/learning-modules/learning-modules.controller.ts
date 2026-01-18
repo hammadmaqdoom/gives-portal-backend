@@ -10,6 +10,8 @@ import {
   Post,
   Query,
   UseGuards,
+  Req,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { LearningModulesService } from './learning-modules.service';
@@ -17,10 +19,11 @@ import { AuthGuard } from '@nestjs/passport';
 import { Roles } from '../roles/roles.decorator';
 import { RoleEnum } from '../roles/roles.enum';
 import sanitizeHtml from 'sanitize-html';
+import { RolesGuard } from '../roles/roles.guard';
 
 @ApiTags('Modules')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller({ path: 'modules', version: '1' })
 export class LearningModulesController {
   constructor(private readonly service: LearningModulesService) {}
@@ -103,10 +106,35 @@ export class LearningModulesController {
   }
 
   @Delete(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string) {
-    await this.service.remove(Number(id));
+  async remove(@Param('id') id: string, @Req() req: any) {
+    const userRole = req.user?.role?.name?.toLowerCase();
+    
+    // Admin and super admin can delete any module
+    if (userRole === 'admin' || userRole === 'superadmin') {
+      await this.service.remove(Number(id));
+      return;
+    }
+
+    // Teacher authorization - check if they're assigned to the class
+    if (userRole === 'teacher') {
+      const authorized = await this.service.canTeacherModifyModule(
+        req.user?.email,
+        Number(id),
+      );
+      
+      if (!authorized) {
+        throw new BadRequestException(
+          'You can only delete modules from classes you are assigned to teach',
+        );
+      }
+
+      await this.service.remove(Number(id));
+      return;
+    }
+
+    throw new BadRequestException('You are not authorized to delete this module');
   }
 
   @Post(':id/toggle-pinned')
@@ -192,7 +220,7 @@ export class LearningModulesController {
 
 @ApiTags('Module Sections')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller({ path: 'module-sections', version: '1' })
 export class LearningModuleSectionsController {
   constructor(private readonly service: LearningModulesService) {}
@@ -225,10 +253,34 @@ export class LearningModuleSectionsController {
   }
 
   @Delete(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
-  async remove(@Param('id') id: string) {
-    await this.service.deleteSection(Number(id));
-    return { success: true };
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
+  async remove(@Param('id') id: string, @Req() req: any) {
+    const userRole = req.user?.role?.name?.toLowerCase();
+    
+    // Admin and super admin can delete any section
+    if (userRole === 'admin' || userRole === 'superadmin') {
+      await this.service.deleteSection(Number(id));
+      return { success: true };
+    }
+
+    // Teacher authorization - check if they're assigned to the class
+    if (userRole === 'teacher') {
+      const authorized = await this.service.canTeacherModifySection(
+        req.user?.email,
+        Number(id),
+      );
+      
+      if (!authorized) {
+        throw new BadRequestException(
+          'You can only delete sections from classes you are assigned to teach',
+        );
+      }
+
+      await this.service.deleteSection(Number(id));
+      return { success: true };
+    }
+
+    throw new BadRequestException('You are not authorized to delete this section');
   }
 
   @Post(':id/modules')
