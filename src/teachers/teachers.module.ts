@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TeachersController } from './teachers.controller';
 import { TeachersService } from './teachers.service';
 import { TeacherCommissionController } from './teacher-commission.controller';
@@ -18,10 +18,10 @@ const commissionPersistenceModule =
   imports: [
     infrastructurePersistenceModule,
     commissionPersistenceModule,
-    UsersModule,
-    NotificationModule,
-    SubjectsModule,
-    FilesModule,
+    forwardRef(() => UsersModule),
+    forwardRef(() => NotificationModule),
+    forwardRef(() => SubjectsModule),
+    forwardRef(() => FilesModule),
   ],
   controllers: [TeachersController, TeacherCommissionController],
   providers: [TeachersService, TeacherCommissionService],

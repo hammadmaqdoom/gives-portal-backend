@@ -26,7 +26,7 @@ export class AccessControlController {
   constructor(private readonly accessControlService: AccessControlService) {}
 
   @Get('check/:studentId/:classId')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ description: 'Check course access for student' })
   async checkCourseAccess(
@@ -41,7 +41,7 @@ export class AccessControlController {
   }
 
   @Patch('toggle-admin-access/:studentId/:classId')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({
     description: 'Toggle admin-granted access for student course',

@@ -12,6 +12,11 @@ export class FilterClassDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  search?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   name?: string;
 
   @ApiPropertyOptional()
@@ -57,9 +62,18 @@ export class QueryClassDto {
 
   @ApiPropertyOptional({ type: String })
   @IsOptional()
-  @Transform(({ value }) =>
-    value ? plainToInstance(FilterClassDto, JSON.parse(value)) : undefined,
-  )
+  @Transform(({ value }) => {
+    if (!value || value === '{}' || value === 'null') return undefined;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed ? plainToInstance(FilterClassDto, parsed) : undefined;
+      } catch {
+        return undefined;
+      }
+    }
+    return plainToInstance(FilterClassDto, value);
+  })
   @ValidateNested()
   @Type(() => FilterClassDto)
   filters?: FilterClassDto | null;
@@ -67,7 +81,20 @@ export class QueryClassDto {
   @ApiPropertyOptional({ type: String })
   @IsOptional()
   @Transform(({ value }) => {
-    return value ? plainToInstance(SortClassDto, JSON.parse(value)) : undefined;
+    if (!value || value === '[]' || value === 'null') return undefined;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed && Array.isArray(parsed) && parsed.length > 0
+          ? plainToInstance(SortClassDto, parsed)
+          : undefined;
+      } catch {
+        return undefined;
+      }
+    }
+    return Array.isArray(value) && value.length > 0
+      ? plainToInstance(SortClassDto, value)
+      : undefined;
   })
   @ValidateNested({ each: true })
   @Type(() => SortClassDto)

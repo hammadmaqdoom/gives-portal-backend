@@ -131,7 +131,7 @@ export class SettingsEntity extends EntityRelationalHelper {
 
   // File Storage Configuration
   @Column({ type: 'varchar', length: 32, nullable: true, default: 'local' })
-  fileDriver: string | null; // local | s3 | s3-presigned | azure-blob-sas
+  fileDriver: string | null; // local | s3 | s3-presigned | azure-blob-sas | b2 | b2-presigned
 
   // AWS S3
   @Column({ type: 'varchar', length: 255, nullable: true })
@@ -161,6 +161,13 @@ export class SettingsEntity extends EntityRelationalHelper {
 
   @Column({ type: 'varchar', length: 500, nullable: true })
   azureBlobPublicBaseUrl: string | null;
+
+  // Backblaze B2
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  b2EndpointUrl: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  b2Region: string | null;
 
   // SMS Configuration
   @Column({ type: 'boolean', default: false })
@@ -200,6 +207,57 @@ export class SettingsEntity extends EntityRelationalHelper {
 
   @Column({ type: 'varchar', length: 7, nullable: true })
   themeCustomColor: string | null; // Hex color code (e.g., #00C7AB)
+
+  // Zoom Configuration
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  zoomClientId: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  zoomClientSecret: string | null;
+
+  @Column({ type: 'boolean', default: false })
+  zoomAdminAccess: boolean; // Allow admins to access Zoom settings (superadmin always has access)
+
+  // Video Content Protection Settings
+  @Column({ type: 'boolean', default: false })
+  contentProtectionEnabled: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  blockDevTools: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  blockKeyboardShortcuts: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  blockRightClick: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  blockTextSelection: boolean;
+
+  @Column({ type: 'varchar', length: 20, default: 'warn' })
+  protectionAction: string; // 'warn' | 'redirect' | 'log'
+
+  // Video Watermark Settings
+  @Column({ type: 'boolean', default: false })
+  watermarkEnabled: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  watermarkShowInstitution: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  watermarkShowInstructor: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  watermarkShowStudentEmail: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  watermarkShowStudentId: boolean;
+
+  @Column({ type: 'decimal', precision: 3, scale: 2, default: 0.4 })
+  watermarkOpacity: number; // 0.2 - 0.6
+
+  @Column({ type: 'varchar', length: 20, default: 'random' })
+  watermarkPosition: string; // 'random' | 'fixed-corner' | 'center'
 
   @CreateDateColumn()
   createdAt: Date;

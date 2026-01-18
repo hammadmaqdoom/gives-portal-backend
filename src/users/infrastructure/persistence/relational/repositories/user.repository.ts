@@ -33,28 +33,48 @@ export class UsersRelationalRepository implements UserRepository {
     filterOptions?: FilterUserDto | null;
     sortOptions?: SortUserDto[] | null;
     paginationOptions: IPaginationOptions;
-  }): Promise<User[]> {
-    const where: FindOptionsWhere<UserEntity> = {};
-    if (filterOptions?.roles?.length) {
-      where.role = filterOptions.roles.map((role) => ({
-        id: Number(role.id),
-      }));
+  }): Promise<{ data: User[]; total: number }> {
+    const queryBuilder = this.usersRepository.createQueryBuilder('user');
+    
+    // Add relations
+    queryBuilder
+      .leftJoinAndSelect('user.role', 'role')
+      .leftJoinAndSelect('user.status', 'status')
+      .leftJoinAndSelect('user.photo', 'photo');
+
+    // Add search filter
+    if (filterOptions?.search) {
+      queryBuilder.andWhere(
+        '(user.firstName ILIKE :search OR user.lastName ILIKE :search OR user.email ILIKE :search)',
+        { search: `%${filterOptions.search}%` },
+      );
     }
 
-    const entities = await this.usersRepository.find({
-      skip: (paginationOptions.page - 1) * paginationOptions.limit,
-      take: paginationOptions.limit,
-      where: where,
-      order: sortOptions?.reduce(
-        (accumulator, sort) => ({
-          ...accumulator,
-          [sort.orderBy]: sort.order,
-        }),
-        {},
-      ),
-    });
+    // Add role filter
+    if (filterOptions?.roles?.length) {
+      const roleIds = filterOptions.roles.map((role) => Number(role.id));
+      queryBuilder.andWhere('user.role.id IN (:...roleIds)', { roleIds });
+    }
 
-    return entities.map((user) => UserMapper.toDomain(user));
+    // Add sorting
+    if (sortOptions && sortOptions.length > 0) {
+      sortOptions.forEach((sort) => {
+        queryBuilder.addOrderBy(`user.${sort.orderBy}`, sort.order as 'ASC' | 'DESC');
+      });
+    } else {
+      queryBuilder.addOrderBy('user.createdAt', 'DESC');
+    }
+
+    // Add pagination
+    const skip = (paginationOptions.page - 1) * paginationOptions.limit;
+    queryBuilder.skip(skip).take(paginationOptions.limit);
+
+    const [entities, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      data: entities.map((user) => UserMapper.toDomain(user)),
+      total,
+    };
   }
 
   async findById(id: User['id']): Promise<NullableType<User>> {

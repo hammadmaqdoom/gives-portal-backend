@@ -177,12 +177,70 @@ export class Settings {
   @ApiProperty({ example: 'https://cdn.example.com' })
   azureBlobPublicBaseUrl?: string | null;
 
+  // Backblaze B2
+  @ApiProperty({ example: 'https://s3.us-west-001.backblazeb2.com' })
+  b2EndpointUrl?: string | null;
+
+  @ApiProperty({ example: 'us-west-001' })
+  b2Region?: string | null;
+
   // Theme Configuration
   @ApiProperty({ example: 'brand' })
   themeColorPreset?: string | null;
 
   @ApiProperty({ example: '#00C7AB' })
   themeCustomColor?: string | null;
+
+  // Zoom Configuration
+  @ApiProperty({ example: 'your_zoom_client_id' })
+  zoomClientId?: string | null;
+
+  @ApiProperty({ example: 'your_zoom_client_secret' })
+  zoomClientSecret?: string | null;
+
+  @ApiProperty({ example: false })
+  zoomAdminAccess: boolean;
+
+  // Video Content Protection Settings
+  @ApiProperty({ example: false, description: 'Enable video content protection' })
+  contentProtectionEnabled: boolean;
+
+  @ApiProperty({ example: false, description: 'Block DevTools access' })
+  blockDevTools: boolean;
+
+  @ApiProperty({ example: true, description: 'Block keyboard shortcuts' })
+  blockKeyboardShortcuts: boolean;
+
+  @ApiProperty({ example: true, description: 'Block right-click context menu' })
+  blockRightClick: boolean;
+
+  @ApiProperty({ example: true, description: 'Block text selection' })
+  blockTextSelection: boolean;
+
+  @ApiProperty({ example: 'warn', description: 'Protection action: warn | redirect | log' })
+  protectionAction: string;
+
+  // Video Watermark Settings
+  @ApiProperty({ example: false, description: 'Enable watermark overlay' })
+  watermarkEnabled: boolean;
+
+  @ApiProperty({ example: true, description: 'Show institution name in watermark' })
+  watermarkShowInstitution: boolean;
+
+  @ApiProperty({ example: true, description: 'Show instructor name in watermark' })
+  watermarkShowInstructor: boolean;
+
+  @ApiProperty({ example: true, description: 'Show student email in watermark' })
+  watermarkShowStudentEmail: boolean;
+
+  @ApiProperty({ example: false, description: 'Show student ID in watermark' })
+  watermarkShowStudentId: boolean;
+
+  @ApiProperty({ example: 0.4, description: 'Watermark opacity (0.2 - 0.6)' })
+  watermarkOpacity: number;
+
+  @ApiProperty({ example: 'random', description: 'Watermark position: random | fixed-corner | center' })
+  watermarkPosition: string;
 
   @ApiProperty()
   createdAt: Date;

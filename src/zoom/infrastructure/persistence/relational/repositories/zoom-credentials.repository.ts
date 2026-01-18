@@ -7,6 +7,7 @@ import { ZoomCredentialsRepository } from '../../zoom-credentials.repository';
 import { ZoomCredentialsMapper } from '../mappers/zoom-credentials.mapper';
 import { NullableType } from '../../../../../utils/types/nullable.type';
 import { DeepPartial } from '../../../../../utils/types/deep-partial.type';
+import { TeacherEntity } from '../../../../../teachers/infrastructure/persistence/relational/entities/teacher.entity';
 
 @Injectable()
 export class RelationalZoomCredentialsRepository
@@ -15,6 +16,8 @@ export class RelationalZoomCredentialsRepository
   constructor(
     @InjectRepository(ZoomCredentialsEntity)
     private readonly repository: Repository<ZoomCredentialsEntity>,
+    @InjectRepository(TeacherEntity)
+    private readonly teacherRepository: Repository<TeacherEntity>,
   ) {}
 
   async create(
@@ -83,5 +86,28 @@ export class RelationalZoomCredentialsRepository
     } catch {
       return null;
     }
+  }
+
+  async getTeacherStatistics(): Promise<{
+    totalTeachers: number;
+    connectedTeachers: number;
+    notConnectedTeachers: number;
+  }> {
+    // Get total number of teachers
+    const totalTeachers = await this.teacherRepository.count({
+      where: { deletedAt: null as any },
+    });
+
+    // Get number of teachers with active Zoom credentials
+    const connectedTeachers = await this.repository
+      .createQueryBuilder('zoom_credentials')
+      .where('zoom_credentials.isActive = :isActive', { isActive: true })
+      .getCount();
+
+    return {
+      totalTeachers,
+      connectedTeachers,
+      notConnectedTeachers: totalTeachers - connectedTeachers,
+    };
   }
 }
