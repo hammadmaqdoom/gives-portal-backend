@@ -31,7 +31,7 @@ export class FeeReminderController {
   constructor(private readonly feeReminderService: FeeReminderService) {}
 
   @Post('send/:invoiceId')
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.superAdmin, RoleEnum.admin, RoleEnum.user)
   @ApiParam({
     name: 'invoiceId',
     description: 'Invoice ID to send reminder for',
@@ -46,7 +46,7 @@ export class FeeReminderController {
   }
 
   @Post('send-upcoming/:invoiceId')
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.superAdmin, RoleEnum.admin, RoleEnum.user)
   @ApiParam({
     name: 'invoiceId',
     description: 'Invoice ID to send upcoming due date reminder for',
@@ -61,7 +61,7 @@ export class FeeReminderController {
   }
 
   @Get('logs')
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.superAdmin, RoleEnum.admin, RoleEnum.user)
   @ApiQuery({
     name: 'limit',
     required: false,
@@ -84,7 +84,7 @@ export class FeeReminderController {
   }
 
   @Get('logs/student/:studentId')
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.superAdmin, RoleEnum.admin, RoleEnum.user)
   @ApiParam({
     name: 'studentId',
     description: 'Student ID to get reminder logs for',
@@ -98,7 +98,7 @@ export class FeeReminderController {
   }
 
   @Get('stats')
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.superAdmin, RoleEnum.admin, RoleEnum.user)
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Fee reminder statistics retrieved successfully',

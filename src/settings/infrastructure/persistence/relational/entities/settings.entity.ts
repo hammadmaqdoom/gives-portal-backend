@@ -215,6 +215,9 @@ export class SettingsEntity extends EntityRelationalHelper {
   @Column({ type: 'varchar', length: 255, nullable: true })
   zoomClientSecret: string | null;
 
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  zoomRedirectUri: string | null;
+
   @Column({ type: 'boolean', default: false })
   zoomAdminAccess: boolean; // Allow admins to access Zoom settings (superadmin always has access)
 

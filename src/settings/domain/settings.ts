@@ -198,6 +198,9 @@ export class Settings {
   @ApiProperty({ example: 'your_zoom_client_secret' })
   zoomClientSecret?: string | null;
 
+  @ApiProperty({ example: 'https://your-domain.com/api/v1/zoom/oauth/callback' })
+  zoomRedirectUri?: string | null;
+
   @ApiProperty({ example: false })
   zoomAdminAccess: boolean;
 

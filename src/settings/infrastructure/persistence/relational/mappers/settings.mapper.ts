@@ -65,6 +65,11 @@ export class SettingsMapper {
     domainEntity.b2Region = raw.b2Region;
     domainEntity.themeColorPreset = raw.themeColorPreset;
     domainEntity.themeCustomColor = raw.themeCustomColor;
+    // Zoom Configuration
+    domainEntity.zoomClientId = raw.zoomClientId;
+    domainEntity.zoomClientSecret = raw.zoomClientSecret;
+    domainEntity.zoomRedirectUri = raw.zoomRedirectUri;
+    domainEntity.zoomAdminAccess = raw.zoomAdminAccess;
     domainEntity.createdAt = raw.createdAt;
     domainEntity.updatedAt = raw.updatedAt;
     return domainEntity;
@@ -146,6 +151,11 @@ export class SettingsMapper {
     persistenceEntity.b2Region = domainEntity.b2Region || null;
     persistenceEntity.themeColorPreset = domainEntity.themeColorPreset || null;
     persistenceEntity.themeCustomColor = domainEntity.themeCustomColor || null;
+    // Zoom Configuration
+    persistenceEntity.zoomClientId = domainEntity.zoomClientId || null;
+    persistenceEntity.zoomClientSecret = domainEntity.zoomClientSecret || null;
+    persistenceEntity.zoomRedirectUri = domainEntity.zoomRedirectUri || null;
+    persistenceEntity.zoomAdminAccess = domainEntity.zoomAdminAccess ?? false;
     persistenceEntity.createdAt = domainEntity.createdAt;
     persistenceEntity.updatedAt = domainEntity.updatedAt;
     return persistenceEntity;

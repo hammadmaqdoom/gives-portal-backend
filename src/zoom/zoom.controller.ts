@@ -11,6 +11,7 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  Res,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -23,6 +24,8 @@ import { RolesGuard } from '../roles/roles.guard';
 import { Roles } from '../roles/roles.decorator';
 import { RoleEnum } from '../roles/roles.enum';
 import { ZoomService } from './zoom.service';
+import { ConfigService } from '@nestjs/config';
+import { Response } from 'express';
 import {
   CreateZoomCredentialsDto,
   UpdateZoomCredentialsDto,
@@ -38,13 +41,16 @@ import {
   path: 'zoom',
   version: '1',
 })
-@UseGuards(AuthGuard('jwt'), RolesGuard)
-@ApiBearerAuth()
 export class ZoomController {
-  constructor(private readonly zoomService: ZoomService) {}
+  constructor(
+    private readonly zoomService: ZoomService,
+    private readonly configService: ConfigService,
+  ) {}
 
   // OAuth (Authorization Code) endpoints
   @Get('oauth/authorize')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Redirect to Zoom OAuth (Authorization Code)' })
   async oauthAuthorize(@Request() req: any) {
@@ -52,18 +58,58 @@ export class ZoomController {
     return { authorizeUrl: url };
   }
 
+  // Public endpoint - no authentication required (Zoom redirects here)
   @Get('oauth/callback')
   @ApiOperation({ summary: 'Zoom OAuth callback to exchange code for tokens' })
   async oauthCallback(
     @Query('code') code: string,
     @Query('state') state: string,
+    @Query('error') error: string,
+    @Res() res: Response,
   ) {
-    await this.zoomService.exchangeOAuthCode(code, state);
-    return { ok: true };
+    // Get frontend URL for redirect
+    const frontendUrl =
+      this.configService.get('app.frontendDomain', { infer: true }) ||
+      this.configService.get('APP_URL', { infer: true }) ||
+      this.configService.get('FRONTEND_DOMAIN', { infer: true }) ||
+      'http://localhost:3000';
+
+    try {
+      // If Zoom returned an error, redirect with error message
+      if (error) {
+        return res.redirect(
+          `${frontendUrl}/dashboard/zoom/callback?error=${encodeURIComponent(error)}`,
+        );
+      }
+
+      // If no code, redirect with error
+      if (!code) {
+        return res.redirect(
+          `${frontendUrl}/dashboard/zoom/callback?error=${encodeURIComponent('No authorization code received')}`,
+        );
+      }
+
+      // Exchange code for tokens
+      await this.zoomService.exchangeOAuthCode(code, state);
+
+      // Redirect to frontend success page
+      return res.redirect(
+        `${frontendUrl}/dashboard/zoom/callback?success=true`,
+      );
+    } catch (error: any) {
+      // Redirect to frontend with error message
+      const errorMessage =
+        error?.message || 'Failed to connect Zoom account';
+      return res.redirect(
+        `${frontendUrl}/dashboard/zoom/callback?error=${encodeURIComponent(errorMessage)}`,
+      );
+    }
   }
 
   // Zoom Credentials Management
   @Post('credentials')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Create Zoom credentials for teacher' })
   @ApiResponse({ status: 201, description: 'Credentials created successfully' })
@@ -81,6 +127,8 @@ export class ZoomController {
   }
 
   @Get('credentials')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Get teacher Zoom credentials' })
   @ApiResponse({
@@ -94,6 +142,8 @@ export class ZoomController {
   }
 
   @Put('credentials')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Update Zoom credentials' })
   @ApiResponse({ status: 200, description: 'Credentials updated successfully' })
@@ -107,6 +157,8 @@ export class ZoomController {
   }
 
   @Delete('credentials')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete Zoom credentials' })
@@ -118,6 +170,8 @@ export class ZoomController {
   }
 
   @Post('credentials/test')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Test Zoom API connection' })
   @ApiResponse({ status: 200, description: 'Connection test completed' })
@@ -130,6 +184,8 @@ export class ZoomController {
 
   // Zoom Meeting Management
   @Post('meetings')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Create a new Zoom meeting' })
   @ApiResponse({ status: 201, description: 'Meeting created successfully' })
@@ -146,6 +202,8 @@ export class ZoomController {
   }
 
   @Get('meetings/class/:classId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Get meetings for a specific class' })
   @ApiResponse({ status: 200, description: 'Meetings retrieved successfully' })
@@ -154,6 +212,8 @@ export class ZoomController {
   }
 
   @Get('meetings/class/:classId/upcoming')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Get upcoming meetings for a class' })
   @ApiResponse({
@@ -165,6 +225,8 @@ export class ZoomController {
   }
 
   @Get('meetings/class/:classId/active')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Get active meetings for a class' })
   @ApiResponse({
@@ -176,6 +238,8 @@ export class ZoomController {
   }
 
   @Get('meetings/:meetingId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Get meeting by meeting ID' })
   @ApiResponse({ status: 200, description: 'Meeting retrieved successfully' })
@@ -184,6 +248,8 @@ export class ZoomController {
   }
 
   @Get('meetings/id/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Get meeting by database ID' })
   @ApiResponse({ status: 200, description: 'Meeting retrieved successfully' })
@@ -194,6 +260,8 @@ export class ZoomController {
   // Signature endpoint removed (no Web SDK embedding)
 
   @Put('meetings/:meetingId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Update a Zoom meeting' })
   @ApiResponse({ status: 200, description: 'Meeting updated successfully' })
@@ -205,6 +273,8 @@ export class ZoomController {
   }
 
   @Post('meetings/:meetingId/start')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Start a Zoom meeting' })
@@ -214,6 +284,8 @@ export class ZoomController {
   }
 
   @Post('meetings/:meetingId/end')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'End a Zoom meeting' })
@@ -223,6 +295,8 @@ export class ZoomController {
   }
 
   @Post('meetings/:meetingId/cancel')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Cancel a Zoom meeting' })
@@ -232,6 +306,8 @@ export class ZoomController {
   }
 
   @Post('meetings/:meetingId/join')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Join a Zoom meeting' })
   @ApiResponse({ status: 200, description: 'Meeting join details retrieved' })
@@ -244,6 +320,8 @@ export class ZoomController {
 
   // Teacher-specific endpoints
   @Get('meetings/teacher')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Get meetings for a specific teacher' })
   @ApiResponse({
@@ -258,6 +336,8 @@ export class ZoomController {
 
   // Admin statistics endpoint
   @Get('statistics/teachers')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth()
   @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Get Zoom connection statistics for all teachers' })
   @ApiResponse({

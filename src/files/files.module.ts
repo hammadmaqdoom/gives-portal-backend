@@ -14,6 +14,7 @@ import { LearningModulesModule } from '../learning-modules/learning-modules.modu
 import { LearningModuleEntity } from '../learning-modules/infrastructure/persistence/relational/entities/learning-module.entity';
 import { AssignmentsModule } from '../assignments/assignments.module';
 import { StudentsModule } from '../students/students.module';
+import { TeachersModule } from '../teachers/teachers.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { StudentsModule } from '../students/students.module';
     forwardRef(() => LearningModulesModule),
     forwardRef(() => AssignmentsModule),
     forwardRef(() => StudentsModule),
+    forwardRef(() => TeachersModule),
   ],
   controllers: [FilesController],
   providers: [FilesService, FileStorageService, FileMapper, FileRepository],

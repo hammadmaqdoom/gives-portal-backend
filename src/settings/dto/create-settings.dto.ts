@@ -400,6 +400,15 @@ export class CreateSettingsDto {
   zoomClientSecret?: string;
 
   @ApiPropertyOptional({
+    example: 'https://your-domain.com/api/v1/zoom/oauth/callback',
+    description: 'Zoom OAuth Redirect URI - must exactly match the redirect URI configured in your Zoom app',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  zoomRedirectUri?: string;
+
+  @ApiPropertyOptional({
     example: false,
     description: 'Allow admins to access and configure Zoom settings (superadmin always has access)',
   })
