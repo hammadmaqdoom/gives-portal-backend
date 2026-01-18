@@ -17,6 +17,7 @@ import { FileEntity } from '../files/infrastructure/persistence/relational/entit
 import { CurrencyModule } from '../currency/currency.module';
 import { SettingsModule } from '../settings/settings.module';
 import { ConfigModule } from '@nestjs/config';
+import { CacheModule } from '../cache/cache.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ConfigModule } from '@nestjs/config';
     CurrencyModule,
     SettingsModule,
     ConfigModule,
+    CacheModule,
   ],
   controllers: [DashboardController],
   providers: [DashboardService],

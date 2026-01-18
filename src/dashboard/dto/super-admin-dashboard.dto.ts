@@ -41,6 +41,9 @@ export class SystemHealthDto {
   @ApiProperty({ example: true, description: 'Storage connection status' })
   storageConnected: boolean;
 
+  @ApiProperty({ example: true, description: 'Redis connection status' })
+  redisConnected: boolean;
+
   @ApiProperty({ example: 'All systems operational', description: 'Health message' })
   message: string;
 }

@@ -33,6 +33,7 @@ import { SettingsService } from '../settings/settings.service';
 import { ConfigService } from '@nestjs/config';
 import { RoleEnum } from '../roles/roles.enum';
 import { FileDriver } from '../files/config/file-config.type';
+import { RedisService } from '../cache/redis.service';
 
 @Injectable()
 export class DashboardService {
@@ -64,6 +65,7 @@ export class DashboardService {
     private readonly currencyService: CurrencyService,
     private readonly settingsService: SettingsService,
     private readonly configService: ConfigService,
+    private readonly redisService: RedisService,
   ) {}
 
   async getAdminStats(): Promise<AdminStatsDto> {
@@ -930,19 +932,52 @@ export class DashboardService {
       await this.fileRepository.count();
       const storageConnected = true;
 
+      // Check Redis connection by attempting a simple operation
+      // First check if Redis is enabled in config
+      const redisEnabled = this.configService.get('redis.enabled', { infer: true }) ?? false;
+      let redisConnected = false;
+      
+      if (redisEnabled) {
+        try {
+          const testKey = 'health-check-' + Date.now();
+          await this.redisService.set(testKey, 'test', 1);
+          const value = await this.redisService.get(testKey);
+          await this.redisService.delete(testKey);
+          redisConnected = value === 'test';
+        } catch (error) {
+          redisConnected = false;
+        }
+      } else {
+        // Redis is disabled, so we don't check connection
+        // We'll mark it as connected=false but won't affect overall health
+        redisConnected = false;
+      }
+
       // Determine overall health status
       let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
       let message = 'All systems operational';
 
-      if (!databaseConnected || !storageConnected) {
-        status = 'unhealthy';
-        message = 'Some systems are experiencing issues';
+      const disconnectedServices: string[] = [];
+      if (!databaseConnected) disconnectedServices.push('Database');
+      if (!storageConnected) disconnectedServices.push('Storage');
+      if (!redisConnected) disconnectedServices.push('Redis');
+
+      if (disconnectedServices.length > 0) {
+        if (disconnectedServices.length === 1 && disconnectedServices[0] === 'Redis') {
+          // Redis is optional, so if only Redis is down, mark as degraded
+          status = 'degraded';
+          message = 'Redis is unavailable, but core systems are operational';
+        } else {
+          status = 'unhealthy';
+          message = `${disconnectedServices.join(', ')} ${disconnectedServices.length === 1 ? 'is' : 'are'} experiencing issues`;
+        }
       }
 
       return {
         status,
         databaseConnected,
         storageConnected,
+        redisConnected,
         message,
       };
     } catch (error) {
@@ -950,6 +985,7 @@ export class DashboardService {
         status: 'unhealthy' as const,
         databaseConnected: false,
         storageConnected: false,
+        redisConnected: false,
         message: 'System health check failed',
       };
     }
