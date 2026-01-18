@@ -22,6 +22,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiOperation,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../roles/roles.guard';
@@ -334,11 +335,18 @@ export class PaymentTransactionsController {
     description: 'My payment transactions retrieved successfully',
     type: [PaymentTransaction],
   })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'startDate', required: false, type: String })
+  @ApiQuery({ name: 'endDate', required: false, type: String })
   async getMyTransactions(
     @Request() req: any,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
     @Query('status') status?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ): Promise<{
     data: PaymentTransaction[];
     meta: {
@@ -360,6 +368,8 @@ export class PaymentTransactionsController {
       page,
       limit,
       status,
+      startDate,
+      endDate,
     });
   }
 
