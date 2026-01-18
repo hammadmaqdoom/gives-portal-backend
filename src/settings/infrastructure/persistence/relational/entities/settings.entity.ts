@@ -218,6 +218,47 @@ export class SettingsEntity extends EntityRelationalHelper {
   @Column({ type: 'boolean', default: false })
   zoomAdminAccess: boolean; // Allow admins to access Zoom settings (superadmin always has access)
 
+  // Video Content Protection Settings
+  @Column({ type: 'boolean', default: false })
+  contentProtectionEnabled: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  blockDevTools: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  blockKeyboardShortcuts: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  blockRightClick: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  blockTextSelection: boolean;
+
+  @Column({ type: 'varchar', length: 20, default: 'warn' })
+  protectionAction: string; // 'warn' | 'redirect' | 'log'
+
+  // Video Watermark Settings
+  @Column({ type: 'boolean', default: false })
+  watermarkEnabled: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  watermarkShowInstitution: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  watermarkShowInstructor: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  watermarkShowStudentEmail: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  watermarkShowStudentId: boolean;
+
+  @Column({ type: 'decimal', precision: 3, scale: 2, default: 0.4 })
+  watermarkOpacity: number; // 0.2 - 0.6
+
+  @Column({ type: 'varchar', length: 20, default: 'random' })
+  watermarkPosition: string; // 'random' | 'fixed-corner' | 'center'
+
   @CreateDateColumn()
   createdAt: Date;
 

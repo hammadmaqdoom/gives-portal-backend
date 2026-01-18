@@ -249,4 +249,42 @@ export class SettingsService {
       themeCustomColor: (settings as any).themeCustomColor || null,
     };
   }
+
+  async getContentProtection(): Promise<{
+    contentProtectionEnabled: boolean;
+    blockDevTools: boolean;
+    blockKeyboardShortcuts: boolean;
+    blockRightClick: boolean;
+    blockTextSelection: boolean;
+    protectionAction: string;
+    watermarkEnabled: boolean;
+    watermarkShowInstitution: boolean;
+    watermarkShowInstructor: boolean;
+    watermarkShowStudentEmail: boolean;
+    watermarkShowStudentId: boolean;
+    watermarkOpacity: number;
+    watermarkPosition: string;
+  }> {
+    const settings = await this.getSettingsOrCreate();
+
+    return {
+      contentProtectionEnabled:
+        (settings as any).contentProtectionEnabled ?? false,
+      blockDevTools: (settings as any).blockDevTools ?? false,
+      blockKeyboardShortcuts: (settings as any).blockKeyboardShortcuts ?? true,
+      blockRightClick: (settings as any).blockRightClick ?? true,
+      blockTextSelection: (settings as any).blockTextSelection ?? true,
+      protectionAction: (settings as any).protectionAction ?? 'warn',
+      watermarkEnabled: (settings as any).watermarkEnabled ?? false,
+      watermarkShowInstitution:
+        (settings as any).watermarkShowInstitution ?? true,
+      watermarkShowInstructor:
+        (settings as any).watermarkShowInstructor ?? true,
+      watermarkShowStudentEmail:
+        (settings as any).watermarkShowStudentEmail ?? true,
+      watermarkShowStudentId: (settings as any).watermarkShowStudentId ?? false,
+      watermarkOpacity: (settings as any).watermarkOpacity ?? 0.4,
+      watermarkPosition: (settings as any).watermarkPosition ?? 'random',
+    };
+  }
 }

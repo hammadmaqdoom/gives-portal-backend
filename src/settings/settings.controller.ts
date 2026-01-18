@@ -159,6 +159,18 @@ export class SettingsController {
     return this.settingsService.getThemeConfig();
   }
 
+  @Get('content-protection')
+  @Roles(RoleEnum.superAdmin, RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @RequireSettingsAccess('content_protection')
+  @ApiOperation({ summary: 'Get content protection and watermark configuration' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Content protection configuration retrieved successfully',
+  })
+  async getContentProtection() {
+    return this.settingsService.getContentProtection();
+  }
+
   @Post('currency/sync')
   @Roles(RoleEnum.superAdmin, RoleEnum.admin)
   @ApiOperation({ summary: 'Manually sync currency rates (fetch latest)' })

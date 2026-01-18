@@ -201,6 +201,47 @@ export class Settings {
   @ApiProperty({ example: false })
   zoomAdminAccess: boolean;
 
+  // Video Content Protection Settings
+  @ApiProperty({ example: false, description: 'Enable video content protection' })
+  contentProtectionEnabled: boolean;
+
+  @ApiProperty({ example: false, description: 'Block DevTools access' })
+  blockDevTools: boolean;
+
+  @ApiProperty({ example: true, description: 'Block keyboard shortcuts' })
+  blockKeyboardShortcuts: boolean;
+
+  @ApiProperty({ example: true, description: 'Block right-click context menu' })
+  blockRightClick: boolean;
+
+  @ApiProperty({ example: true, description: 'Block text selection' })
+  blockTextSelection: boolean;
+
+  @ApiProperty({ example: 'warn', description: 'Protection action: warn | redirect | log' })
+  protectionAction: string;
+
+  // Video Watermark Settings
+  @ApiProperty({ example: false, description: 'Enable watermark overlay' })
+  watermarkEnabled: boolean;
+
+  @ApiProperty({ example: true, description: 'Show institution name in watermark' })
+  watermarkShowInstitution: boolean;
+
+  @ApiProperty({ example: true, description: 'Show instructor name in watermark' })
+  watermarkShowInstructor: boolean;
+
+  @ApiProperty({ example: true, description: 'Show student email in watermark' })
+  watermarkShowStudentEmail: boolean;
+
+  @ApiProperty({ example: false, description: 'Show student ID in watermark' })
+  watermarkShowStudentId: boolean;
+
+  @ApiProperty({ example: 0.4, description: 'Watermark opacity (0.2 - 0.6)' })
+  watermarkOpacity: number;
+
+  @ApiProperty({ example: 'random', description: 'Watermark position: random | fixed-corner | center' })
+  watermarkPosition: string;
+
   @ApiProperty()
   createdAt: Date;
 
