@@ -47,7 +47,7 @@ export class AssignmentsController {
   constructor(private readonly assignmentsService: AssignmentsService) {}
 
   @Post()
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.CREATED)
   create(
     @Body() createAssignmentDto: CreateAssignmentDto,
@@ -57,7 +57,7 @@ export class AssignmentsController {
   }
 
   @Get()
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user, RoleEnum.superAdmin)
   @ApiOkResponse({
     type: InfinityPaginationResponseDto,
   })
@@ -83,7 +83,7 @@ export class AssignmentsController {
   }
 
   @Get('class/:classId')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user, RoleEnum.superAdmin)
   @ApiParam({
     name: 'classId',
     type: String,
@@ -99,7 +99,7 @@ export class AssignmentsController {
   }
 
   @Get(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user, RoleEnum.superAdmin)
   @ApiParam({
     name: 'id',
     type: String,
@@ -115,7 +115,7 @@ export class AssignmentsController {
   }
 
   @Patch(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   @ApiParam({
     name: 'id',
     type: String,
@@ -134,7 +134,7 @@ export class AssignmentsController {
   }
 
   @Delete(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   @ApiParam({
     name: 'id',
     type: String,

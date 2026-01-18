@@ -5,7 +5,7 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
+import { Transform, Type, plainToInstance } from 'class-transformer';
 import { Class } from '../domain/class';
 
 export class FilterClassDto {
@@ -60,14 +60,42 @@ export class QueryClassDto {
   @IsOptional()
   limit?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: String })
   @IsOptional()
+  @Transform(({ value }) => {
+    if (!value || value === '{}' || value === 'null') return undefined;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed ? plainToInstance(FilterClassDto, parsed) : undefined;
+      } catch {
+        return undefined;
+      }
+    }
+    return plainToInstance(FilterClassDto, value);
+  })
   @ValidateNested()
   @Type(() => FilterClassDto)
   filters?: FilterClassDto | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: String })
   @IsOptional()
+  @Transform(({ value }) => {
+    if (!value || value === '[]' || value === 'null') return undefined;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed && Array.isArray(parsed) && parsed.length > 0
+          ? plainToInstance(SortClassDto, parsed)
+          : undefined;
+      } catch {
+        return undefined;
+      }
+    }
+    return Array.isArray(value) && value.length > 0
+      ? plainToInstance(SortClassDto, value)
+      : undefined;
+  })
   @ValidateNested({ each: true })
   @Type(() => SortClassDto)
   sort?: SortClassDto[] | null;

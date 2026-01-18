@@ -12,8 +12,11 @@ import { AssignmentEntity } from '../assignments/infrastructure/persistence/rela
 import { SubmissionEntity } from '../assignments/infrastructure/persistence/relational/entities/submission.entity';
 import { ParentEntity } from '../parents/infrastructure/persistence/relational/entities/parent.entity';
 import { StudentClassEnrollmentEntity } from '../students/infrastructure/persistence/relational/entities/student-class-enrollment.entity';
+import { UserEntity } from '../users/infrastructure/persistence/relational/entities/user.entity';
+import { FileEntity } from '../files/infrastructure/persistence/relational/entities/file.entity';
 import { CurrencyModule } from '../currency/currency.module';
 import { SettingsModule } from '../settings/settings.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
@@ -28,9 +31,12 @@ import { SettingsModule } from '../settings/settings.module';
       SubmissionEntity,
       ParentEntity,
       StudentClassEnrollmentEntity,
+      UserEntity,
+      FileEntity,
     ]),
     CurrencyModule,
     SettingsModule,
+    ConfigModule,
   ],
   controllers: [DashboardController],
   providers: [DashboardService],
