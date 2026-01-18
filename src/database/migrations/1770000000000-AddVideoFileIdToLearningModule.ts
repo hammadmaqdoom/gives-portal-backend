@@ -9,7 +9,7 @@ export class AddVideoFileIdToLearningModule1770000000000
     // Add video_file_id column to learning_module table
     await queryRunner.query(`
       ALTER TABLE "learning_module" 
-      ADD COLUMN IF NOT EXISTS "video_file_id" varchar
+      ADD COLUMN IF NOT EXISTS "video_file_id" uuid
     `);
 
     // Add foreign key constraint to files table
