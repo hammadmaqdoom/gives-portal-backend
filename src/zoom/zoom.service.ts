@@ -227,6 +227,7 @@ export class ZoomService {
     
     let clientId = settings?.zoomClientId;
     let clientSecret = settings?.zoomClientSecret;
+    let redirectUri = settings?.zoomRedirectUri;
     
     // Fall back to environment variables if not in settings
     if (!clientId || !clientSecret) {
@@ -234,7 +235,9 @@ export class ZoomService {
       clientSecret = process.env.ZOOM_OAUTH_CLIENT_SECRET;
     }
     
-    const redirectUri = process.env.ZOOM_OAUTH_REDIRECT_URI;
+    if (!redirectUri) {
+      redirectUri = process.env.ZOOM_OAUTH_REDIRECT_URI;
+    }
     
     if (!clientId || !clientSecret || !redirectUri) {
       throw new BadRequestException('Zoom OAuth configuration not found in settings or environment variables');

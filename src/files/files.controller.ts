@@ -41,6 +41,7 @@ import * as path from 'path';
 import { AccessControlService } from '../access-control/access-control.service';
 import { ClassesService } from '../classes/classes.service';
 import { StudentsService } from '../students/students.service';
+import { TeachersService } from '../teachers/teachers.service';
 
 @ApiTags('File Management')
 @ApiBearerAuth()
@@ -57,6 +58,7 @@ export class FilesController {
     private readonly accessControlService: AccessControlService,
     private readonly classesService: ClassesService,
     private readonly studentsService: StudentsService,
+    private readonly teachersService: TeachersService,
   ) {}
 
   /**
@@ -68,6 +70,66 @@ export class FilesController {
     const host = process.env.HOST || 'localhost';
     const port = process.env.PORT || '3000';
     return `${protocol}://${host}:${port}`;
+  }
+
+  /**
+   * Check if a teacher is assigned to a class
+   */
+  private async checkTeacherOwnsClass(
+    teacherEmail: string,
+    classId: number,
+  ): Promise<boolean> {
+    try {
+      // Get teacher by email
+      const teacher = await this.teachersService.findByEmail(teacherEmail);
+      if (!teacher) {
+        return false;
+      }
+
+      // Get class and check if teacher is assigned to it
+      const classEntity = await this.classesService.findById(classId);
+      if (!classEntity) {
+        return false;
+      }
+
+      // Check if the teacher is assigned to this class
+      return classEntity.teacher?.id === teacher.id;
+    } catch (error) {
+      console.error('Error checking teacher class ownership:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get class ID from file context
+   */
+  private async getClassIdFromFile(file: any): Promise<number | null> {
+    // If file context is directly a class
+    if (file.contextType === 'class') {
+      return parseInt(file.contextId, 10);
+    }
+
+    // If file context is a learning module, get the class from the module
+    if (file.contextType === 'module') {
+      try {
+        const { InjectRepository } = require('@nestjs/typeorm');
+        const { Repository } = require('typeorm');
+        const { LearningModuleEntity } = require('../learning-modules/infrastructure/persistence/relational/entities/learning-module.entity');
+        const moduleId = parseInt(file.contextId, 10);
+        
+        // We need to query the module to get its classId
+        const moduleRepository = this.configService.get('typeorm');
+        // For now, we'll use the filesService to check this
+        const modulesUsingFile = await this.filesService.checkFileUsageInModules(file.id);
+        if (modulesUsingFile.length > 0 && modulesUsingFile[0].classId) {
+          return modulesUsingFile[0].classId;
+        }
+      } catch (error) {
+        console.error('Error getting class ID from module:', error);
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -1292,35 +1354,78 @@ export class FilesController {
       throw new BadRequestException('File not found');
     }
 
-    // Check if user can delete this file
     const userRole = req.user?.role?.name?.toLowerCase();
-    if (
-      file.uploadedBy !== req.user?.id &&
-      userRole !== 'admin' &&
-      userRole !== 'superadmin'
-    ) {
-      throw new BadRequestException('You can only delete your own files');
+    const userEmail = req.user?.email;
+
+    // Admin and super admin can delete any file
+    if (userRole === 'admin' || userRole === 'superadmin') {
+      // Check if file is being used by any learning module
+      if (file.contextType === 'class' || file.contextType === 'module') {
+        const modulesUsingFile = await this.filesService.checkFileUsageInModules(id);
+        if (modulesUsingFile.length > 0) {
+          throw new BadRequestException(
+            `Cannot delete file: It is being used by ${modulesUsingFile.length} learning module(s)`,
+          );
+        }
+      }
+
+      await this.filesService.deleteFile(id);
+      return {
+        message: 'File deleted successfully',
+      };
     }
 
-    // Check if file is being used by any learning module
-    if (file.contextType === 'class') {
-      const { InjectRepository } = require('@nestjs/typeorm');
-      const { Repository } = require('typeorm');
-      const { LearningModuleEntity } = require('../learning-modules/infrastructure/persistence/relational/entities/learning-module.entity');
-      // We'll need to inject this properly, but for now check via service
-      const modulesUsingFile = await this.filesService.checkFileUsageInModules(id);
-      if (modulesUsingFile.length > 0) {
-        throw new BadRequestException(
-          `Cannot delete file: It is being used by ${modulesUsingFile.length} learning module(s)`,
-        );
+    // Teacher authorization
+    if (userRole === 'teacher') {
+      // Get the class ID associated with this file
+      let classId: number | null = null;
+
+      if (file.contextType === 'class') {
+        classId = parseInt(file.contextId, 10);
+      } else if (file.contextType === 'module') {
+        // For module files, we need to get the class from the module
+        classId = await this.getClassIdFromFile(file);
+      }
+
+      if (classId) {
+        // Check if teacher is assigned to this class
+        const isTeacherOfClass = await this.checkTeacherOwnsClass(userEmail, classId);
+        
+        if (!isTeacherOfClass) {
+          throw new BadRequestException(
+            'You can only delete files from classes you are assigned to teach',
+          );
+        }
+
+        // Check if file is being used by any learning module
+        const modulesUsingFile = await this.filesService.checkFileUsageInModules(id);
+        if (modulesUsingFile.length > 0) {
+          throw new BadRequestException(
+            `Cannot delete file: It is being used by ${modulesUsingFile.length} learning module(s)`,
+          );
+        }
+
+        await this.filesService.deleteFile(id);
+        return {
+          message: 'File deleted successfully',
+        };
+      } else {
+        // For non-class/module files, teachers can only delete their own uploads
+        if (file.uploadedBy !== req.user?.id) {
+          throw new BadRequestException(
+            'You can only delete files you uploaded',
+          );
+        }
+
+        await this.filesService.deleteFile(id);
+        return {
+          message: 'File deleted successfully',
+        };
       }
     }
 
-    await this.filesService.deleteFile(id);
-
-    return {
-      message: 'File deleted successfully',
-    };
+    // If we reach here, user is not authorized
+    throw new BadRequestException('You are not authorized to delete this file');
   }
 
   @Delete('context/:contextType/:contextId')
@@ -1331,11 +1436,61 @@ export class FilesController {
   async deleteFilesByContext(
     @Param('contextType') contextType: string,
     @Param('contextId') contextId: string,
+    @Req() req: any,
   ) {
-    await this.filesService.deleteFilesByContext(contextType, contextId);
+    const userRole = req.user?.role?.name?.toLowerCase();
+    const userEmail = req.user?.email;
 
-    return {
-      message: 'All files for this context have been deleted',
-    };
+    // Admin and super admin can delete any files
+    if (userRole === 'admin' || userRole === 'superadmin') {
+      await this.filesService.deleteFilesByContext(contextType, contextId);
+      return {
+        message: 'All files for this context have been deleted',
+      };
+    }
+
+    // Teacher authorization
+    if (userRole === 'teacher') {
+      let classId: number | null = null;
+
+      // Determine the class ID based on context type
+      if (contextType === 'class') {
+        classId = parseInt(contextId, 10);
+      } else if (contextType === 'module') {
+        // For module context, get the class from the module
+        try {
+          const files = await this.filesService.getFilesByContext(contextType, contextId);
+          if (files.length > 0) {
+            classId = await this.getClassIdFromFile(files[0]);
+          }
+        } catch (error) {
+          console.error('Error getting files for module:', error);
+        }
+      }
+
+      if (classId) {
+        // Check if teacher is assigned to this class
+        const isTeacherOfClass = await this.checkTeacherOwnsClass(userEmail, classId);
+        
+        if (!isTeacherOfClass) {
+          throw new BadRequestException(
+            'You can only delete files from classes you are assigned to teach',
+          );
+        }
+
+        await this.filesService.deleteFilesByContext(contextType, contextId);
+        return {
+          message: 'All files for this context have been deleted',
+        };
+      } else {
+        // For non-class/module contexts, deny access
+        throw new BadRequestException(
+          'Teachers can only delete files associated with their assigned classes',
+        );
+      }
+    }
+
+    // If we reach here, user is not authorized
+    throw new BadRequestException('You are not authorized to delete these files');
   }
 }

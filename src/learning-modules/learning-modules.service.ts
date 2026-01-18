@@ -12,6 +12,8 @@ import { ModuleCompletionEntity } from './infrastructure/persistence/relational/
 import { AccessControlService } from '../access-control/access-control.service';
 import { FilesService } from '../files/files.service';
 import { BadRequestException } from '@nestjs/common';
+import { TeachersService } from '../teachers/teachers.service';
+import { ClassesService } from '../classes/classes.service';
 
 @Injectable()
 export class LearningModulesService {
@@ -26,6 +28,10 @@ export class LearningModulesService {
     private readonly accessControlService: AccessControlService,
     @Inject(forwardRef(() => FilesService))
     private readonly filesService: FilesService,
+    @Inject(forwardRef(() => TeachersService))
+    private readonly teachersService: TeachersService,
+    @Inject(forwardRef(() => ClassesService))
+    private readonly classesService: ClassesService,
   ) {}
 
   async list({ classId }: { classId?: number }) {
@@ -378,6 +384,72 @@ export class LearningModulesService {
       return (await this.completionRepo.findOne({
         where: { id: completion.id },
       })) as ModuleCompletionEntity;
+    }
+  }
+
+  /**
+   * Check if a teacher can modify a module (based on class assignment)
+   */
+  async canTeacherModifyModule(
+    teacherEmail: string,
+    moduleId: number,
+  ): Promise<boolean> {
+    try {
+      // Get the module
+      const module = await this.get(moduleId);
+      if (!module || !module.classId) {
+        return false;
+      }
+
+      // Get teacher by email
+      const teacher = await this.teachersService.findByEmail(teacherEmail);
+      if (!teacher) {
+        return false;
+      }
+
+      // Get class and check if teacher is assigned
+      const classEntity = await this.classesService.findById(module.classId);
+      if (!classEntity) {
+        return false;
+      }
+
+      return classEntity.teacher?.id === teacher.id;
+    } catch (error) {
+      console.error('Error checking teacher module authorization:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if a teacher can modify a section (based on class assignment)
+   */
+  async canTeacherModifySection(
+    teacherEmail: string,
+    sectionId: number,
+  ): Promise<boolean> {
+    try {
+      // Get the section
+      const section = await this.sectionRepo.findOne({ where: { id: sectionId } });
+      if (!section || !section.classId) {
+        return false;
+      }
+
+      // Get teacher by email
+      const teacher = await this.teachersService.findByEmail(teacherEmail);
+      if (!teacher) {
+        return false;
+      }
+
+      // Get class and check if teacher is assigned
+      const classEntity = await this.classesService.findById(section.classId);
+      if (!classEntity) {
+        return false;
+      }
+
+      return classEntity.teacher?.id === teacher.id;
+    } catch (error) {
+      console.error('Error checking teacher section authorization:', error);
+      return false;
     }
   }
 }
