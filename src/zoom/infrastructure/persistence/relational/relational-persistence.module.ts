@@ -6,10 +6,11 @@ import { RelationalZoomCredentialsRepository } from './repositories/zoom-credent
 import { RelationalZoomMeetingRepository } from './repositories/zoom-meeting.repository';
 import { ZoomCredentialsEntity } from './entities/zoom-credentials.entity';
 import { ZoomMeetingEntity } from './entities/zoom-meeting.entity';
+import { TeacherEntity } from '../../../../teachers/infrastructure/persistence/relational/entities/teacher.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ZoomCredentialsEntity, ZoomMeetingEntity]),
+    TypeOrmModule.forFeature([ZoomCredentialsEntity, ZoomMeetingEntity, TeacherEntity]),
   ],
   providers: [
     {

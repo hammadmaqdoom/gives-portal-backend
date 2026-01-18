@@ -57,7 +57,7 @@ import { BulkCreateClassesDto } from './dto/bulk-create-classes.dto';
 export class ClassesController {
   constructor(private readonly classesService: ClassesService) {}
 
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   create(@Body() createClassDto: CreateClassDto): Promise<Class> {
@@ -107,7 +107,7 @@ export class ClassesController {
   }
 
   @Patch(':id')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiParam({
     name: 'id',
     type: String,
@@ -126,7 +126,7 @@ export class ClassesController {
   }
 
   @Patch(':id/public-sale')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiParam({
     name: 'id',
     type: String,
@@ -145,7 +145,7 @@ export class ClassesController {
   }
 
   @Delete(':id')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiParam({
     name: 'id',
     type: String,
@@ -176,7 +176,7 @@ export class ClassesController {
   }
 
   // Bulk enroll endpoint
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @Post(':id/enrollments/bulk')
   @HttpCode(HttpStatus.CREATED)
   @ApiParam({ name: 'id', type: String, required: true })
@@ -190,7 +190,7 @@ export class ClassesController {
   }
 
   @Post('bulk-create')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({
     summary: 'Bulk create classes from JSON data',
     description: 'Send an array of class objects to bulk create classes',
