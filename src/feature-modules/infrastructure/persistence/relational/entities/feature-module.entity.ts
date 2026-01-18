@@ -19,13 +19,13 @@ export class FeatureModuleEntity extends EntityRelationalHelper {
   @Column({ type: 'varchar', length: 100, unique: true })
   name: string;
 
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar', length: 255, name: 'display_name' })
   displayName: string;
 
   @Column({ type: 'text', nullable: true })
   description: string | null;
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ type: 'boolean', default: true, name: 'is_enabled' })
   isEnabled: boolean;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
@@ -35,10 +35,10 @@ export class FeatureModuleEntity extends EntityRelationalHelper {
   category: string;
 
   @Index()
-  @Column({ type: 'varchar', length: 20, default: 'feature' })
+  @Column({ type: 'varchar', length: 20, default: 'feature', name: 'module_type' })
   moduleType: 'feature' | 'settings_tab';
 
-  @Column({ type: 'integer', default: 0 })
+  @Column({ type: 'integer', default: 0, name: 'sort_order' })
   sortOrder: number;
 
   @CreateDateColumn()

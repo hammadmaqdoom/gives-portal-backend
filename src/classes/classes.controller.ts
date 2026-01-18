@@ -65,7 +65,7 @@ export class ClassesController {
   }
 
   @Get()
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOkResponse({
     type: InfinityPaginationResponseDto,
   })
@@ -91,7 +91,7 @@ export class ClassesController {
   }
 
   @Get(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiParam({
     name: 'id',
     type: String,
@@ -166,6 +166,7 @@ export class ClassesController {
 
   // New enrollment endpoint
   @Get(':id/enrollments')
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @HttpCode(HttpStatus.OK)
   @ApiParam({ name: 'id', type: String, required: true })
   @ApiOkResponse({

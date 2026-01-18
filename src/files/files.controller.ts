@@ -118,7 +118,7 @@ export class FilesController {
     },
   })
   @UseInterceptors(FilesInterceptor('files', 10))
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async uploadAssignmentFiles(
     @UploadedFiles(
       new ParseFilePipe({
@@ -186,7 +186,7 @@ export class FilesController {
     },
   })
   @UseInterceptors(FilesInterceptor('files', 10))
-  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async uploadSubmissionFiles(
     @UploadedFiles(
       new ParseFilePipe({
@@ -254,7 +254,7 @@ export class FilesController {
     },
   })
   @UseInterceptors(FilesInterceptor('files', 10))
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async uploadModuleFiles(
     @UploadedFiles(
       new ParseFilePipe({
@@ -321,7 +321,7 @@ export class FilesController {
     },
   })
   @UseInterceptors(FileInterceptor('file'))
-  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async uploadProfilePicture(
     @UploadedFile(
       new ParseFilePipe({
@@ -382,7 +382,7 @@ export class FilesController {
     },
   })
   @UseInterceptors(FileInterceptor('file'))
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async uploadCourseThumbnail(
     @UploadedFile(
       new ParseFilePipe({
@@ -443,7 +443,7 @@ export class FilesController {
     },
   })
   @UseInterceptors(FileInterceptor('file'))
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async uploadCourseCover(
     @UploadedFile(
       new ParseFilePipe({
@@ -504,7 +504,7 @@ export class FilesController {
     },
   })
   @UseInterceptors(FileInterceptor('file'))
-  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async uploadFile(
     @UploadedFile(
       new ParseFilePipe({
@@ -566,7 +566,7 @@ export class FilesController {
     },
   })
   @UseInterceptors(FileInterceptor('file'))
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async uploadClassVideo(
     @UploadedFile(
       new ParseFilePipe({
@@ -615,7 +615,7 @@ export class FilesController {
   @Get('class/:classId')
   @ApiOperation({ summary: 'Get all files for a class' })
   @ApiParam({ name: 'classId', description: 'Class ID' })
-  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.user, RoleEnum.superAdmin)
   async getClassFiles(@Param('classId') classId: string, @Req() req: any) {
     const files = await this.filesService.getFilesByClass(Number(classId));
 
@@ -623,7 +623,7 @@ export class FilesController {
     const user = req.user;
     const userRole = user?.role?.name?.toLowerCase();
 
-    if (userRole !== 'admin' && userRole !== 'teacher') {
+    if (userRole !== 'admin' && userRole !== 'teacher' && userRole !== 'superadmin') {
       // For students, check if they have access to the class
       if (userRole === 'user' || !userRole) {
         const studentId = user?.id;
@@ -670,6 +670,7 @@ export class FilesController {
     description: 'Context type (assignment, submission, module)',
   })
   @ApiParam({ name: 'contextId', description: 'Context ID' })
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async getFilesByContext(
     @Param('contextType') contextType: string,
     @Param('contextId') contextId: string,
@@ -706,6 +707,7 @@ export class FilesController {
   @Get('by-path')
   @ApiOperation({ summary: 'Get file by path (for backward compatibility)' })
   @ApiParam({ name: 'path', description: 'File path' })
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async getFileByPath(@Query('path') filePath: string) {
     try {
       console.log(`Looking for file with path: ${filePath}`);
@@ -768,7 +770,8 @@ export class FilesController {
   @Get('serve/:id')
   @ApiOperation({ summary: 'Serve file content by ID' })
   @ApiParam({ name: 'id', description: 'File ID' })
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async serveFile(@Param('id') id: string, @Req() req: any, @Res() res: any) {
     try {
       const file = await this.filesService.getFileById(id);
@@ -782,8 +785,8 @@ export class FilesController {
         const user = req.user;
         const userRole = user?.role?.name?.toLowerCase();
 
-        // Admins and teachers always have access
-        if (userRole !== 'admin' && userRole !== 'teacher') {
+        // Admins, teachers, and super admins always have access
+        if (userRole !== 'admin' && userRole !== 'teacher' && userRole !== 'superadmin') {
           // For students, check if they have access to the class
           if (userRole === 'user' || !userRole) {
             const studentId = user?.id;
@@ -943,6 +946,7 @@ export class FilesController {
   @Get('serve/payment-proofs/:filename')
   @ApiOperation({ summary: 'Serve payment proof file by filename' })
   @ApiParam({ name: 'filename', description: 'Payment proof filename' })
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async servePaymentProofFile(
     @Param('filename') filename: string,
     @Res() res: any,
@@ -1010,6 +1014,7 @@ export class FilesController {
 
   @Get()
   @ApiOperation({ summary: 'Get all files with pagination and filters' })
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async getAllFiles(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
@@ -1108,6 +1113,7 @@ export class FilesController {
 
   @Get('stats')
   @ApiOperation({ summary: 'Get file statistics' })
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async getFileStats() {
     const files = await this.filesService.getAllFiles();
 
@@ -1148,6 +1154,7 @@ export class FilesController {
 
   @Get('debug/count')
   @ApiOperation({ summary: 'Get total file count for debugging' })
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async getFileCount() {
     console.log('Debug: Getting file count');
     const allFiles = await this.filesService.getAllFiles();
@@ -1179,6 +1186,7 @@ export class FilesController {
   @Get(':id/download')
   @ApiOperation({ summary: 'Download file by ID' })
   @ApiParam({ name: 'id', description: 'File ID' })
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async downloadFile(@Param('id') id: string, @Res() res: any) {
     const file = await this.filesService.getFileById(id);
     if (!file) {
@@ -1228,6 +1236,7 @@ export class FilesController {
   @Get(':id')
   @ApiOperation({ summary: 'Get file by ID' })
   @ApiParam({ name: 'id', description: 'File ID' })
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async getFileById(@Param('id') id: string) {
     const file = await this.filesService.getFileById(id);
     if (!file) {
@@ -1251,7 +1260,7 @@ export class FilesController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a file' })
   @ApiParam({ name: 'id', description: 'File ID' })
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async deleteFile(@Param('id') id: string, @Req() req: any) {
     const file = await this.filesService.getFileById(id);
     if (!file) {
@@ -1259,9 +1268,11 @@ export class FilesController {
     }
 
     // Check if user can delete this file
+    const userRole = req.user?.role?.name?.toLowerCase();
     if (
       file.uploadedBy !== req.user?.id &&
-      req.user?.role?.name !== RoleEnum.admin
+      userRole !== 'admin' &&
+      userRole !== 'superadmin'
     ) {
       throw new BadRequestException('You can only delete your own files');
     }
@@ -1291,7 +1302,7 @@ export class FilesController {
   @ApiOperation({ summary: 'Delete all files for a context' })
   @ApiParam({ name: 'contextType', description: 'Context type' })
   @ApiParam({ name: 'contextId', description: 'Context ID' })
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async deleteFilesByContext(
     @Param('contextType') contextType: string,
     @Param('contextId') contextId: string,

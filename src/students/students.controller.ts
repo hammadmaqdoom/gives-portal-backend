@@ -64,7 +64,7 @@ export class StudentsController {
   @Get('me')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.user)
+  @Roles(RoleEnum.user, RoleEnum.superAdmin)
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Current user student profile retrieved successfully',
@@ -117,8 +117,8 @@ export class StudentsController {
 
   @Get()
   @ApiBearerAuth()
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user, RoleEnum.teacher)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Students retrieved successfully',
