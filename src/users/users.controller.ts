@@ -69,24 +69,37 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   async findAll(
     @Query() query: QueryUserDto,
-  ): Promise<InfinityPaginationResponseDto<User>> {
+    @Query('search') search?: string,
+  ): Promise<InfinityPaginationResponseDto<User> & { meta?: { total: number; page: number; limit: number } }> {
     const page = query?.page ?? 1;
     let limit = query?.limit ?? 10;
     if (limit > 50) {
       limit = 50;
     }
 
-    return infinityPagination(
-      await this.usersService.findManyWithPagination({
-        filterOptions: query?.filters,
-        sortOptions: query?.sort,
-        paginationOptions: {
-          page,
-          limit,
-        },
-      }),
-      { page, limit },
-    );
+    // Merge top-level search parameter with filter DTO (prioritize top-level)
+    const filterOptions = {
+      ...query?.filters,
+      search: search || query?.filters?.search,
+    };
+
+    const result = await this.usersService.findManyWithPagination({
+      filterOptions,
+      sortOptions: query?.sort,
+      paginationOptions: {
+        page,
+        limit,
+      },
+    });
+
+    return {
+      ...infinityPagination(result.data, { page, limit }),
+      meta: {
+        total: result.total,
+        page,
+        limit,
+      },
+    };
   }
 
   @ApiOkResponse({

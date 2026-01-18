@@ -128,6 +128,8 @@ export class SettingsService {
     azureContainerName?: string | null;
     azureBlobSasExpirySeconds?: number | null;
     azureBlobPublicBaseUrl?: string | null;
+    b2EndpointUrl?: string | null;
+    b2Region?: string | null;
   }> {
     const s = await this.getSettingsOrCreate();
     return {
@@ -141,6 +143,8 @@ export class SettingsService {
       azureContainerName: (s as any).azureContainerName,
       azureBlobSasExpirySeconds: (s as any).azureBlobSasExpirySeconds ?? null,
       azureBlobPublicBaseUrl: (s as any).azureBlobPublicBaseUrl,
+      b2EndpointUrl: (s as any).b2EndpointUrl,
+      b2Region: (s as any).b2Region,
     };
   }
 
