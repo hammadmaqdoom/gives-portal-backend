@@ -406,4 +406,112 @@ export class CreateSettingsDto {
   @IsOptional()
   @IsBoolean()
   zoomAdminAccess?: boolean;
+
+  // Video Content Protection Settings
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Enable video content protection features',
+  })
+  @IsOptional()
+  @IsBoolean()
+  contentProtectionEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Block DevTools access during video playback',
+  })
+  @IsOptional()
+  @IsBoolean()
+  blockDevTools?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Block keyboard shortcuts like F12, Ctrl+U, etc.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  blockKeyboardShortcuts?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Block right-click context menu on video',
+  })
+  @IsOptional()
+  @IsBoolean()
+  blockRightClick?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Block text selection on video content area',
+  })
+  @IsOptional()
+  @IsBoolean()
+  blockTextSelection?: boolean;
+
+  @ApiPropertyOptional({
+    example: 'warn',
+    description: 'Action to take on protection violation: warn | redirect | log',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  protectionAction?: string;
+
+  // Video Watermark Settings
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Enable watermark overlay on videos',
+  })
+  @IsOptional()
+  @IsBoolean()
+  watermarkEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Show institution name in watermark',
+  })
+  @IsOptional()
+  @IsBoolean()
+  watermarkShowInstitution?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Show instructor name in watermark',
+  })
+  @IsOptional()
+  @IsBoolean()
+  watermarkShowInstructor?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Show student email in watermark',
+  })
+  @IsOptional()
+  @IsBoolean()
+  watermarkShowStudentEmail?: boolean;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Show student ID in watermark',
+  })
+  @IsOptional()
+  @IsBoolean()
+  watermarkShowStudentId?: boolean;
+
+  @ApiPropertyOptional({
+    example: 0.4,
+    description: 'Watermark opacity (0.2 - 0.6)',
+  })
+  @IsOptional()
+  @IsNumber()
+  watermarkOpacity?: number;
+
+  @ApiPropertyOptional({
+    example: 'random',
+    description: 'Watermark position mode: random | fixed-corner | center',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  watermarkPosition?: string;
 }
