@@ -44,9 +44,9 @@ import { PaymentTransactionRepositoryImpl } from './infrastructure/persistence/r
     forwardRef(() => InvoicesModule),
     forwardRef(() => StudentsModule),
     forwardRef(() => ParentsModule),
-    FilesModule,
-    SettingsModule,
-    FeatureModulesModule,
+    forwardRef(() => FilesModule),
+    forwardRef(() => SettingsModule),
+    forwardRef(() => FeatureModulesModule),
   ],
   controllers: [
     PaymentGatewaysController,
