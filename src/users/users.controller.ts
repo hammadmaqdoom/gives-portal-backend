@@ -69,6 +69,7 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   async findAll(
     @Query() query: QueryUserDto,
+    @Query('search') search?: string,
   ): Promise<InfinityPaginationResponseDto<User> & { meta?: { total: number; page: number; limit: number } }> {
     const page = query?.page ?? 1;
     let limit = query?.limit ?? 10;
@@ -76,8 +77,14 @@ export class UsersController {
       limit = 50;
     }
 
+    // Merge top-level search parameter with filter DTO (prioritize top-level)
+    const filterOptions = {
+      ...query?.filters,
+      search: search || query?.filters?.search,
+    };
+
     const result = await this.usersService.findManyWithPagination({
-      filterOptions: query?.filters,
+      filterOptions,
       sortOptions: query?.sort,
       paginationOptions: {
         page,
