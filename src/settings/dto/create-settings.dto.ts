@@ -285,6 +285,19 @@ export class CreateSettingsDto {
   @IsString()
   azureBlobPublicBaseUrl?: string;
 
+  // Backblaze B2
+  @ApiPropertyOptional({ example: 'https://s3.us-west-001.backblazeb2.com' })
+  @IsOptional()
+  @IsUrl()
+  @MaxLength(500)
+  b2EndpointUrl?: string;
+
+  @ApiPropertyOptional({ example: 'us-west-001' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  b2Region?: string;
+
   // SMS Configuration
   @ApiPropertyOptional({ example: false })
   @IsOptional()

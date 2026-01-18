@@ -21,11 +21,11 @@ import { MailModule } from '../mail/mail.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([StudentEntity, StudentClassEnrollmentEntity]),
-    FilesModule,
-    UsersModule,
-    NotificationModule,
-    CurrencyModule,
-    MailModule,
+    forwardRef(() => FilesModule),
+    forwardRef(() => UsersModule),
+    forwardRef(() => NotificationModule),
+    forwardRef(() => CurrencyModule),
+    forwardRef(() => MailModule),
     forwardRef(() => ParentsModule),
     forwardRef(() => InvoicesModule),
     forwardRef(() => ClassesModule),
