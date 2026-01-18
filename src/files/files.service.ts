@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FileRepository } from './infrastructure/persistence/relational/repositories/file.repository';
 import { File } from './domain/file';
@@ -7,6 +7,9 @@ import {
   FileUploadContext,
   UploadedFileInfo,
 } from './file-storage.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { LearningModuleEntity } from '../learning-modules/infrastructure/persistence/relational/entities/learning-module.entity';
 
 @Injectable()
 export class FilesService {
@@ -14,6 +17,8 @@ export class FilesService {
     private readonly fileRepository: FileRepository,
     private readonly fileStorageService: FileStorageService,
     private readonly configService: ConfigService,
+    @InjectRepository(LearningModuleEntity)
+    private readonly learningModuleRepo: Repository<LearningModuleEntity>,
   ) {}
 
   /**
@@ -197,5 +202,42 @@ export class FilesService {
    */
   async updateFile(id: string, fileData: Partial<File>): Promise<File | null> {
     return this.fileRepository.update(id, fileData);
+  }
+
+  /**
+   * Get files by class ID
+   */
+  async getFilesByClass(classId: number): Promise<File[]> {
+    return this.getFilesByContext('class', classId.toString());
+  }
+
+  /**
+   * Delete a class file
+   */
+  async deleteClassFile(fileId: string, classId: number): Promise<void> {
+    const file = await this.fileRepository.findById(fileId);
+    if (!file) {
+      throw new BadRequestException('File not found');
+    }
+
+    // Verify the file belongs to the specified class
+    if (file.contextType !== 'class' || file.contextId !== classId.toString()) {
+      throw new BadRequestException('File does not belong to this class');
+    }
+
+    // Delete from storage
+    await this.fileStorageService.deleteFile(file.path);
+
+    // Delete from database
+    await this.fileRepository.delete(fileId);
+  }
+
+  /**
+   * Check if a file is being used by any learning modules
+   */
+  async checkFileUsageInModules(fileId: string): Promise<LearningModuleEntity[]> {
+    return this.learningModuleRepo.find({
+      where: { videoFileId: fileId },
+    });
   }
 }
