@@ -22,6 +22,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiOperation,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../roles/roles.guard';
@@ -56,7 +57,7 @@ export class PaymentTransactionsController {
   ) {}
 
   @Post('create-session')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Create payment session' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -237,7 +238,7 @@ export class PaymentTransactionsController {
   }
 
   @Get()
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({ summary: 'Get payment transactions' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -274,7 +275,7 @@ export class PaymentTransactionsController {
 
   // Admin-friendly flat response for dashboard tables
   @Get('admin/flat')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({
     summary: 'Get payment transactions (flat view for dashboard)',
   })
@@ -334,11 +335,18 @@ export class PaymentTransactionsController {
     description: 'My payment transactions retrieved successfully',
     type: [PaymentTransaction],
   })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'startDate', required: false, type: String })
+  @ApiQuery({ name: 'endDate', required: false, type: String })
   async getMyTransactions(
     @Request() req: any,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
     @Query('status') status?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ): Promise<{
     data: PaymentTransaction[];
     meta: {
@@ -360,11 +368,13 @@ export class PaymentTransactionsController {
       page,
       limit,
       status,
+      startDate,
+      endDate,
     });
   }
 
   @Get(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Get payment transaction by ID' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -378,7 +388,7 @@ export class PaymentTransactionsController {
   }
 
   @Patch(':id/refund')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({ summary: 'Refund payment transaction' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -521,7 +531,7 @@ export class PaymentTransactionsController {
   }
 
   @Post('cleanup-expired')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Clean up expired pending transactions' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -533,7 +543,7 @@ export class PaymentTransactionsController {
   }
 
   @Post('verify-payment')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Verify payment completion using tracker' })
   @ApiResponse({ status: 200, description: 'Payment verification result' })
   async verifyPayment(
@@ -565,7 +575,7 @@ export class PaymentTransactionsController {
   }
 
   @Post('bank-transfer')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Create bank transfer payment' })
   @ApiResponse({
@@ -665,7 +675,7 @@ export class PaymentTransactionsController {
   }
 
   @Patch(':id/status')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({
     summary: 'Manually update bank-transfer transaction status (paid/unpaid)',
   })

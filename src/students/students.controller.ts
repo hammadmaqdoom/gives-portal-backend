@@ -64,7 +64,7 @@ export class StudentsController {
   @Get('me')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.user)
+  @Roles(RoleEnum.user, RoleEnum.superAdmin)
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Current user student profile retrieved successfully',
@@ -95,7 +95,7 @@ export class StudentsController {
   @Post()
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'Student created successfully',
@@ -117,24 +117,31 @@ export class StudentsController {
 
   @Get()
   @ApiBearerAuth()
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user, RoleEnum.teacher)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin, RoleEnum.user)
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Students retrieved successfully',
     type: [StudentResponseDto],
   })
   findAll(
-    @Query() filterStudentDto: FilterStudentDto,
-    @Query() sortStudentDto: SortStudentDto,
-    @Query() paginationOptionsDto: PaginationOptionsDto,
+    @Query('search') search?: string,
+    @Query() filterStudentDto?: FilterStudentDto,
+    @Query() sortStudentDto?: SortStudentDto,
+    @Query() paginationOptionsDto?: PaginationOptionsDto,
   ) {
+    // Merge top-level search parameter with filter DTO (prioritize top-level)
+    const filterOptions = {
+      ...filterStudentDto,
+      search: search || filterStudentDto?.search,
+    };
+
     return this.studentsService.findManyWithPagination({
-      filterOptions: filterStudentDto,
+      filterOptions,
       sortOptions: sortStudentDto ? [sortStudentDto] : null,
       paginationOptions: {
-        page: paginationOptionsDto.page,
-        limit: paginationOptionsDto.limit,
+        page: paginationOptionsDto?.page || 1,
+        limit: paginationOptionsDto?.limit || 10,
       },
       includeRelations: true,
     });
@@ -143,7 +150,7 @@ export class StudentsController {
   @Get('debug/all')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Debug: List all students',
@@ -191,7 +198,7 @@ export class StudentsController {
   @Get('enrollments/all')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'All enrollments retrieved successfully',
@@ -209,7 +216,7 @@ export class StudentsController {
   @Get('enrollments/stats')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Enrollment statistics retrieved successfully',
@@ -221,7 +228,7 @@ export class StudentsController {
   @Get('classes/:classId/enrollment-history')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Class enrollment history retrieved successfully',
@@ -233,7 +240,7 @@ export class StudentsController {
   @Get(':id')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Student retrieved successfully',
@@ -246,7 +253,7 @@ export class StudentsController {
   @Get(':id/details')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Student with details retrieved successfully',
@@ -259,7 +266,7 @@ export class StudentsController {
   @Patch(':id')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Student updated successfully',
@@ -272,7 +279,7 @@ export class StudentsController {
   @Delete(':id')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiResponse({
     status: HttpStatus.NO_CONTENT,
@@ -286,7 +293,7 @@ export class StudentsController {
   @Post(':id/enrollments')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'Student enrolled in class successfully',
@@ -302,7 +309,7 @@ export class StudentsController {
   @Patch(':id/enrollments/:classId')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Enrollment updated successfully',
@@ -323,7 +330,7 @@ export class StudentsController {
   @Delete(':id/enrollments/:classId')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiResponse({
     status: HttpStatus.NO_CONTENT,
@@ -336,7 +343,7 @@ export class StudentsController {
   @Get(':id/enrollments')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Student enrollments retrieved successfully',
@@ -349,7 +356,7 @@ export class StudentsController {
   @Get(':id/enrollment-history')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Student enrollment history retrieved successfully',
@@ -361,7 +368,7 @@ export class StudentsController {
   @Post(':id/enrollments/bulk')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'Student enrolled in multiple classes successfully',
@@ -383,7 +390,7 @@ export class StudentsController {
   @Post('link-to-user/:studentId/:userId')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Link a student to a user account' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -399,7 +406,7 @@ export class StudentsController {
   @Post('auto-link-students')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({
     summary: 'Automatically link all students to their user accounts by email',
   })
@@ -414,7 +421,7 @@ export class StudentsController {
   @Post('bulk-enroll')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({
     summary: 'Bulk enroll students from Excel/CSV file',
     description:
