@@ -379,4 +379,31 @@ export class CreateSettingsDto {
   @IsString()
   @MaxLength(7)
   themeCustomColor?: string;
+
+  // Zoom Configuration
+  @ApiPropertyOptional({
+    example: 'your_zoom_client_id',
+    description: 'Zoom OAuth Client ID for app-level integration',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  zoomClientId?: string;
+
+  @ApiPropertyOptional({
+    example: 'your_zoom_client_secret',
+    description: 'Zoom OAuth Client Secret for app-level integration',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  zoomClientSecret?: string;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Allow admins to access and configure Zoom settings (superadmin always has access)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  zoomAdminAccess?: boolean;
 }
