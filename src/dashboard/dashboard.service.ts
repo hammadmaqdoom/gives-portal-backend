@@ -11,6 +11,8 @@ import { AssignmentEntity } from '../assignments/infrastructure/persistence/rela
 import { SubmissionEntity } from '../assignments/infrastructure/persistence/relational/entities/submission.entity';
 import { ParentEntity } from '../parents/infrastructure/persistence/relational/entities/parent.entity';
 import { StudentClassEnrollmentEntity } from '../students/infrastructure/persistence/relational/entities/student-class-enrollment.entity';
+import { UserEntity } from '../users/infrastructure/persistence/relational/entities/user.entity';
+import { FileEntity } from '../files/infrastructure/persistence/relational/entities/file.entity';
 import { AttendanceStatus } from '../attendance/domain/attendance';
 import { PaymentStatus } from '../fees/domain/fee';
 import { AssignmentStatus } from '../assignments/domain/assignment';
@@ -25,8 +27,12 @@ import {
   StudentAnalyticsDto,
 } from './dto/student-dashboard.dto';
 import { ParentStatsDto, ParentAnalyticsDto } from './dto/parent-dashboard.dto';
+import { SuperAdminStatsDto } from './dto/super-admin-dashboard.dto';
 import { CurrencyService } from '../currency/currency.service';
 import { SettingsService } from '../settings/settings.service';
+import { ConfigService } from '@nestjs/config';
+import { RoleEnum } from '../roles/roles.enum';
+import { FileDriver } from '../files/config/file-config.type';
 
 @Injectable()
 export class DashboardService {
@@ -51,8 +57,13 @@ export class DashboardService {
     private parentRepository: Repository<ParentEntity>,
     @InjectRepository(StudentClassEnrollmentEntity)
     private enrollmentRepository: Repository<StudentClassEnrollmentEntity>,
+    @InjectRepository(UserEntity)
+    private userRepository: Repository<UserEntity>,
+    @InjectRepository(FileEntity)
+    private fileRepository: Repository<FileEntity>,
     private readonly currencyService: CurrencyService,
     private readonly settingsService: SettingsService,
+    private readonly configService: ConfigService,
   ) {}
 
   async getAdminStats(): Promise<AdminStatsDto> {
@@ -794,5 +805,153 @@ export class DashboardService {
       amount: parseFloat(item.amount),
       status: item.status,
     }));
+  }
+
+  // Super Admin Dashboard Methods
+  async getSuperAdminStats(): Promise<SuperAdminStatsDto> {
+    const [
+      userBreakdown,
+      storageStats,
+      systemHealth,
+      totalClasses,
+      totalParents,
+      totalRevenue,
+      pendingFees,
+    ] = await Promise.all([
+      this.getUserRoleBreakdown(),
+      this.getStorageStats(),
+      this.getSystemHealth(),
+      this.classRepository.count(),
+      this.parentRepository.count(),
+      this.getTotalRevenue(),
+      this.getPendingFees(),
+    ]);
+
+    return {
+      userBreakdown,
+      storageStats,
+      systemHealth,
+      totalClasses,
+      totalParents,
+      totalRevenue,
+      pendingFees,
+    };
+  }
+
+  private async getUserRoleBreakdown() {
+    const [
+      totalUsers,
+      students,
+      teachers,
+      admins,
+      superAdmins,
+    ] = await Promise.all([
+      this.userRepository.count(),
+      this.userRepository.count({
+        where: { role: { id: RoleEnum.user } },
+      }),
+      this.userRepository.count({
+        where: { role: { id: RoleEnum.teacher } },
+      }),
+      this.userRepository.count({
+        where: { role: { id: RoleEnum.admin } },
+      }),
+      this.userRepository.count({
+        where: { role: { id: RoleEnum.superAdmin } },
+      }),
+    ]);
+
+    return {
+      totalUsers,
+      students,
+      teachers,
+      admins,
+      superAdmins,
+    };
+  }
+
+  private async getStorageStats() {
+    try {
+      const result = await this.fileRepository
+        .createQueryBuilder('file')
+        .select('SUM(file.size)', 'totalSize')
+        .addSelect('COUNT(file.id)', 'totalFiles')
+        .where('file.deletedAt IS NULL')
+        .getRawOne();
+
+      const totalStorageBytes = parseInt(result?.totalSize || '0', 10);
+      const totalFiles = parseInt(result?.totalFiles || '0', 10);
+
+      // Format storage size
+      const formatBytes = (bytes: number): string => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+      };
+
+      // Get storage provider from config
+      const fileDriver = this.configService.get<FileDriver>('file.driver', { infer: true }) || FileDriver.LOCAL;
+      let storageProvider = 'LOCAL';
+      
+      if (fileDriver === FileDriver.S3 || fileDriver === FileDriver.S3_PRESIGNED) {
+        storageProvider = 'S3';
+      } else if (fileDriver === FileDriver.B2 || fileDriver === FileDriver.B2_PRESIGNED) {
+        storageProvider = 'B2';
+      } else if (fileDriver === FileDriver.AZURE_BLOB_SAS) {
+        storageProvider = 'Azure Blob';
+      }
+
+      return {
+        totalStorageBytes,
+        totalStorageFormatted: formatBytes(totalStorageBytes),
+        totalFiles,
+        storageProvider,
+      };
+    } catch (error) {
+      // Return defaults if there's an error
+      return {
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 Bytes',
+        totalFiles: 0,
+        storageProvider: 'Unknown',
+      };
+    }
+  }
+
+  private async getSystemHealth() {
+    try {
+      // Check database connection by running a simple query
+      await this.userRepository.count();
+      const databaseConnected = true;
+
+      // Check storage by checking if we can query files
+      await this.fileRepository.count();
+      const storageConnected = true;
+
+      // Determine overall health status
+      let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
+      let message = 'All systems operational';
+
+      if (!databaseConnected || !storageConnected) {
+        status = 'unhealthy';
+        message = 'Some systems are experiencing issues';
+      }
+
+      return {
+        status,
+        databaseConnected,
+        storageConnected,
+        message,
+      };
+    } catch (error) {
+      return {
+        status: 'unhealthy' as const,
+        databaseConnected: false,
+        storageConnected: false,
+        message: 'System health check failed',
+      };
+    }
   }
 }

@@ -26,8 +26,8 @@ const infrastructure = [
 @Module({
   imports: [
     TypeOrmModule.forFeature([ParentEntity, ParentStudentEntity]),
-    UsersModule,
-    MailModule,
+    forwardRef(() => UsersModule),
+    forwardRef(() => MailModule),
     forwardRef(() => StudentsModule),
   ],
   providers: [ParentsService, ...infrastructure],
