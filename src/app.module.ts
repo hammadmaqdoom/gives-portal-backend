@@ -38,6 +38,7 @@ import { PublicModule } from './public/public.module';
 import { CartModule } from './cart/cart.module';
 import { CheckoutModule } from './checkout/checkout.module';
 import { AccessControlModule } from './access-control/access-control.module';
+import { FeatureModulesModule } from './feature-modules/feature-modules.module';
 import { AppDataSource } from './database/data-source';
 import authConfig from './auth/config/auth.config';
 import { DataSource, DataSourceOptions } from 'typeorm';
@@ -105,6 +106,7 @@ import sentryConfig from './config/sentry.config';
     CartModule,
     CheckoutModule,
     AccessControlModule,
+    FeatureModulesModule,
   ],
 })
 export class AppModule {}

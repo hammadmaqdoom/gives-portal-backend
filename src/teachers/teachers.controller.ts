@@ -86,7 +86,7 @@ export class TeachersController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -97,7 +97,7 @@ export class TeachersController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Post(':id/reset-password')
   @HttpCode(HttpStatus.OK)
@@ -113,7 +113,7 @@ export class TeachersController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get(':id/check-user-account')
   @ApiParam({
@@ -130,7 +130,7 @@ export class TeachersController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get()
   @ApiOkResponse({
@@ -158,7 +158,7 @@ export class TeachersController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get(':id')
   @ApiParam({
@@ -176,7 +176,7 @@ export class TeachersController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Patch(':id')
   @ApiParam({
@@ -201,7 +201,7 @@ export class TeachersController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Delete(':id')
   @ApiParam({
@@ -216,7 +216,7 @@ export class TeachersController {
   @Post('bulk-create')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({
     summary: 'Bulk create teachers from Excel/CSV file',
     description:

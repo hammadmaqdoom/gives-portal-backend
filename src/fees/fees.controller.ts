@@ -48,14 +48,14 @@ export class FeesController {
   constructor(private readonly feesService: FeesService) {}
 
   @Post()
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @HttpCode(HttpStatus.CREATED)
   create(@Body() createFeeDto: CreateFeeDto): Promise<Fee> {
     return this.feesService.create(createFeeDto);
   }
 
   @Get()
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOkResponse({
     type: InfinityPaginationResponseDto,
   })
@@ -81,7 +81,7 @@ export class FeesController {
   }
 
   @Get('student/:studentId')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiParam({
     name: 'studentId',
     type: String,
@@ -254,7 +254,7 @@ export class FeesController {
   }
 
   @Delete(':id')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiParam({
     name: 'id',
     type: String,
@@ -266,7 +266,7 @@ export class FeesController {
 
   // Additional endpoints for frontend compatibility
   @Get('student/:studentId/payments')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiParam({
     name: 'studentId',
     type: String,
@@ -282,7 +282,7 @@ export class FeesController {
   }
 
   @Get('reports')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOkResponse({
     type: DiscountAnalyticsDto,
   })

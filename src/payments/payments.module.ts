@@ -18,6 +18,7 @@ import { StudentsModule } from '../students/students.module';
 import { ParentsModule } from '../parents/parents.module';
 import { FilesModule } from '../files/files.module';
 import { SettingsModule } from '../settings/settings.module';
+import { FeatureModulesModule } from '../feature-modules/feature-modules.module';
 
 // Entities
 import { PaymentGatewayEntity } from './infrastructure/persistence/relational/entities/payment-gateway.entity';
@@ -43,8 +44,9 @@ import { PaymentTransactionRepositoryImpl } from './infrastructure/persistence/r
     forwardRef(() => InvoicesModule),
     forwardRef(() => StudentsModule),
     forwardRef(() => ParentsModule),
-    FilesModule,
-    SettingsModule,
+    forwardRef(() => FilesModule),
+    forwardRef(() => SettingsModule),
+    forwardRef(() => FeatureModulesModule),
   ],
   controllers: [
     PaymentGatewaysController,
