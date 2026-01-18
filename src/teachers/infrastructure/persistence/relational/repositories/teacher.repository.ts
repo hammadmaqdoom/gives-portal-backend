@@ -62,6 +62,14 @@ export class TeachersRelationalRepository implements TeacherRepository {
   }): Promise<Teacher[]> {
     const queryBuilder = this.teachersRepository.createQueryBuilder('teacher');
 
+    // Add unified search filter
+    if (filterOptions?.search) {
+      queryBuilder.andWhere(
+        '(teacher.name ILIKE :search OR teacher.email ILIKE :search OR teacher.phone ILIKE :search)',
+        { search: `%${filterOptions.search}%` },
+      );
+    }
+
     if (filterOptions?.name) {
       queryBuilder.andWhere('teacher.name ILIKE :name', {
         name: `%${filterOptions.name}%`,

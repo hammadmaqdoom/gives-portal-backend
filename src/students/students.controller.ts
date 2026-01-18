@@ -125,16 +125,23 @@ export class StudentsController {
     type: [StudentResponseDto],
   })
   findAll(
-    @Query() filterStudentDto: FilterStudentDto,
-    @Query() sortStudentDto: SortStudentDto,
-    @Query() paginationOptionsDto: PaginationOptionsDto,
+    @Query('search') search?: string,
+    @Query() filterStudentDto?: FilterStudentDto,
+    @Query() sortStudentDto?: SortStudentDto,
+    @Query() paginationOptionsDto?: PaginationOptionsDto,
   ) {
+    // Merge top-level search parameter with filter DTO (prioritize top-level)
+    const filterOptions = {
+      ...filterStudentDto,
+      search: search || filterStudentDto?.search,
+    };
+
     return this.studentsService.findManyWithPagination({
-      filterOptions: filterStudentDto,
+      filterOptions,
       sortOptions: sortStudentDto ? [sortStudentDto] : null,
       paginationOptions: {
-        page: paginationOptionsDto.page,
-        limit: paginationOptionsDto.limit,
+        page: paginationOptionsDto?.page || 1,
+        limit: paginationOptionsDto?.limit || 10,
       },
       includeRelations: true,
     });
