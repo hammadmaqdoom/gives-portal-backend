@@ -40,6 +40,9 @@ export class LearningModuleEntity extends EntityRelationalHelper {
   @Column({ type: String, nullable: true })
   videoUrl?: string | null;
 
+  @Column({ type: String, nullable: true, name: 'video_file_id' })
+  videoFileId?: string | null;
+
   @Column({ type: 'jsonb', nullable: true })
   attachments?: any;
 

@@ -38,6 +38,10 @@ import { FileStorageService, FileUploadContext } from './file-storage.service';
 import { FileDriver } from './config/file-config.type';
 import { User } from '../users/domain/user';
 import * as path from 'path';
+import { AccessControlService } from '../access-control/access-control.service';
+import { ClassesService } from '../classes/classes.service';
+import { StudentsService } from '../students/students.service';
+import { TeachersService } from '../teachers/teachers.service';
 
 @ApiTags('File Management')
 @ApiBearerAuth()
@@ -51,6 +55,10 @@ export class FilesController {
     private readonly filesService: FilesService,
     private readonly fileStorageService: FileStorageService,
     private readonly configService: ConfigService,
+    private readonly accessControlService: AccessControlService,
+    private readonly classesService: ClassesService,
+    private readonly studentsService: StudentsService,
+    private readonly teachersService: TeachersService,
   ) {}
 
   /**
@@ -62,6 +70,66 @@ export class FilesController {
     const host = process.env.HOST || 'localhost';
     const port = process.env.PORT || '3000';
     return `${protocol}://${host}:${port}`;
+  }
+
+  /**
+   * Check if a teacher is assigned to a class
+   */
+  private async checkTeacherOwnsClass(
+    teacherEmail: string,
+    classId: number,
+  ): Promise<boolean> {
+    try {
+      // Get teacher by email
+      const teacher = await this.teachersService.findByEmail(teacherEmail);
+      if (!teacher) {
+        return false;
+      }
+
+      // Get class and check if teacher is assigned to it
+      const classEntity = await this.classesService.findById(classId);
+      if (!classEntity) {
+        return false;
+      }
+
+      // Check if the teacher is assigned to this class
+      return classEntity.teacher?.id === teacher.id;
+    } catch (error) {
+      console.error('Error checking teacher class ownership:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get class ID from file context
+   */
+  private async getClassIdFromFile(file: any): Promise<number | null> {
+    // If file context is directly a class
+    if (file.contextType === 'class') {
+      return parseInt(file.contextId, 10);
+    }
+
+    // If file context is a learning module, get the class from the module
+    if (file.contextType === 'module') {
+      try {
+        const { InjectRepository } = require('@nestjs/typeorm');
+        const { Repository } = require('typeorm');
+        const { LearningModuleEntity } = require('../learning-modules/infrastructure/persistence/relational/entities/learning-module.entity');
+        const moduleId = parseInt(file.contextId, 10);
+        
+        // We need to query the module to get its classId
+        const moduleRepository = this.configService.get('typeorm');
+        // For now, we'll use the filesService to check this
+        const modulesUsingFile = await this.filesService.checkFileUsageInModules(file.id);
+        if (modulesUsingFile.length > 0 && modulesUsingFile[0].classId) {
+          return modulesUsingFile[0].classId;
+        }
+      } catch (error) {
+        console.error('Error getting class ID from module:', error);
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -114,7 +182,7 @@ export class FilesController {
     },
   })
   @UseInterceptors(FilesInterceptor('files', 10))
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async uploadAssignmentFiles(
     @UploadedFiles(
       new ParseFilePipe({
@@ -182,7 +250,7 @@ export class FilesController {
     },
   })
   @UseInterceptors(FilesInterceptor('files', 10))
-  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async uploadSubmissionFiles(
     @UploadedFiles(
       new ParseFilePipe({
@@ -250,7 +318,7 @@ export class FilesController {
     },
   })
   @UseInterceptors(FilesInterceptor('files', 10))
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async uploadModuleFiles(
     @UploadedFiles(
       new ParseFilePipe({
@@ -317,7 +385,7 @@ export class FilesController {
     },
   })
   @UseInterceptors(FileInterceptor('file'))
-  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async uploadProfilePicture(
     @UploadedFile(
       new ParseFilePipe({
@@ -378,7 +446,7 @@ export class FilesController {
     },
   })
   @UseInterceptors(FileInterceptor('file'))
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async uploadCourseThumbnail(
     @UploadedFile(
       new ParseFilePipe({
@@ -439,7 +507,7 @@ export class FilesController {
     },
   })
   @UseInterceptors(FileInterceptor('file'))
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async uploadCourseCover(
     @UploadedFile(
       new ParseFilePipe({
@@ -500,7 +568,7 @@ export class FilesController {
     },
   })
   @UseInterceptors(FileInterceptor('file'))
-  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async uploadFile(
     @UploadedFile(
       new ParseFilePipe({
@@ -546,6 +614,142 @@ export class FilesController {
     };
   }
 
+  @Post('upload/video/:classId')
+  @ApiOperation({ summary: 'Upload a video file for a class' })
+  @ApiParam({ name: 'classId', description: 'Class ID' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
+  async uploadClassVideo(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5368709120 }), // 5GB for videos
+          new FileTypeValidator({
+            fileType: '.(mp4|webm|mov|avi|mkv|flv|wmv|m4v)',
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+    @Param('classId') classId: string,
+    @Req() req: any,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const context: FileUploadContext = {
+      type: 'class',
+      id: classId,
+      userId: req.user?.id || 'unknown',
+    };
+
+    const uploadedFile = await this.filesService.uploadFileWithContext(
+      file,
+      context,
+    );
+
+    // Generate proper URL for the uploaded file
+    const fileUrl = await this.generateFileUrl(uploadedFile.id, uploadedFile.path);
+
+    return {
+      id: uploadedFile.id,
+      filename: uploadedFile.filename,
+      originalName: uploadedFile.originalName,
+      path: uploadedFile.path,
+      size: uploadedFile.size,
+      mimeType: uploadedFile.mimeType,
+      uploadedAt: uploadedFile.uploadedAt,
+      url: fileUrl,
+    };
+  }
+
+  @Get('class/:classId')
+  @ApiOperation({ summary: 'Get all files for a class' })
+  @ApiParam({ name: 'classId', description: 'Class ID' })
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.user, RoleEnum.superAdmin)
+  async getClassFiles(@Param('classId') classId: string, @Req() req: any) {
+    const user = req.user;
+    const userRole = user?.role?.name?.toLowerCase();
+
+    // Check authorization - verify user has access to this class
+    if (userRole !== 'admin' && userRole !== 'teacher' && userRole !== 'superadmin') {
+      // For students, check if they have access to the class
+      if (userRole === 'user' || !userRole) {
+        // Get student ID from user ID
+        const student = await this.studentsService.findByUserId(user?.id);
+        const studentId = student?.id;
+        
+        if (studentId) {
+          const accessStatus = await this.accessControlService.checkCourseAccess(
+            studentId,
+            Number(classId),
+          );
+          if (!accessStatus.hasAccess) {
+            throw new BadRequestException(
+              'You do not have access to this class',
+            );
+          }
+        } else {
+          throw new BadRequestException('Student profile not found');
+        }
+      }
+    }
+
+    // Get files filtered by user role
+    let files: any[];
+    if (userRole === 'admin' || userRole === 'teacher' || userRole === 'superadmin') {
+      // Admins, teachers, and superadmins see all files
+      files = await this.filesService.getFilesByClassFilteredByRole(
+        Number(classId),
+        userRole,
+      );
+    } else {
+      // Students see only assignment and their own submission files
+      const student = await this.studentsService.findByUserId(user?.id);
+      const studentId = student?.id;
+      if (!studentId) {
+        throw new BadRequestException('Student profile not found');
+      }
+      files = await this.filesService.getFilesByClassFilteredByRole(
+        Number(classId),
+        userRole,
+        studentId,
+      );
+    }
+
+    // Generate proper URLs for all files
+    const filesWithUrls = await Promise.all(
+      files.map(async (file) => ({
+        id: file.id,
+        filename: file.filename,
+        originalName: file.originalName,
+        path: file.path,
+        size: file.size,
+        mimeType: file.mimeType,
+        uploadedBy: file.uploadedBy,
+        uploadedAt: file.uploadedAt,
+        url: await this.generateFileUrl(file.id, file.path),
+      })),
+    );
+
+    return {
+      files: filesWithUrls,
+    };
+  }
+
   @Get('context/:contextType/:contextId')
   @ApiOperation({ summary: 'Get files by context' })
   @ApiParam({
@@ -553,6 +757,7 @@ export class FilesController {
     description: 'Context type (assignment, submission, module)',
   })
   @ApiParam({ name: 'contextId', description: 'Context ID' })
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async getFilesByContext(
     @Param('contextType') contextType: string,
     @Param('contextId') contextId: string,
@@ -589,6 +794,7 @@ export class FilesController {
   @Get('by-path')
   @ApiOperation({ summary: 'Get file by path (for backward compatibility)' })
   @ApiParam({ name: 'path', description: 'File path' })
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async getFileByPath(@Query('path') filePath: string) {
     try {
       console.log(`Looking for file with path: ${filePath}`);
@@ -651,11 +857,44 @@ export class FilesController {
   @Get('serve/:id')
   @ApiOperation({ summary: 'Serve file content by ID' })
   @ApiParam({ name: 'id', description: 'File ID' })
-  async serveFile(@Param('id') id: string, @Res() res: any) {
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
+  async serveFile(@Param('id') id: string, @Req() req: any, @Res() res: any) {
     try {
       const file = await this.filesService.getFileById(id);
       if (!file) {
         throw new BadRequestException('File not found');
+      }
+
+      // Check authorization for class files
+      if (file.contextType === 'class') {
+        const classId = parseInt(file.contextId, 10);
+        const user = req.user;
+        const userRole = user?.role?.name?.toLowerCase();
+
+        // Admins, teachers, and super admins always have access
+        if (userRole !== 'admin' && userRole !== 'teacher' && userRole !== 'superadmin') {
+          // For students, check if they have access to the class
+          if (userRole === 'user' || !userRole) {
+            const studentId = user?.id;
+            if (studentId) {
+              const accessStatus = await this.accessControlService.checkCourseAccess(
+                studentId,
+                classId,
+              );
+              if (!accessStatus.hasAccess) {
+                throw new BadRequestException(
+                  'You do not have access to this file',
+                );
+              }
+            } else {
+              throw new BadRequestException('Authentication required');
+            }
+          }
+        }
+
+        // Verify the class exists (skip if we can't verify - authorization check is sufficient)
+        // The class existence will be validated by the access control check above
       }
 
       console.log(`Serving file: ${file.filename} from path: ${file.path}`);
@@ -794,6 +1033,7 @@ export class FilesController {
   @Get('serve/payment-proofs/:filename')
   @ApiOperation({ summary: 'Serve payment proof file by filename' })
   @ApiParam({ name: 'filename', description: 'Payment proof filename' })
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async servePaymentProofFile(
     @Param('filename') filename: string,
     @Res() res: any,
@@ -861,6 +1101,7 @@ export class FilesController {
 
   @Get()
   @ApiOperation({ summary: 'Get all files with pagination and filters' })
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async getAllFiles(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
@@ -959,6 +1200,7 @@ export class FilesController {
 
   @Get('stats')
   @ApiOperation({ summary: 'Get file statistics' })
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async getFileStats() {
     const files = await this.filesService.getAllFiles();
 
@@ -999,6 +1241,7 @@ export class FilesController {
 
   @Get('debug/count')
   @ApiOperation({ summary: 'Get total file count for debugging' })
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async getFileCount() {
     console.log('Debug: Getting file count');
     const allFiles = await this.filesService.getAllFiles();
@@ -1030,6 +1273,7 @@ export class FilesController {
   @Get(':id/download')
   @ApiOperation({ summary: 'Download file by ID' })
   @ApiParam({ name: 'id', description: 'File ID' })
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async downloadFile(@Param('id') id: string, @Res() res: any) {
     const file = await this.filesService.getFileById(id);
     if (!file) {
@@ -1079,6 +1323,7 @@ export class FilesController {
   @Get(':id')
   @ApiOperation({ summary: 'Get file by ID' })
   @ApiParam({ name: 'id', description: 'File ID' })
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async getFileById(@Param('id') id: string) {
     const file = await this.filesService.getFileById(id);
     if (!file) {
@@ -1102,40 +1347,150 @@ export class FilesController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a file' })
   @ApiParam({ name: 'id', description: 'File ID' })
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async deleteFile(@Param('id') id: string, @Req() req: any) {
     const file = await this.filesService.getFileById(id);
     if (!file) {
       throw new BadRequestException('File not found');
     }
 
-    // Check if user can delete this file
-    if (
-      file.uploadedBy !== req.user?.id &&
-      req.user?.role?.name !== RoleEnum.admin
-    ) {
-      throw new BadRequestException('You can only delete your own files');
+    const userRole = req.user?.role?.name?.toLowerCase();
+    const userEmail = req.user?.email;
+
+    // Admin and super admin can delete any file
+    if (userRole === 'admin' || userRole === 'superadmin') {
+      // Check if file is being used by any learning module
+      if (file.contextType === 'class' || file.contextType === 'module') {
+        const modulesUsingFile = await this.filesService.checkFileUsageInModules(id);
+        if (modulesUsingFile.length > 0) {
+          throw new BadRequestException(
+            `Cannot delete file: It is being used by ${modulesUsingFile.length} learning module(s)`,
+          );
+        }
+      }
+
+      await this.filesService.deleteFile(id);
+      return {
+        message: 'File deleted successfully',
+      };
     }
 
-    await this.filesService.deleteFile(id);
+    // Teacher authorization
+    if (userRole === 'teacher') {
+      // Get the class ID associated with this file
+      let classId: number | null = null;
 
-    return {
-      message: 'File deleted successfully',
-    };
+      if (file.contextType === 'class') {
+        classId = parseInt(file.contextId, 10);
+      } else if (file.contextType === 'module') {
+        // For module files, we need to get the class from the module
+        classId = await this.getClassIdFromFile(file);
+      }
+
+      if (classId) {
+        // Check if teacher is assigned to this class
+        const isTeacherOfClass = await this.checkTeacherOwnsClass(userEmail, classId);
+        
+        if (!isTeacherOfClass) {
+          throw new BadRequestException(
+            'You can only delete files from classes you are assigned to teach',
+          );
+        }
+
+        // Check if file is being used by any learning module
+        const modulesUsingFile = await this.filesService.checkFileUsageInModules(id);
+        if (modulesUsingFile.length > 0) {
+          throw new BadRequestException(
+            `Cannot delete file: It is being used by ${modulesUsingFile.length} learning module(s)`,
+          );
+        }
+
+        await this.filesService.deleteFile(id);
+        return {
+          message: 'File deleted successfully',
+        };
+      } else {
+        // For non-class/module files, teachers can only delete their own uploads
+        if (file.uploadedBy !== req.user?.id) {
+          throw new BadRequestException(
+            'You can only delete files you uploaded',
+          );
+        }
+
+        await this.filesService.deleteFile(id);
+        return {
+          message: 'File deleted successfully',
+        };
+      }
+    }
+
+    // If we reach here, user is not authorized
+    throw new BadRequestException('You are not authorized to delete this file');
   }
 
   @Delete('context/:contextType/:contextId')
   @ApiOperation({ summary: 'Delete all files for a context' })
   @ApiParam({ name: 'contextType', description: 'Context type' })
   @ApiParam({ name: 'contextId', description: 'Context ID' })
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async deleteFilesByContext(
     @Param('contextType') contextType: string,
     @Param('contextId') contextId: string,
+    @Req() req: any,
   ) {
-    await this.filesService.deleteFilesByContext(contextType, contextId);
+    const userRole = req.user?.role?.name?.toLowerCase();
+    const userEmail = req.user?.email;
 
-    return {
-      message: 'All files for this context have been deleted',
-    };
+    // Admin and super admin can delete any files
+    if (userRole === 'admin' || userRole === 'superadmin') {
+      await this.filesService.deleteFilesByContext(contextType, contextId);
+      return {
+        message: 'All files for this context have been deleted',
+      };
+    }
+
+    // Teacher authorization
+    if (userRole === 'teacher') {
+      let classId: number | null = null;
+
+      // Determine the class ID based on context type
+      if (contextType === 'class') {
+        classId = parseInt(contextId, 10);
+      } else if (contextType === 'module') {
+        // For module context, get the class from the module
+        try {
+          const files = await this.filesService.getFilesByContext(contextType, contextId);
+          if (files.length > 0) {
+            classId = await this.getClassIdFromFile(files[0]);
+          }
+        } catch (error) {
+          console.error('Error getting files for module:', error);
+        }
+      }
+
+      if (classId) {
+        // Check if teacher is assigned to this class
+        const isTeacherOfClass = await this.checkTeacherOwnsClass(userEmail, classId);
+        
+        if (!isTeacherOfClass) {
+          throw new BadRequestException(
+            'You can only delete files from classes you are assigned to teach',
+          );
+        }
+
+        await this.filesService.deleteFilesByContext(contextType, contextId);
+        return {
+          message: 'All files for this context have been deleted',
+        };
+      } else {
+        // For non-class/module contexts, deny access
+        throw new BadRequestException(
+          'Teachers can only delete files associated with their assigned classes',
+        );
+      }
+    }
+
+    // If we reach here, user is not authorized
+    throw new BadRequestException('You are not authorized to delete these files');
   }
 }
