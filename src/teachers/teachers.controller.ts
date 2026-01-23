@@ -82,12 +82,12 @@ export class TeachersController {
   async getCurrentUserTeacher(@Request() req): Promise<NullableType<Teacher>> {
     const user = req.user;
     
-    if (!user?.email) {
+    if (!user?.id) {
       return null;
     }
     
-    // Find teacher by email
-    return this.teachersService.findByEmail(user.email);
+    // Find teacher by user ID (since JWT payload only contains id, not email)
+    return this.teachersService.findByUserId(user.id);
   }
 
   // Public endpoint - get single teacher by ID

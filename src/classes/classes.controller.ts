@@ -90,8 +90,8 @@ export class ClassesController {
     // If user is a teacher, enforce filtering by their teacher ID
     const userRole = req.user?.role?.id;
     if (userRole === RoleEnum.teacher) {
-      // Find teacher by user email (case-insensitive)
-      const teacher = await this.teachersService.findByEmail(req.user?.email);
+      // Find teacher by user ID (since JWT payload only contains id, not email)
+      const teacher = await this.teachersService.findByUserId(req.user?.id);
       
       if (teacher?.id) {
         // Merge teacher filter with existing filters
@@ -106,7 +106,7 @@ export class ClassesController {
         // If teacher not found, log for debugging and return empty result
         // This is a security measure - teachers should have a teacher record
         console.warn(
-          `Teacher not found for user email: ${req.user?.email}. User ID: ${req.user?.id}, Role: ${userRole}`,
+          `Teacher not found for user ID: ${req.user?.id}, Role: ${userRole}`,
         );
         return infinityPagination([], { page, limit });
       }
