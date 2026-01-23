@@ -7,7 +7,10 @@ import {
   IsNumber,
   IsEmail,
   IsUrl,
+  IsArray,
   MaxLength,
+  Min,
+  Max,
 } from 'class-validator';
 
 export class CreateSettingsDto {
@@ -523,4 +526,84 @@ export class CreateSettingsDto {
   @IsString()
   @MaxLength(20)
   watermarkPosition?: string;
+
+  // Disable-DevTool Configuration
+  @ApiPropertyOptional({
+    example: '5d41402abc4b2a76b9719d911017c592',
+    description: 'MD5 hash for developer bypass (generate using DisableDevtool.md5())',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  disableDevToolMd5?: string;
+
+  @ApiPropertyOptional({
+    example: 'ddtk',
+    description: 'Custom bypass parameter name (default: ddtk)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  disableDevToolTkName?: string;
+
+  @ApiPropertyOptional({
+    example: 'https://example.com/blocked',
+    description: 'Redirect URL when devtools detected (optional)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  disableDevToolUrl?: string;
+
+  @ApiPropertyOptional({
+    example: [0, 1, 2, 3, 4, 5, 6, 7],
+    description: 'Array of detector types to enable (0-7, default: all)',
+    type: [Number],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsNumber({}, { each: true })
+  disableDevToolDetectors?: number[];
+
+  @ApiPropertyOptional({
+    example: 200,
+    description: 'Detection interval in milliseconds (default: 200)',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(50)
+  @Max(5000)
+  disableDevToolInterval?: number;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Whether to clear console logs',
+  })
+  @IsOptional()
+  @IsBoolean()
+  disableDevToolClearLog?: boolean;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Whether to disable copying',
+  })
+  @IsOptional()
+  @IsBoolean()
+  blockCopy?: boolean;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Whether to disable cutting',
+  })
+  @IsOptional()
+  @IsBoolean()
+  blockCut?: boolean;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Whether to disable pasting',
+  })
+  @IsOptional()
+  @IsBoolean()
+  blockPaste?: boolean;
 }

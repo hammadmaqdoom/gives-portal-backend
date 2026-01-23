@@ -262,6 +262,34 @@ export class SettingsEntity extends EntityRelationalHelper {
   @Column({ type: 'varchar', length: 20, default: 'random' })
   watermarkPosition: string; // 'random' | 'fixed-corner' | 'center'
 
+  // Disable-DevTool Configuration
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  disableDevToolMd5: string | null; // MD5 hash for developer bypass
+
+  @Column({ type: 'varchar', length: 50, nullable: true, default: 'ddtk' })
+  disableDevToolTkName: string | null; // Custom bypass parameter name
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  disableDevToolUrl: string | null; // Redirect URL when devtools detected
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  disableDevToolDetectors: string | null; // JSON array of detector types
+
+  @Column({ type: 'integer', nullable: true, default: 200 })
+  disableDevToolInterval: number | null; // Detection interval in ms
+
+  @Column({ type: 'boolean', default: false })
+  disableDevToolClearLog: boolean; // Whether to clear console logs
+
+  @Column({ type: 'boolean', default: false })
+  blockCopy: boolean; // Whether to disable copying
+
+  @Column({ type: 'boolean', default: false })
+  blockCut: boolean; // Whether to disable cutting
+
+  @Column({ type: 'boolean', default: false })
+  blockPaste: boolean; // Whether to disable pasting
+
   @CreateDateColumn()
   createdAt: Date;
 
