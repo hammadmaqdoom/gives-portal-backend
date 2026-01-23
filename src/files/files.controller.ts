@@ -1017,12 +1017,6 @@ export class FilesController {
         throw new BadRequestException('File not found on disk');
       }
 
-      // Get frontend domain for CORS
-      const frontendDomain = this.configService.get('app.frontendDomain', {
-        infer: true,
-      });
-      const allowedOrigin = frontendDomain || req.headers.origin || '*';
-      
       // Set appropriate headers with security measures
       res.setHeader('Content-Type', file.mimeType);
       res.setHeader(
@@ -1135,12 +1129,6 @@ export class FilesController {
         return;
       }
 
-      // Get frontend domain for CORS
-      const frontendDomain = this.configService.get('app.frontendDomain', {
-        infer: true,
-      });
-      const allowedOrigin = frontendDomain || req.headers.origin || '*';
-      
       // Set appropriate headers with security measures
       res.setHeader('Content-Type', file.mimeType);
       res.setHeader('Content-Length', fs.statSync(fullPath).size);
