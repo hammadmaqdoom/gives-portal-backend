@@ -33,6 +33,7 @@ import { RolesGuard } from '../roles/roles.guard';
 import { Roles } from '../roles/roles.decorator';
 import { RoleEnum } from '../roles/roles.enum';
 import { JwtQueryParamGuard } from './guards/jwt-query-param.guard';
+import { FrontendOriginGuard } from './guards/frontend-origin.guard';
 import { FilesService } from './files.service';
 import { ConfigService } from '@nestjs/config';
 import { FileStorageService, FileUploadContext } from './file-storage.service';
@@ -904,6 +905,7 @@ export class FilesController {
   @Get('serve/:id')
   @ApiOperation({ summary: 'Serve file content by ID' })
   @ApiParam({ name: 'id', description: 'File ID' })
+  @UseGuards(FrontendOriginGuard)
   @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async serveFile(@Param('id') id: string, @Req() req: any, @Res() res: any, @Query('token') token?: string) {
     try {
@@ -945,6 +947,12 @@ export class FilesController {
 
       console.log(`Serving file: ${file.filename} from path: ${file.path}`);
 
+      // Get frontend domain for CORS
+      const frontendDomain = this.configService.get('app.frontendDomain', {
+        infer: true,
+      });
+      const allowedOrigin = frontendDomain || req.headers.origin || '*';
+      
       // If using non-local storage (e.g., s3), stream via server to avoid CORS
       const isLocal = await this.fileStorageService.isLocal();
       if (!isLocal) {
@@ -960,6 +968,24 @@ export class FilesController {
             'Content-Disposition',
             `inline; filename="${file.originalName}"`,
           );
+          
+          // Restrict CORS to frontend domain only
+          res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+          res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+          res.setHeader(
+            'Access-Control-Allow-Headers',
+            'Content-Type, Authorization, X-Frontend-Request',
+          );
+          res.setHeader('Access-Control-Allow-Credentials', 'true');
+          
+          // Security headers
+          res.setHeader('X-Content-Type-Options', 'nosniff');
+          res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+          res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
+          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+          
           stream.pipe(res);
           return;
         } catch (e) {
@@ -991,18 +1017,37 @@ export class FilesController {
         throw new BadRequestException('File not found on disk');
       }
 
-      // Set appropriate headers
+      // Get frontend domain for CORS
+      const frontendDomain = this.configService.get('app.frontendDomain', {
+        infer: true,
+      });
+      const allowedOrigin = frontendDomain || req.headers.origin || '*';
+      
+      // Set appropriate headers with security measures
       res.setHeader('Content-Type', file.mimeType);
       res.setHeader(
         'Content-Disposition',
         `inline; filename="${file.originalName}"`,
       );
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      
+      // Restrict CORS to frontend domain only
+      res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
       res.setHeader(
         'Access-Control-Allow-Headers',
-        'Content-Type, Authorization',
+        'Content-Type, Authorization, X-Frontend-Request',
       );
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      
+      // Security headers to prevent downloads and protect content
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+      res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
+      
+      // Prevent caching to ensure fresh token validation
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
 
       // Stream the file
       const fileStream = fs.createReadStream(fullPath);
@@ -1014,18 +1059,27 @@ export class FilesController {
   }
 
   @Options('serve/:id')
-  async serveFileOptions(@Res() res: any) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+  @UseGuards(FrontendOriginGuard)
+  async serveFileOptions(@Req() req: any, @Res() res: any) {
+    const frontendDomain = this.configService.get('app.frontendDomain', {
+      infer: true,
+    });
+    const allowedOrigin = frontendDomain || req.headers.origin || '*';
+    
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.setHeader(
       'Access-Control-Allow-Headers',
-      'Content-Type, Authorization',
+      'Content-Type, Authorization, X-Frontend-Request',
     );
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400');
     res.status(200).send();
   }
 
   @Head('serve/:id')
-  async serveFileHead(@Param('id') id: string, @Res() res: any) {
+  @UseGuards(FrontendOriginGuard)
+  async serveFileHead(@Param('id') id: string, @Req() req: any, @Res() res: any) {
     try {
       const file = await this.filesService.getFileById(id);
       if (!file) {
@@ -1033,6 +1087,12 @@ export class FilesController {
         return;
       }
 
+      // Get frontend domain for CORS
+      const frontendDomain = this.configService.get('app.frontendDomain', {
+        infer: true,
+      });
+      const allowedOrigin = frontendDomain || req.headers.origin || '*';
+      
       // If using non-local storage, return headers from storage
       const isLocal = await this.fileStorageService.isLocal();
       if (!isLocal) {
@@ -1041,6 +1101,22 @@ export class FilesController {
             await this.fileStorageService.headObject(file.path);
           if (contentType) res.setHeader('Content-Type', contentType);
           if (contentLength) res.setHeader('Content-Length', contentLength);
+          
+          // Security headers
+          res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+          res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+          res.setHeader(
+            'Access-Control-Allow-Headers',
+            'Content-Type, Authorization, X-Frontend-Request',
+          );
+          res.setHeader('Access-Control-Allow-Credentials', 'true');
+          res.setHeader('X-Content-Type-Options', 'nosniff');
+          res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+          res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
+          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+          
           res.status(200).send();
           return;
         } catch (e) {
@@ -1059,15 +1135,30 @@ export class FilesController {
         return;
       }
 
-      // Set appropriate headers
+      // Get frontend domain for CORS
+      const frontendDomain = this.configService.get('app.frontendDomain', {
+        infer: true,
+      });
+      const allowedOrigin = frontendDomain || req.headers.origin || '*';
+      
+      // Set appropriate headers with security measures
       res.setHeader('Content-Type', file.mimeType);
       res.setHeader('Content-Length', fs.statSync(fullPath).size);
-      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
       res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
       res.setHeader(
         'Access-Control-Allow-Headers',
-        'Content-Type, Authorization',
+        'Content-Type, Authorization, X-Frontend-Request',
       );
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      
+      // Security headers
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+      res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
 
       res.status(200).send();
     } catch (error) {
