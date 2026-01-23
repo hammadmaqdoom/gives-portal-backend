@@ -193,16 +193,9 @@ export class InvoicesService {
       userId,
     );
 
-    // First find the student by user ID
-    const student = await this.studentsService.findByUserId(userId);
-    console.log('🔍 findByStudentUserId - Found student:', student);
-
-    if (!student) {
-      console.log(
-        '🔍 findByStudentUserId - No student found, returning empty array',
-      );
-      return [];
-    }
+    // First find the student by user ID, auto-create if doesn't exist
+    const student = await this.studentsService.ensureStudentProfileForUser(userId);
+    console.log('🔍 findByStudentUserId - Found/created student:', student);
 
     // Then get invoices for that student
     console.log(

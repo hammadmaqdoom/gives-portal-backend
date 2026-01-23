@@ -356,13 +356,10 @@ export class PaymentTransactionsController {
       totalPages: number;
     };
   }> {
-    // Get student ID from user ID
-    const student = await this.studentsService.findByUserId(
+    // Get student ID from user ID, auto-create if doesn't exist
+    const student = await this.studentsService.ensureStudentProfileForUser(
       parseInt(req.user?.id, 10),
     );
-    if (!student) {
-      throw new Error('Student profile not found for current user');
-    }
 
     return this.paymentsService.getUserTransactions(student.id, {
       page,
