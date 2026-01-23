@@ -46,7 +46,7 @@ import { TeachersService } from '../teachers/teachers.service';
 
 @ApiTags('File Management')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'), RolesGuard)
+@UseGuards(JwtQueryParamGuard, RolesGuard)
 @Controller({
   path: 'files',
   version: '1',
@@ -904,7 +904,6 @@ export class FilesController {
   @Get('serve/:id')
   @ApiOperation({ summary: 'Serve file content by ID' })
   @ApiParam({ name: 'id', description: 'File ID' })
-  @UseGuards(JwtQueryParamGuard, RolesGuard)
   @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async serveFile(@Param('id') id: string, @Req() req: any, @Res() res: any, @Query('token') token?: string) {
     try {

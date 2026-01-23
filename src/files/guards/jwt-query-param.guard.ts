@@ -31,7 +31,21 @@ export class JwtQueryParamGuard implements CanActivate {
     
     // If no token in header, try to get from query parameter
     if (!token && request.query?.token) {
-      token = request.query.token;
+      // NestJS should automatically decode query parameters, but handle both cases
+      // Check if the token appears to be URL-encoded (contains %)
+      const rawToken = request.query.token;
+      if (rawToken.includes('%')) {
+        // Token appears to be URL-encoded, decode it
+        try {
+          token = decodeURIComponent(rawToken);
+        } catch (e) {
+          // If decoding fails, use the token as-is
+          token = rawToken;
+        }
+      } else {
+        // Token appears to already be decoded
+        token = rawToken;
+      }
     }
     
     if (!token) {
@@ -62,6 +76,10 @@ export class JwtQueryParamGuard implements CanActivate {
     } catch (error) {
       if (error instanceof UnauthorizedException) {
         throw error;
+      }
+      // Log the actual error for debugging (in development)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('JWT verification error:', error);
       }
       throw new UnauthorizedException('Invalid or expired token');
     }

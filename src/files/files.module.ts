@@ -17,7 +17,9 @@ import { StudentsModule } from '../students/students.module';
 import { TeachersModule } from '../teachers/teachers.module';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtQueryParamGuard } from './guards/jwt-query-param.guard';
+import { JwtQueryParamStrategy } from './strategies/jwt-query-param.strategy';
 import { UsersModule } from '../users/users.module';
+import { PassportModule } from '@nestjs/passport';
 
 @Module({
   imports: [
@@ -32,9 +34,10 @@ import { UsersModule } from '../users/users.module';
     forwardRef(() => TeachersModule),
     forwardRef(() => UsersModule),
     JwtModule.register({}),
+    PassportModule,
   ],
   controllers: [FilesController],
-  providers: [FilesService, FileStorageService, FileMapper, FileRepository, JwtQueryParamGuard],
+  providers: [FilesService, FileStorageService, FileMapper, FileRepository, JwtQueryParamGuard, JwtQueryParamStrategy],
   exports: [
     FilesService,
     FileStorageService,
