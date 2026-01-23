@@ -562,9 +562,11 @@ export class DashboardService {
   async findTeacherByUserEmail(
     userEmail: string,
   ): Promise<TeacherEntity | null> {
-    return await this.teacherRepository.findOne({
-      where: { email: userEmail },
-    });
+    // Use case-insensitive email lookup
+    return await this.teacherRepository
+      .createQueryBuilder('teacher')
+      .where('LOWER(teacher.email) = LOWER(:email)', { email: userEmail })
+      .getOne();
   }
 
   private async getEnrolledClassCount(studentId: number): Promise<number> {
