@@ -49,7 +49,7 @@ export class InvoicesController {
   ) {}
 
   @Post()
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({ summary: 'Create a new invoice' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -61,7 +61,7 @@ export class InvoicesController {
   }
 
   @Get()
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({ summary: 'Get all invoices with pagination and filters' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -89,7 +89,7 @@ export class InvoicesController {
   }
 
   @Get('stats')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({ summary: 'Get invoice statistics' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -100,7 +100,7 @@ export class InvoicesController {
   }
 
   @Get('overdue')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({ summary: 'Get all overdue invoices' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -112,7 +112,7 @@ export class InvoicesController {
   }
 
   @Get('student/:studentId')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Get invoices for a specific student' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -124,7 +124,7 @@ export class InvoicesController {
   }
 
   @Get('parent/:parentId')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Get invoices for a specific parent' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -173,7 +173,7 @@ export class InvoicesController {
   }
 
   @Get('generate-number')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({ summary: 'Generate a new invoice number' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -184,7 +184,7 @@ export class InvoicesController {
   }
 
   @Get(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Get invoice by ID' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -196,7 +196,7 @@ export class InvoicesController {
   }
 
   @Patch(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({ summary: 'Update invoice' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -208,7 +208,7 @@ export class InvoicesController {
   }
 
   @Patch(':id/mark-paid')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({ summary: 'Mark invoice as paid' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -227,7 +227,7 @@ export class InvoicesController {
   }
 
   @Post(':id/approve-payment')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({
     summary: 'Approve bank transfer payment and activate enrollments',
   })
@@ -262,7 +262,7 @@ export class InvoicesController {
   }
 
   @Patch(':id/upload-proof')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Upload payment proof for invoice' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -277,7 +277,7 @@ export class InvoicesController {
   }
 
   @Post(':id/upload-proof-file')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Upload payment proof file for invoice' })
   @ApiResponse({
@@ -321,7 +321,7 @@ export class InvoicesController {
   }
 
   @Get(':id/pdf')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Download invoice as PDF' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -348,7 +348,7 @@ export class InvoicesController {
   }
 
   @Get(':id/view')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'View invoice as PDF' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -375,7 +375,7 @@ export class InvoicesController {
   }
 
   @Post(':id/send-email')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send invoice via email' })
   @ApiResponse({
@@ -387,7 +387,7 @@ export class InvoicesController {
   }
 
   @Delete('bulk')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete multiple invoices' })
   @ApiResponse({
@@ -399,7 +399,7 @@ export class InvoicesController {
   }
 
   @Delete(':id')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete invoice' })
   @ApiResponse({
