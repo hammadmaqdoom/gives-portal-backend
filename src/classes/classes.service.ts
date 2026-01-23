@@ -526,9 +526,11 @@ export class ClassesService {
         thumbnailFile.url = `${baseUrl}/api/v1/files/serve/${thumbnailFile.id}`;
       } else if (
         fileDriver === FileDriver.S3 ||
-        fileDriver === FileDriver.S3_PRESIGNED
+        fileDriver === FileDriver.S3_PRESIGNED ||
+        fileDriver === FileDriver.B2 ||
+        fileDriver === FileDriver.B2_PRESIGNED
       ) {
-        // For S3 files, generate presigned URL
+        // For S3/B2 files, generate presigned URL
         try {
           thumbnailFile.url = await this.fileStorageService.getPresignedFileUrl(
             thumbnailFile.path,
@@ -557,9 +559,11 @@ export class ClassesService {
         coverImageFile.url = `${baseUrl}/api/v1/files/serve/${coverImageFile.id}`;
       } else if (
         fileDriver === FileDriver.S3 ||
-        fileDriver === FileDriver.S3_PRESIGNED
+        fileDriver === FileDriver.S3_PRESIGNED ||
+        fileDriver === FileDriver.B2 ||
+        fileDriver === FileDriver.B2_PRESIGNED
       ) {
-        // For S3 files, generate presigned URL
+        // For S3/B2 files, generate presigned URL
         try {
           coverImageFile.url = await this.fileStorageService.getPresignedFileUrl(
             coverImageFile.path,

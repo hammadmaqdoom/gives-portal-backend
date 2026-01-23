@@ -38,7 +38,7 @@ export class TeacherCommissionController {
   ) {}
 
   @Post()
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({ summary: 'Create a new teacher commission' })
   @ApiResponse({ status: 201, description: 'Commission created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
@@ -51,7 +51,7 @@ export class TeacherCommissionController {
   }
 
   @Get()
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({
     summary: 'Get all teacher commissions with pagination and filtering',
   })
@@ -95,7 +95,7 @@ export class TeacherCommissionController {
   }
 
   @Get('pending')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({ summary: 'Get all pending teacher commissions' })
   @ApiResponse({
     status: 200,
@@ -108,7 +108,7 @@ export class TeacherCommissionController {
   }
 
   @Get('overdue')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({ summary: 'Get all overdue teacher commissions' })
   @ApiResponse({
     status: 200,
@@ -121,7 +121,7 @@ export class TeacherCommissionController {
   }
 
   @Get('teacher/:teacherId')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({ summary: 'Get all commissions for a specific teacher' })
   @ApiResponse({
     status: 200,
@@ -136,7 +136,7 @@ export class TeacherCommissionController {
   }
 
   @Get('class/:classId')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({ summary: 'Get all commissions for a specific class' })
   @ApiResponse({
     status: 200,
@@ -149,7 +149,7 @@ export class TeacherCommissionController {
   }
 
   @Get('student/:studentId')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({ summary: 'Get all commissions for a specific student' })
   @ApiResponse({
     status: 200,
@@ -164,7 +164,7 @@ export class TeacherCommissionController {
   }
 
   @Get(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({ summary: 'Get a specific teacher commission by ID' })
   @ApiResponse({
     status: 200,
@@ -178,7 +178,7 @@ export class TeacherCommissionController {
   }
 
   @Patch(':id')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Update a teacher commission' })
   @ApiResponse({ status: 200, description: 'Commission updated successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
@@ -193,7 +193,7 @@ export class TeacherCommissionController {
   }
 
   @Patch(':id/mark-paid')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Mark a teacher commission as paid' })
   @ApiResponse({
@@ -211,7 +211,7 @@ export class TeacherCommissionController {
   }
 
   @Delete(':id')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a teacher commission' })
   @ApiResponse({ status: 204, description: 'Commission deleted successfully' })
