@@ -99,6 +99,34 @@ export class FileRepository {
     await this.fileRepository.delete({ contextType, contextId });
   }
 
+  async findByMultipleContexts(
+    contexts: Array<{ contextType: string; contextId: string }>,
+  ): Promise<File[]> {
+    if (contexts.length === 0) {
+      return [];
+    }
+
+    // Build query with OR conditions for multiple contexts
+    const queryBuilder = this.fileRepository.createQueryBuilder('file');
+    
+    const parameters: Record<string, any> = {};
+    const conditions: string[] = [];
+    
+    contexts.forEach((context, index) => {
+      const typeParam = `contextType${index}`;
+      const idParam = `contextId${index}`;
+      parameters[typeParam] = context.contextType;
+      parameters[idParam] = context.contextId;
+      conditions.push(`(file.contextType = :${typeParam} AND file.contextId = :${idParam})`);
+    });
+
+    queryBuilder.where(conditions.join(' OR '), parameters);
+    queryBuilder.orderBy('file.uploadedAt', 'DESC');
+    
+    const files = await queryBuilder.getMany();
+    return files.map((file) => this.fileMapper.toDomain(file));
+  }
+
   async remove(id: string): Promise<void> {
     await this.fileRepository.softDelete(id);
   }
