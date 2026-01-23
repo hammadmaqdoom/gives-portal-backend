@@ -245,6 +245,34 @@ export class Settings {
   @ApiProperty({ example: 'random', description: 'Watermark position: random | fixed-corner | center' })
   watermarkPosition: string;
 
+  // Disable-DevTool Configuration
+  @ApiProperty({ example: '5d41402abc4b2a76b9719d911017c592', description: 'MD5 hash for developer bypass', required: false })
+  disableDevToolMd5?: string | null;
+
+  @ApiProperty({ example: 'ddtk', description: 'Custom bypass parameter name', required: false })
+  disableDevToolTkName?: string | null;
+
+  @ApiProperty({ example: 'https://example.com/blocked', description: 'Redirect URL when devtools detected', required: false })
+  disableDevToolUrl?: string | null;
+
+  @ApiProperty({ example: [0, 1, 2, 3, 4, 5, 6, 7], description: 'Array of detector types to enable', required: false })
+  disableDevToolDetectors?: number[] | null;
+
+  @ApiProperty({ example: 200, description: 'Detection interval in milliseconds', required: false })
+  disableDevToolInterval?: number | null;
+
+  @ApiProperty({ example: false, description: 'Whether to clear console logs', required: false })
+  disableDevToolClearLog?: boolean;
+
+  @ApiProperty({ example: false, description: 'Whether to disable copying', required: false })
+  blockCopy?: boolean;
+
+  @ApiProperty({ example: false, description: 'Whether to disable cutting', required: false })
+  blockCut?: boolean;
+
+  @ApiProperty({ example: false, description: 'Whether to disable pasting', required: false })
+  blockPaste?: boolean;
+
   @ApiProperty()
   createdAt: Date;
 
