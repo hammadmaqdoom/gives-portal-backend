@@ -68,12 +68,27 @@ export class RelationalZoomCredentialsRepository
   }
 
   async storeOAuthTokens(teacherId: number, tokens: any): Promise<void> {
-    const entity = await this.repository.findOne({
+    let entity = await this.repository.findOne({
       where: { teacherId, isActive: true },
     });
-    if (!entity) throw new Error('Zoom credentials not found');
-    entity.zoomWebhookSecret = JSON.stringify(tokens);
-    await this.repository.save(entity);
+    
+    // If no credentials exist, create a minimal record for OAuth-only connection
+    // The S2S fields (zoomApiKey, zoomApiSecret, zoomAccountId) are required by the schema
+    // but not needed for OAuth Authorization Code flow
+    if (!entity) {
+      entity = this.repository.create({
+        teacherId,
+        zoomApiKey: 'oauth-only', // Placeholder - not used for OAuth flow
+        zoomApiSecret: 'oauth-only', // Placeholder - not used for OAuth flow
+        zoomAccountId: 'oauth-only', // Placeholder - not used for OAuth flow
+        zoomWebhookSecret: JSON.stringify(tokens),
+        isActive: true,
+      });
+      await this.repository.save(entity);
+    } else {
+      entity.zoomWebhookSecret = JSON.stringify(tokens);
+      await this.repository.save(entity);
+    }
   }
 
   async getOAuthTokens(teacherId: number): Promise<any | null> {

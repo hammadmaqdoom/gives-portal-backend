@@ -152,16 +152,54 @@ export class ZoomService {
       await this.zoomCredentialsRepository.findByTeacherId(teacherId);
     if (!credentials) return null;
 
+    // Check if this is an OAuth-only connection (has OAuth tokens)
+    const oauthTokens = await this.zoomCredentialsRepository.getOAuthTokens(teacherId);
+    const isPlaceholder = credentials.zoomApiKey === 'oauth-only';
+
     // Return decrypted data (excluding secrets)
-    return {
-      ...credentials,
-      zoomApiKey: this.decrypt(credentials.zoomApiKey),
-      zoomApiSecret: '***HIDDEN***',
-      zoomAccountId: this.decrypt(credentials.zoomAccountId),
-      zoomWebhookSecret: credentials.zoomWebhookSecret
-        ? this.decrypt(credentials.zoomWebhookSecret)
-        : undefined,
-    };
+    // For OAuth-only connections, skip decryption of placeholder values
+    try {
+      // Handle zoomWebhookSecret - it might contain OAuth tokens (JSON) or encrypted webhook secret
+      let webhookSecret: string | undefined = undefined;
+      if (credentials.zoomWebhookSecret) {
+        // If it's OAuth tokens (starts with '{' or '['), return as-is
+        // Otherwise, try to decrypt it (it's a webhook secret)
+        if (credentials.zoomWebhookSecret.trim().startsWith('{') || credentials.zoomWebhookSecret.trim().startsWith('[')) {
+          // It's OAuth tokens JSON, return as-is (but don't expose it)
+          webhookSecret = '***OAUTH_TOKENS_STORED***';
+        } else {
+          // It's an encrypted webhook secret, try to decrypt
+          try {
+            webhookSecret = this.decrypt(credentials.zoomWebhookSecret);
+          } catch {
+            // If decryption fails, it might be OAuth tokens stored without JSON wrapper
+            webhookSecret = '***HIDDEN***';
+          }
+        }
+      }
+      
+      return {
+        ...credentials,
+        zoomApiKey: isPlaceholder ? 'oauth-only' : this.decrypt(credentials.zoomApiKey),
+        zoomApiSecret: '***HIDDEN***',
+        zoomAccountId: isPlaceholder ? 'oauth-only' : this.decrypt(credentials.zoomAccountId),
+        zoomWebhookSecret: webhookSecret,
+      };
+    } catch (error) {
+      // If decryption fails, check if OAuth tokens exist (OAuth-only connection)
+      if (oauthTokens || isPlaceholder) {
+        return {
+          ...credentials,
+          zoomApiKey: 'oauth-only',
+          zoomApiSecret: '***HIDDEN***',
+          zoomAccountId: 'oauth-only',
+          zoomWebhookSecret: credentials.zoomWebhookSecret ? '***OAUTH_TOKENS_STORED***' : undefined,
+        };
+      }
+      // If no OAuth tokens and decryption fails, return null
+      this.logger.error('Failed to decrypt Zoom credentials', error);
+      return null;
+    }
   }
 
   async deleteCredentials(teacherId: number): Promise<void> {
@@ -286,11 +324,23 @@ export class ZoomService {
       this.logger.error(
         `OAuth code exchange failed: ${res.status} ${res.statusText} - ${txt}`,
       );
-      throw new BadRequestException('Zoom OAuth exchange failed');
+      throw new BadRequestException(`Zoom OAuth exchange failed: ${txt}`);
     }
     const tokens = await res.json();
     const teacherId = parseInt(state, 10);
-    await this.zoomCredentialsRepository.storeOAuthTokens(teacherId, tokens);
+    
+    if (isNaN(teacherId)) {
+      this.logger.error(`Invalid teacher ID in OAuth state: ${state}`);
+      throw new BadRequestException('Invalid OAuth state parameter');
+    }
+    
+    try {
+      await this.zoomCredentialsRepository.storeOAuthTokens(teacherId, tokens);
+      this.logger.log(`Successfully stored OAuth tokens for teacher ${teacherId}`);
+    } catch (error) {
+      this.logger.error(`Failed to store OAuth tokens for teacher ${teacherId}:`, error);
+      throw new BadRequestException('Failed to store Zoom OAuth tokens');
+    }
   }
 
   private async refreshOAuthToken(teacherId: number): Promise<string> {
@@ -550,9 +600,21 @@ export class ZoomService {
       const credentials = await this.getCredentials(teacherId);
       if (!credentials) return false;
 
-      // Here you would make a test API call to Zoom
-      // For now, we'll just return true if credentials exist
-      return true;
+      // Check if OAuth tokens exist (for OAuth Authorization Code flow)
+      const oauthTokens = await this.zoomCredentialsRepository.getOAuthTokens(teacherId);
+      if (oauthTokens) {
+        // OAuth connection exists - verify token is still valid by attempting to refresh if needed
+        // For now, just check if tokens exist
+        return true;
+      }
+
+      // If no OAuth tokens, check if S2S credentials exist (not placeholder)
+      if (credentials.zoomApiKey && credentials.zoomApiKey !== 'oauth-only') {
+        // S2S credentials exist
+        return true;
+      }
+
+      return false;
     } catch (error) {
       this.logger.error('Failed to test Zoom connection', error);
       return false;
