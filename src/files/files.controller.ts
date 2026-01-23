@@ -133,34 +133,50 @@ export class FilesController {
   }
 
   /**
-   * Generate proper file URL (presigned for S3, serve endpoint for local)
+   * Generate proper file URL (presigned for S3/B2, serve endpoint for local)
+   * For videos, always use serve endpoint to avoid expiration issues
    */
-  private async generateFileUrl(fileId: string, filePath: string): Promise<string> {
+  private async generateFileUrl(
+    fileId: string,
+    filePath: string,
+    mimeType?: string,
+  ): Promise<string> {
     const fileDriver = await this.fileStorageService.getDriver();
     const baseUrl = this.getBaseUrl();
 
-    if (fileDriver === FileDriver.LOCAL) {
-      // For local files, use the serve endpoint
+    // Check if file is a video by mimeType or file extension
+    const isVideo =
+      mimeType?.startsWith('video/') ||
+      /\.(mp4|webm|mov|avi|mkv|flv|wmv|m4v)$/i.test(filePath);
+
+    // For videos, always use serve endpoint (no expiration)
+    // For local files, always use serve endpoint
+    if (isVideo || fileDriver === FileDriver.LOCAL) {
       return `${baseUrl}/api/v1/files/serve/${fileId}`;
-    } else if (
+    }
+
+    // For S3/B2 non-video files, generate presigned URL with longer expiry
+    if (
       fileDriver === FileDriver.S3 ||
-      fileDriver === FileDriver.S3_PRESIGNED
+      fileDriver === FileDriver.S3_PRESIGNED ||
+      fileDriver === FileDriver.B2 ||
+      fileDriver === FileDriver.B2_PRESIGNED
     ) {
-      // For S3 files, generate presigned URL
       try {
+        // Use longer expiry for non-video files (24 hours)
         return await this.fileStorageService.getPresignedFileUrl(
           filePath,
-          3600, // 1 hour expiry
+          86400, // 24 hours expiry
         );
       } catch (error) {
         console.error('Error generating presigned URL:', error);
         // Fallback to serve endpoint if presigned URL generation fails
         return `${baseUrl}/api/v1/files/serve/${fileId}`;
       }
-    } else {
-      // Fallback for other storage types
-      return `${baseUrl}/api/v1/files/serve/${fileId}`;
     }
+
+    // Fallback for other storage types
+    return `${baseUrl}/api/v1/files/serve/${fileId}`;
   }
 
   @Post('upload/assignment/:assignmentId')
@@ -221,7 +237,7 @@ export class FilesController {
         size: file.size,
         mimeType: file.mimeType,
         uploadedAt: file.uploadedAt,
-        url: await this.generateFileUrl(file.id, file.path),
+        url: await this.generateFileUrl(file.id, file.path, file.mimeType),
       })),
     );
 
@@ -289,7 +305,7 @@ export class FilesController {
         size: file.size,
         mimeType: file.mimeType,
         uploadedAt: file.uploadedAt,
-        url: await this.generateFileUrl(file.id, file.path),
+        url: await this.generateFileUrl(file.id, file.path, file.mimeType),
       })),
     );
 
@@ -358,7 +374,7 @@ export class FilesController {
         size: file.size,
         mimeType: file.mimeType,
         uploadedAt: file.uploadedAt,
-        url: await this.generateFileUrl(file.id, file.path),
+        url: await this.generateFileUrl(file.id, file.path, file.mimeType),
       })),
     );
 
@@ -416,7 +432,11 @@ export class FilesController {
     );
 
     // Generate proper URL for the uploaded file
-    const fileUrl = await this.generateFileUrl(uploadedFile.id, uploadedFile.path);
+    const fileUrl = await this.generateFileUrl(
+      uploadedFile.id,
+      uploadedFile.path,
+      uploadedFile.mimeType,
+    );
 
     return {
       id: uploadedFile.id,
@@ -477,7 +497,11 @@ export class FilesController {
     );
 
     // Generate proper URL for the uploaded file
-    const fileUrl = await this.generateFileUrl(uploadedFile.id, uploadedFile.path);
+    const fileUrl = await this.generateFileUrl(
+      uploadedFile.id,
+      uploadedFile.path,
+      uploadedFile.mimeType,
+    );
 
     return {
       id: uploadedFile.id,
@@ -538,7 +562,11 @@ export class FilesController {
     );
 
     // Generate proper URL for the uploaded file
-    const fileUrl = await this.generateFileUrl(uploadedFile.id, uploadedFile.path);
+    const fileUrl = await this.generateFileUrl(
+      uploadedFile.id,
+      uploadedFile.path,
+      uploadedFile.mimeType,
+    );
 
     return {
       id: uploadedFile.id,
@@ -599,7 +627,11 @@ export class FilesController {
     );
 
     // Generate proper URL for the uploaded file
-    const fileUrl = await this.generateFileUrl(uploadedFile.id, uploadedFile.path);
+    const fileUrl = await this.generateFileUrl(
+      uploadedFile.id,
+      uploadedFile.path,
+      uploadedFile.mimeType,
+    );
 
     return {
       id: uploadedFile.id,
@@ -662,7 +694,11 @@ export class FilesController {
     );
 
     // Generate proper URL for the uploaded file
-    const fileUrl = await this.generateFileUrl(uploadedFile.id, uploadedFile.path);
+    const fileUrl = await this.generateFileUrl(
+      uploadedFile.id,
+      uploadedFile.path,
+      uploadedFile.mimeType,
+    );
 
     return {
       id: uploadedFile.id,
@@ -741,7 +777,7 @@ export class FilesController {
         mimeType: file.mimeType,
         uploadedBy: file.uploadedBy,
         uploadedAt: file.uploadedAt,
-        url: await this.generateFileUrl(file.id, file.path),
+        url: await this.generateFileUrl(file.id, file.path, file.mimeType),
       })),
     );
 
@@ -775,8 +811,9 @@ export class FilesController {
     );
     console.log('Files:', files);
 
-    return {
-      files: files.map((file) => ({
+    // Generate proper URLs for all files
+    const filesWithUrls = await Promise.all(
+      files.map(async (file) => ({
         id: file.id,
         filename: file.filename,
         originalName: file.originalName,
@@ -785,9 +822,12 @@ export class FilesController {
         mimeType: file.mimeType,
         uploadedBy: file.uploadedBy,
         uploadedAt: file.uploadedAt,
-        // Generate proper URL for file serving
-        url: `${this.getBaseUrl()}/api/v1/files/serve/${file.id}`,
+        url: await this.generateFileUrl(file.id, file.path, file.mimeType),
       })),
+    );
+
+    return {
+      files: filesWithUrls,
     };
   }
 
@@ -836,6 +876,13 @@ export class FilesController {
         throw new BadRequestException('File not found in database');
       }
 
+      // Generate proper URL for file serving
+      const fileUrl = await this.generateFileUrl(
+        file.id,
+        file.path,
+        file.mimeType,
+      );
+
       return {
         id: file.id,
         filename: file.filename,
@@ -845,8 +892,7 @@ export class FilesController {
         mimeType: file.mimeType,
         uploadedBy: file.uploadedBy,
         uploadedAt: file.uploadedAt,
-        // Generate proper URL for file serving
-        url: `${this.getBaseUrl()}/api/v1/files/serve/${file.id}`,
+        url: fileUrl,
       };
     } catch (error) {
       console.error('Error getting file by path:', error);
@@ -1172,13 +1218,14 @@ export class FilesController {
     const endIndex = startIndex + limit;
     const paginatedFiles = filteredFiles.slice(startIndex, endIndex);
 
-    return {
-      data: paginatedFiles.map((file) => ({
+    // Generate proper URLs for all files
+    const filesWithUrls = await Promise.all(
+      paginatedFiles.map(async (file) => ({
         id: file.id,
         filename: file.filename,
         originalName: file.originalName,
         path: file.path,
-        url: `${this.getBaseUrl()}/api/v1/files/serve/${file.id}`,
+        url: await this.generateFileUrl(file.id, file.path, file.mimeType),
         size: file.size,
         mimeType: file.mimeType,
         uploadedBy: file.uploadedBy,
@@ -1189,6 +1236,10 @@ export class FilesController {
         updatedAt: file.updatedAt,
         deletedAt: file.deletedAt,
       })),
+    );
+
+    return {
+      data: filesWithUrls,
       meta: {
         total,
         page,
@@ -1215,21 +1266,25 @@ export class FilesController {
       {} as Record<string, number>,
     );
 
-    const recentUploads = files
+    const recentFiles = files
       .sort(
         (a, b) =>
           new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
       )
-      .slice(0, 5)
-      .map((file) => ({
+      .slice(0, 5);
+
+    // Generate proper URLs for recent uploads
+    const recentUploads = await Promise.all(
+      recentFiles.map(async (file) => ({
         id: file.id,
         filename: file.filename,
         originalName: file.originalName,
         size: file.size,
         mimeType: file.mimeType,
         uploadedAt: file.uploadedAt,
-        url: `${this.getBaseUrl()}/api/v1/files/serve/${file.id}`,
-      }));
+        url: await this.generateFileUrl(file.id, file.path, file.mimeType),
+      })),
+    );
 
     return {
       totalFiles: files.length,
@@ -1330,6 +1385,13 @@ export class FilesController {
       throw new BadRequestException('File not found');
     }
 
+    // Generate proper URL for file serving
+    const fileUrl = await this.generateFileUrl(
+      file.id,
+      file.path,
+      file.mimeType,
+    );
+
     return {
       id: file.id,
       filename: file.filename,
@@ -1339,8 +1401,7 @@ export class FilesController {
       mimeType: file.mimeType,
       uploadedBy: file.uploadedBy,
       uploadedAt: file.uploadedAt,
-      // Generate proper URL for file serving
-      url: `${this.getBaseUrl()}/api/v1/files/serve/${file.id}`,
+      url: fileUrl,
     };
   }
 

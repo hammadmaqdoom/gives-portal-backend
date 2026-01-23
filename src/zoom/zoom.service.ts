@@ -225,21 +225,32 @@ export class ZoomService {
     // First try to get from settings
     const settings = await this.settingsService.getSettings();
     
-    let clientId = settings?.zoomClientId;
-    let clientSecret = settings?.zoomClientSecret;
-    let redirectUri = settings?.zoomRedirectUri;
+    // Get values from settings, trimming whitespace and checking for empty strings
+    let clientId = settings?.zoomClientId?.trim() || null;
+    let clientSecret = settings?.zoomClientSecret?.trim() || null;
+    let redirectUri = settings?.zoomRedirectUri?.trim() || null;
     
-    // Fall back to environment variables if not in settings
-    if (!clientId || !clientSecret) {
-      clientId = process.env.ZOOM_OAUTH_CLIENT_ID;
-      clientSecret = process.env.ZOOM_OAUTH_CLIENT_SECRET;
+    // Fall back to environment variables if not in settings (check each field individually)
+    if (!clientId || clientId === '') {
+      clientId = process.env.ZOOM_OAUTH_CLIENT_ID?.trim() || null;
     }
     
-    if (!redirectUri) {
-      redirectUri = process.env.ZOOM_OAUTH_REDIRECT_URI;
+    if (!clientSecret || clientSecret === '') {
+      clientSecret = process.env.ZOOM_OAUTH_CLIENT_SECRET?.trim() || null;
     }
     
+    if (!redirectUri || redirectUri === '') {
+      redirectUri = process.env.ZOOM_OAUTH_REDIRECT_URI?.trim() || null;
+    }
+    
+    // Validate all required fields are present
     if (!clientId || !clientSecret || !redirectUri) {
+      this.logger.error('Zoom OAuth configuration missing:', {
+        hasClientId: !!clientId,
+        hasClientSecret: !!clientSecret,
+        hasRedirectUri: !!redirectUri,
+        settingsExists: !!settings,
+      });
       throw new BadRequestException('Zoom OAuth configuration not found in settings or environment variables');
     }
     
