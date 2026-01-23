@@ -569,6 +569,28 @@ export class DashboardService {
       .getOne();
   }
 
+  async findTeacherByUserId(
+    userId: number,
+  ): Promise<TeacherEntity | null> {
+    // First, get the user to retrieve their email
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user || !user.email) {
+      console.warn(
+        `User not found or has no email. User ID: ${userId}`,
+      );
+      return null;
+    }
+
+    // Then find teacher by email (case-insensitive)
+    return await this.teacherRepository
+      .createQueryBuilder('teacher')
+      .where('LOWER(teacher.email) = LOWER(:email)', { email: user.email })
+      .getOne();
+  }
+
   private async getEnrolledClassCount(studentId: number): Promise<number> {
     return await this.enrollmentRepository.count({
       where: { student: { id: studentId } },

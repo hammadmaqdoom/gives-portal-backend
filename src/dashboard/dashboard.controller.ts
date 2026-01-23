@@ -71,12 +71,14 @@ export class DashboardController {
     type: TeacherStatsDto,
   })
   async getTeacherStats(@Request() req): Promise<TeacherStatsDto> {
-    // Find teacher by user email
-    const teacher = await this.dashboardService.findTeacherByUserEmail(
-      req.user.email,
+    // Find teacher by user ID (since JWT payload only contains id, not email)
+    const teacher = await this.dashboardService.findTeacherByUserId(
+      req.user.id,
     );
     if (!teacher) {
-      throw new Error('Teacher not found for this user');
+      throw new Error(
+        `Teacher not found for this user. User ID: ${req.user.id}, Role: ${req.user.role?.id || req.user.role}`,
+      );
     }
     return this.dashboardService.getTeacherStats(teacher.id);
   }
@@ -92,12 +94,14 @@ export class DashboardController {
     type: TeacherAnalyticsDto,
   })
   async getTeacherAnalytics(@Request() req): Promise<TeacherAnalyticsDto> {
-    // Find teacher by user email
-    const teacher = await this.dashboardService.findTeacherByUserEmail(
-      req.user.email,
+    // Find teacher by user ID (since JWT payload only contains id, not email)
+    const teacher = await this.dashboardService.findTeacherByUserId(
+      req.user.id,
     );
     if (!teacher) {
-      throw new Error('Teacher not found for this user');
+      throw new Error(
+        `Teacher not found for this user. User ID: ${req.user.id}, Role: ${req.user.role?.id || req.user.role}`,
+      );
     }
     return this.dashboardService.getTeacherAnalytics(teacher.id);
   }
