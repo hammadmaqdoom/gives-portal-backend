@@ -79,6 +79,32 @@ export class FilesController {
   }
 
   /**
+   * Get allowed origin for CORS headers
+   * Prefers request origin, then constructs from frontend domain config
+   */
+  private getAllowedOrigin(req: any): string {
+    const requestOrigin = req.headers.origin;
+    const frontendDomain = this.configService.get('app.frontendDomain', {
+      infer: true,
+    });
+    
+    // Construct allowed origin - use request origin if available, otherwise construct from config
+    if (requestOrigin) {
+      return requestOrigin;
+    } else if (frontendDomain) {
+      // If it already has protocol, use as-is, otherwise add https:// (or http:// in dev)
+      if (frontendDomain.startsWith('http://') || frontendDomain.startsWith('https://')) {
+        return frontendDomain;
+      } else {
+        const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+        return `${protocol}://${frontendDomain}`;
+      }
+    }
+    
+    return '*';
+  }
+
+  /**
    * Check if a teacher is assigned to a class
    */
   private async checkTeacherOwnsClass(
@@ -988,11 +1014,8 @@ export class FilesController {
 
       console.log(`Serving file: ${file.filename} from path: ${file.path}`);
 
-      // Get frontend domain for CORS
-      const frontendDomain = this.configService.get('app.frontendDomain', {
-        infer: true,
-      });
-      const allowedOrigin = frontendDomain || req.headers.origin || '*';
+      // Get allowed origin for CORS
+      const allowedOrigin = this.getAllowedOrigin(req);
       
       // If using non-local storage (e.g., s3), stream via server to avoid CORS
       const isLocal = await this.fileStorageService.isLocal();
@@ -1065,7 +1088,7 @@ export class FilesController {
         `inline; filename="${file.originalName}"`,
       );
       
-      // Restrict CORS to frontend domain only
+      // Restrict CORS to frontend domain only (already set above for non-local, set here for local)
       res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
       res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
       res.setHeader(
@@ -1096,12 +1119,9 @@ export class FilesController {
   @Options('serve/:id')
   @UseGuards(FrontendOriginGuard)
   async serveFileOptions(@Req() req: any, @Res() res: any) {
-    const frontendDomain = this.configService.get('app.frontendDomain', {
-      infer: true,
-    });
-    const allowedOrigin = frontendDomain || req.headers.origin || '*';
-    
-    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+      // Get allowed origin for CORS
+      const allowedOrigin = this.getAllowedOrigin(req);
+      res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.setHeader(
       'Access-Control-Allow-Headers',
@@ -1122,11 +1142,8 @@ export class FilesController {
         return;
       }
 
-      // Get frontend domain for CORS
-      const frontendDomain = this.configService.get('app.frontendDomain', {
-        infer: true,
-      });
-      const allowedOrigin = frontendDomain || req.headers.origin || '*';
+      // Get allowed origin for CORS
+      const allowedOrigin = this.getAllowedOrigin(req);
       
       // If using non-local storage, return headers from storage
       const isLocal = await this.fileStorageService.isLocal();
