@@ -90,7 +90,7 @@ export class ClassesController {
     // If user is a teacher, enforce filtering by their teacher ID
     const userRole = req.user?.role?.id;
     if (userRole === RoleEnum.teacher) {
-      // Find teacher by user email
+      // Find teacher by user email (case-insensitive)
       const teacher = await this.teachersService.findByEmail(req.user?.email);
       
       if (teacher?.id) {
@@ -103,8 +103,11 @@ export class ClassesController {
           filters.teacherId = teacher.id;
         }
       } else {
-        // If teacher not found, return empty result to prevent seeing all classes
+        // If teacher not found, log for debugging and return empty result
         // This is a security measure - teachers should have a teacher record
+        console.warn(
+          `Teacher not found for user email: ${req.user?.email}. User ID: ${req.user?.id}, Role: ${userRole}`,
+        );
         return infinityPagination([], { page, limit });
       }
     }

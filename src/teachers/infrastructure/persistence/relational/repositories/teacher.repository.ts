@@ -37,9 +37,11 @@ export class TeachersRelationalRepository implements TeacherRepository {
 
   async findByEmail(email: Teacher['email']): Promise<NullableType<Teacher>> {
     if (!email) return null;
-    const teacher = await this.teachersRepository.findOne({
-      where: { email },
-    });
+    // Use case-insensitive email lookup
+    const teacher = await this.teachersRepository
+      .createQueryBuilder('teacher')
+      .where('LOWER(teacher.email) = LOWER(:email)', { email })
+      .getOne();
     return teacher ? this.teacherMapper.toDomain(teacher) : null;
   }
 
