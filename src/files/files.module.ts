@@ -15,6 +15,9 @@ import { LearningModuleEntity } from '../learning-modules/infrastructure/persist
 import { AssignmentsModule } from '../assignments/assignments.module';
 import { StudentsModule } from '../students/students.module';
 import { TeachersModule } from '../teachers/teachers.module';
+import { JwtModule } from '@nestjs/jwt';
+import { JwtQueryParamGuard } from './guards/jwt-query-param.guard';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -27,9 +30,11 @@ import { TeachersModule } from '../teachers/teachers.module';
     forwardRef(() => AssignmentsModule),
     forwardRef(() => StudentsModule),
     forwardRef(() => TeachersModule),
+    forwardRef(() => UsersModule),
+    JwtModule.register({}),
   ],
   controllers: [FilesController],
-  providers: [FilesService, FileStorageService, FileMapper, FileRepository],
+  providers: [FilesService, FileStorageService, FileMapper, FileRepository, JwtQueryParamGuard],
   exports: [
     FilesService,
     FileStorageService,
