@@ -16,6 +16,7 @@ import {
   ParseFilePipe,
   MaxFileSizeValidator,
   FileTypeValidator,
+  Request,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateClassDto } from './dto/create-class.dto';
@@ -46,6 +47,7 @@ import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
 import { BulkClassesResultDto } from './dto/bulk-classes-response.dto';
 import { BulkCreateClassesDto } from './dto/bulk-create-classes.dto';
+import { TeachersService } from '../teachers/teachers.service';
 
 @ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -55,9 +57,12 @@ import { BulkCreateClassesDto } from './dto/bulk-create-classes.dto';
   version: '1',
 })
 export class ClassesController {
-  constructor(private readonly classesService: ClassesService) {}
+  constructor(
+    private readonly classesService: ClassesService,
+    private readonly teachersService: TeachersService,
+  ) {}
 
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   create(@Body() createClassDto: CreateClassDto): Promise<Class> {
@@ -65,7 +70,7 @@ export class ClassesController {
   }
 
   @Get()
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiOkResponse({
     type: InfinityPaginationResponseDto,
   })
@@ -74,12 +79,34 @@ export class ClassesController {
   })
   async findAll(
     @Query() query: QueryClassDto,
+    @Request() req,
   ): Promise<InfinityPaginationResponseDto<Class>> {
     const page = query?.page ?? 1;
     const limit = query?.limit ?? 10;
 
+    // Parse filters from query string if provided
+    let filters = query?.filters ?? null;
+    
+    // If user is a teacher, enforce filtering by their teacher ID
+    const userRole = req.user?.role?.id;
+    if (userRole === RoleEnum.teacher) {
+      // Find teacher by user email
+      const teacher = await this.teachersService.findByEmail(req.user?.email);
+      
+      if (teacher?.id) {
+        // Merge teacher filter with existing filters
+        if (!filters) {
+          filters = { teacherId: teacher.id };
+        } else {
+          // Ensure teacherId is set to the current teacher's ID
+          // This prevents teachers from seeing other teachers' classes
+          filters.teacherId = teacher.id;
+        }
+      }
+    }
+
     const data = await this.classesService.findManyWithPagination({
-      filterOptions: query?.filters ?? null,
+      filterOptions: filters,
       sortOptions: query?.sort ?? null,
       paginationOptions: {
         page,
@@ -91,7 +118,7 @@ export class ClassesController {
   }
 
   @Get(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @ApiParam({
     name: 'id',
     type: String,
@@ -102,12 +129,25 @@ export class ClassesController {
   @SerializeOptions({
     groups: ['admin'],
   })
-  findOne(@Param('id') id: string): Promise<NullableType<Class>> {
-    return this.classesService.findById(+id);
+  async findOne(@Param('id') id: string, @Request() req): Promise<NullableType<Class>> {
+    const classEntity = await this.classesService.findById(+id);
+    
+    // If user is a teacher, ensure they can only access their own classes
+    const userRole = req.user?.role?.id;
+    if (userRole === RoleEnum.teacher && classEntity) {
+      const teacher = await this.teachersService.findByEmail(req.user?.email);
+      
+      if (teacher?.id && classEntity.teacher?.id !== teacher.id) {
+        // Teacher is trying to access a class that doesn't belong to them
+        return null;
+      }
+    }
+    
+    return classEntity;
   }
 
   @Patch(':id')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiParam({
     name: 'id',
     type: String,
@@ -126,7 +166,7 @@ export class ClassesController {
   }
 
   @Patch(':id/public-sale')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiParam({
     name: 'id',
     type: String,
@@ -145,7 +185,7 @@ export class ClassesController {
   }
 
   @Delete(':id')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiParam({
     name: 'id',
     type: String,
@@ -166,6 +206,7 @@ export class ClassesController {
 
   // New enrollment endpoint
   @Get(':id/enrollments')
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher, RoleEnum.user)
   @HttpCode(HttpStatus.OK)
   @ApiParam({ name: 'id', type: String, required: true })
   @ApiOkResponse({
@@ -176,7 +217,7 @@ export class ClassesController {
   }
 
   // Bulk enroll endpoint
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @Post(':id/enrollments/bulk')
   @HttpCode(HttpStatus.CREATED)
   @ApiParam({ name: 'id', type: String, required: true })
@@ -190,7 +231,7 @@ export class ClassesController {
   }
 
   @Post('bulk-create')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({
     summary: 'Bulk create classes from JSON data',
     description: 'Send an array of class objects to bulk create classes',

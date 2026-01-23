@@ -17,6 +17,7 @@ import {
   ParseFilePipe,
   MaxFileSizeValidator,
   FileTypeValidator,
+  Request,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
@@ -68,6 +69,27 @@ export class TeachersController {
     return this.teachersService.findPublicTeachers();
   }
 
+  // Get current user's teacher profile
+  @Get('me')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({
+    type: Teacher,
+    description: 'Returns the teacher profile for the current logged-in user',
+  })
+  async getCurrentUserTeacher(@Request() req): Promise<NullableType<Teacher>> {
+    const user = req.user;
+    
+    if (!user?.email) {
+      return null;
+    }
+    
+    // Find teacher by email
+    return this.teachersService.findByEmail(user.email);
+  }
+
   // Public endpoint - get single teacher by ID
   @Get('public/:id')
   @HttpCode(HttpStatus.OK)
@@ -86,7 +108,7 @@ export class TeachersController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -97,7 +119,7 @@ export class TeachersController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Post(':id/reset-password')
   @HttpCode(HttpStatus.OK)
@@ -113,7 +135,7 @@ export class TeachersController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get(':id/check-user-account')
   @ApiParam({
@@ -130,7 +152,7 @@ export class TeachersController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get()
   @ApiOkResponse({
@@ -158,7 +180,7 @@ export class TeachersController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get(':id')
   @ApiParam({
@@ -176,7 +198,7 @@ export class TeachersController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Patch(':id')
   @ApiParam({
@@ -201,7 +223,7 @@ export class TeachersController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Delete(':id')
   @ApiParam({
@@ -216,7 +238,7 @@ export class TeachersController {
   @Post('bulk-create')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({
     summary: 'Bulk create teachers from Excel/CSV file',
     description:

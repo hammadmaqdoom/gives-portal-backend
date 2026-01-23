@@ -74,7 +74,7 @@ export class SubjectsController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -83,7 +83,7 @@ export class SubjectsController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get()
   @ApiOkResponse({
@@ -111,7 +111,7 @@ export class SubjectsController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get(':id')
   @ApiParam({
@@ -129,7 +129,7 @@ export class SubjectsController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Patch(':id')
   @ApiParam({
@@ -150,7 +150,7 @@ export class SubjectsController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Delete(':id')
   @ApiParam({
@@ -165,7 +165,7 @@ export class SubjectsController {
   @Post('bulk-create')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({
     summary: 'Bulk create subjects from JSON data',
     description: 'Send an array of subject objects to bulk create subjects',

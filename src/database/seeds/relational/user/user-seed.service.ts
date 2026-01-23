@@ -36,8 +36,8 @@ export class UserSeedService {
           email: adminEmail,
           password,
           role: {
-            id: RoleEnum.admin,
-            name: 'Admin',
+            id: RoleEnum.superAdmin,
+            name: 'SuperAdmin',
           },
           status: {
             id: StatusEnum.active,
@@ -45,6 +45,21 @@ export class UserSeedService {
           },
         }),
       );
+    }
+
+    // Also update existing admin@digitaro.co to super admin if it exists
+    const existingAdmin = await this.repository.findOne({
+      where: {
+        email: 'admin@digitaro.co',
+      },
+    });
+
+    if (existingAdmin && existingAdmin.role?.id !== RoleEnum.superAdmin) {
+      existingAdmin.role = {
+        id: RoleEnum.superAdmin,
+        name: 'SuperAdmin',
+      } as any;
+      await this.repository.save(existingAdmin);
     }
 
     const countUser = await this.repository.count({
