@@ -60,9 +60,15 @@ export class SettingsService {
       throw new NotFoundException('Settings not found');
     }
 
+    // Convert detectors array to JSON string if provided
+    const updateData = { ...updateSettingsDto };
+    if (updateData.disableDevToolDetectors && Array.isArray(updateData.disableDevToolDetectors)) {
+      (updateData as any).disableDevToolDetectors = JSON.stringify(updateData.disableDevToolDetectors);
+    }
+
     const updatedSettings = await this.settingsRepository.update(
       existingSettings.id,
-      updateSettingsDto,
+      updateData,
     );
 
     // Attempt to refresh mailer transporter immediately (best-effort)
@@ -128,6 +134,8 @@ export class SettingsService {
     azureContainerName?: string | null;
     azureBlobSasExpirySeconds?: number | null;
     azureBlobPublicBaseUrl?: string | null;
+    b2EndpointUrl?: string | null;
+    b2Region?: string | null;
   }> {
     const s = await this.getSettingsOrCreate();
     return {
@@ -141,6 +149,8 @@ export class SettingsService {
       azureContainerName: (s as any).azureContainerName,
       azureBlobSasExpirySeconds: (s as any).azureBlobSasExpirySeconds ?? null,
       azureBlobPublicBaseUrl: (s as any).azureBlobPublicBaseUrl,
+      b2EndpointUrl: (s as any).b2EndpointUrl,
+      b2Region: (s as any).b2Region,
     };
   }
 
@@ -243,6 +253,74 @@ export class SettingsService {
     return {
       themeColorPreset: (settings as any).themeColorPreset || null,
       themeCustomColor: (settings as any).themeCustomColor || null,
+    };
+  }
+
+  async getContentProtection(): Promise<{
+    contentProtectionEnabled: boolean;
+    blockDevTools: boolean;
+    blockKeyboardShortcuts: boolean;
+    blockRightClick: boolean;
+    blockTextSelection: boolean;
+    protectionAction: string;
+    watermarkEnabled: boolean;
+    watermarkShowInstitution: boolean;
+    watermarkShowInstructor: boolean;
+    watermarkShowStudentEmail: boolean;
+    watermarkShowStudentId: boolean;
+    watermarkOpacity: number;
+    watermarkPosition: string;
+    disableDevToolMd5?: string | null;
+    disableDevToolTkName?: string | null;
+    disableDevToolUrl?: string | null;
+    disableDevToolDetectors?: number[] | null;
+    disableDevToolInterval?: number | null;
+    disableDevToolClearLog?: boolean;
+    blockCopy?: boolean;
+    blockCut?: boolean;
+    blockPaste?: boolean;
+  }> {
+    const settings = await this.getSettingsOrCreate();
+
+    // Parse detectors if stored as JSON string
+    let detectors: number[] | null = null;
+    if ((settings as any).disableDevToolDetectors) {
+      try {
+        detectors = typeof (settings as any).disableDevToolDetectors === 'string'
+          ? JSON.parse((settings as any).disableDevToolDetectors)
+          : (settings as any).disableDevToolDetectors;
+      } catch {
+        detectors = null;
+      }
+    }
+
+    return {
+      contentProtectionEnabled:
+        (settings as any).contentProtectionEnabled ?? false,
+      blockDevTools: (settings as any).blockDevTools ?? false,
+      blockKeyboardShortcuts: (settings as any).blockKeyboardShortcuts ?? true,
+      blockRightClick: (settings as any).blockRightClick ?? true,
+      blockTextSelection: (settings as any).blockTextSelection ?? true,
+      protectionAction: (settings as any).protectionAction ?? 'warn',
+      watermarkEnabled: (settings as any).watermarkEnabled ?? false,
+      watermarkShowInstitution:
+        (settings as any).watermarkShowInstitution ?? true,
+      watermarkShowInstructor:
+        (settings as any).watermarkShowInstructor ?? true,
+      watermarkShowStudentEmail:
+        (settings as any).watermarkShowStudentEmail ?? true,
+      watermarkShowStudentId: (settings as any).watermarkShowStudentId ?? false,
+      watermarkOpacity: (settings as any).watermarkOpacity ?? 0.4,
+      watermarkPosition: (settings as any).watermarkPosition ?? 'random',
+      disableDevToolMd5: (settings as any).disableDevToolMd5 ?? null,
+      disableDevToolTkName: (settings as any).disableDevToolTkName ?? 'ddtk',
+      disableDevToolUrl: (settings as any).disableDevToolUrl ?? null,
+      disableDevToolDetectors: detectors,
+      disableDevToolInterval: (settings as any).disableDevToolInterval ?? 200,
+      disableDevToolClearLog: (settings as any).disableDevToolClearLog ?? false,
+      blockCopy: (settings as any).blockCopy ?? false,
+      blockCut: (settings as any).blockCut ?? false,
+      blockPaste: (settings as any).blockPaste ?? false,
     };
   }
 }
