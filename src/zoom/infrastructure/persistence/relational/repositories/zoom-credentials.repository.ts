@@ -7,6 +7,7 @@ import { ZoomCredentialsRepository } from '../../zoom-credentials.repository';
 import { ZoomCredentialsMapper } from '../mappers/zoom-credentials.mapper';
 import { NullableType } from '../../../../../utils/types/nullable.type';
 import { DeepPartial } from '../../../../../utils/types/deep-partial.type';
+import { TeacherEntity } from '../../../../../teachers/infrastructure/persistence/relational/entities/teacher.entity';
 
 @Injectable()
 export class RelationalZoomCredentialsRepository
@@ -15,6 +16,8 @@ export class RelationalZoomCredentialsRepository
   constructor(
     @InjectRepository(ZoomCredentialsEntity)
     private readonly repository: Repository<ZoomCredentialsEntity>,
+    @InjectRepository(TeacherEntity)
+    private readonly teacherRepository: Repository<TeacherEntity>,
   ) {}
 
   async create(
@@ -65,12 +68,27 @@ export class RelationalZoomCredentialsRepository
   }
 
   async storeOAuthTokens(teacherId: number, tokens: any): Promise<void> {
-    const entity = await this.repository.findOne({
+    let entity = await this.repository.findOne({
       where: { teacherId, isActive: true },
     });
-    if (!entity) throw new Error('Zoom credentials not found');
-    entity.zoomWebhookSecret = JSON.stringify(tokens);
-    await this.repository.save(entity);
+    
+    // If no credentials exist, create a minimal record for OAuth-only connection
+    // The S2S fields (zoomApiKey, zoomApiSecret, zoomAccountId) are required by the schema
+    // but not needed for OAuth Authorization Code flow
+    if (!entity) {
+      entity = this.repository.create({
+        teacherId,
+        zoomApiKey: 'oauth-only', // Placeholder - not used for OAuth flow
+        zoomApiSecret: 'oauth-only', // Placeholder - not used for OAuth flow
+        zoomAccountId: 'oauth-only', // Placeholder - not used for OAuth flow
+        zoomWebhookSecret: JSON.stringify(tokens),
+        isActive: true,
+      });
+      await this.repository.save(entity);
+    } else {
+      entity.zoomWebhookSecret = JSON.stringify(tokens);
+      await this.repository.save(entity);
+    }
   }
 
   async getOAuthTokens(teacherId: number): Promise<any | null> {
@@ -83,5 +101,28 @@ export class RelationalZoomCredentialsRepository
     } catch {
       return null;
     }
+  }
+
+  async getTeacherStatistics(): Promise<{
+    totalTeachers: number;
+    connectedTeachers: number;
+    notConnectedTeachers: number;
+  }> {
+    // Get total number of teachers
+    const totalTeachers = await this.teacherRepository.count({
+      where: { deletedAt: null as any },
+    });
+
+    // Get number of teachers with active Zoom credentials
+    const connectedTeachers = await this.repository
+      .createQueryBuilder('zoom_credentials')
+      .where('zoom_credentials.isActive = :isActive', { isActive: true })
+      .getCount();
+
+    return {
+      totalTeachers,
+      connectedTeachers,
+      notConnectedTeachers: totalTeachers - connectedTeachers,
+    };
   }
 }

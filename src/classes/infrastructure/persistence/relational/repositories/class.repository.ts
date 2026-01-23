@@ -74,6 +74,14 @@ export class ClassesRelationalRepository implements ClassRepository {
       .leftJoinAndSelect('class.thumbnailFile', 'thumbnailFile')
       .leftJoinAndSelect('class.coverImageFile', 'coverImageFile');
 
+    // Add unified search filter
+    if (filterOptions?.search) {
+      queryBuilder.andWhere(
+        '(class.name ILIKE :search OR class.batchTerm ILIKE :search OR class.timing ILIKE :search OR subject.name ILIKE :search OR teacher.name ILIKE :search)',
+        { search: `%${filterOptions.search}%` },
+      );
+    }
+
     if (filterOptions?.name) {
       queryBuilder.andWhere('class.name ILIKE :name', {
         name: `%${filterOptions.name}%`,

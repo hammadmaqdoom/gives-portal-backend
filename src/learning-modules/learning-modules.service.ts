@@ -10,6 +10,10 @@ import { LearningModuleEntity } from './infrastructure/persistence/relational/en
 import { LearningModuleSectionEntity } from './infrastructure/persistence/relational/entities/learning-module-section.entity';
 import { ModuleCompletionEntity } from './infrastructure/persistence/relational/entities/module-completion.entity';
 import { AccessControlService } from '../access-control/access-control.service';
+import { FilesService } from '../files/files.service';
+import { BadRequestException } from '@nestjs/common';
+import { TeachersService } from '../teachers/teachers.service';
+import { ClassesService } from '../classes/classes.service';
 
 @Injectable()
 export class LearningModulesService {
@@ -22,6 +26,12 @@ export class LearningModulesService {
     private readonly completionRepo: Repository<ModuleCompletionEntity>,
     @Inject(forwardRef(() => AccessControlService))
     private readonly accessControlService: AccessControlService,
+    @Inject(forwardRef(() => FilesService))
+    private readonly filesService: FilesService,
+    @Inject(forwardRef(() => TeachersService))
+    private readonly teachersService: TeachersService,
+    @Inject(forwardRef(() => ClassesService))
+    private readonly classesService: ClassesService,
   ) {}
 
   async list({ classId }: { classId?: number }) {
@@ -52,13 +62,61 @@ export class LearningModulesService {
   }
 
   async create(payload: Partial<LearningModuleEntity>) {
+    // Validate videoFileId if provided
+    if (payload.videoFileId) {
+      await this.validateVideoFile(payload.videoFileId, payload.classId);
+    }
+
     const entity = this.repo.create(payload);
     return this.repo.save(entity);
   }
 
   async update(id: number, payload: Partial<LearningModuleEntity>) {
+    // Get existing module to check classId
+    const existingModule = await this.get(id);
+    if (!existingModule) {
+      throw new BadRequestException('Module not found');
+    }
+
+    // Validate videoFileId if provided
+    if (payload.videoFileId) {
+      const classId = payload.classId || existingModule.classId;
+      await this.validateVideoFile(payload.videoFileId, classId);
+    }
+
     await this.repo.update({ id }, payload);
     return this.get(id);
+  }
+
+  /**
+   * Validate that a video file exists, belongs to the class, and is a video file
+   */
+  private async validateVideoFile(
+    videoFileId: string,
+    classId?: number | null,
+  ): Promise<void> {
+    if (!videoFileId) {
+      return;
+    }
+
+    const file = await this.filesService.getFileById(videoFileId);
+    if (!file) {
+      throw new BadRequestException('Video file not found');
+    }
+
+    // Check if it's a video file
+    if (!file.mimeType.startsWith('video/')) {
+      throw new BadRequestException('File is not a video file');
+    }
+
+    // If classId is provided, verify the file belongs to that class
+    if (classId) {
+      if (file.contextType !== 'class' || file.contextId !== classId.toString()) {
+        throw new BadRequestException(
+          'Video file does not belong to this class',
+        );
+      }
+    }
   }
 
   async remove(id: number) {
@@ -326,6 +384,72 @@ export class LearningModulesService {
       return (await this.completionRepo.findOne({
         where: { id: completion.id },
       })) as ModuleCompletionEntity;
+    }
+  }
+
+  /**
+   * Check if a teacher can modify a module (based on class assignment)
+   */
+  async canTeacherModifyModule(
+    teacherEmail: string,
+    moduleId: number,
+  ): Promise<boolean> {
+    try {
+      // Get the module
+      const module = await this.get(moduleId);
+      if (!module || !module.classId) {
+        return false;
+      }
+
+      // Get teacher by email
+      const teacher = await this.teachersService.findByEmail(teacherEmail);
+      if (!teacher) {
+        return false;
+      }
+
+      // Get class and check if teacher is assigned
+      const classEntity = await this.classesService.findById(module.classId);
+      if (!classEntity) {
+        return false;
+      }
+
+      return classEntity.teacher?.id === teacher.id;
+    } catch (error) {
+      console.error('Error checking teacher module authorization:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if a teacher can modify a section (based on class assignment)
+   */
+  async canTeacherModifySection(
+    teacherEmail: string,
+    sectionId: number,
+  ): Promise<boolean> {
+    try {
+      // Get the section
+      const section = await this.sectionRepo.findOne({ where: { id: sectionId } });
+      if (!section || !section.classId) {
+        return false;
+      }
+
+      // Get teacher by email
+      const teacher = await this.teachersService.findByEmail(teacherEmail);
+      if (!teacher) {
+        return false;
+      }
+
+      // Get class and check if teacher is assigned
+      const classEntity = await this.classesService.findById(section.classId);
+      if (!classEntity) {
+        return false;
+      }
+
+      return classEntity.teacher?.id === teacher.id;
+    } catch (error) {
+      console.error('Error checking teacher section authorization:', error);
+      return false;
     }
   }
 }
