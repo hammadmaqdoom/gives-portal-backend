@@ -3,6 +3,8 @@ export enum FileDriver {
   S3 = 's3',
   S3_PRESIGNED = 's3-presigned',
   AZURE_BLOB_SAS = 'azure-blob-sas',
+  B2 = 'b2',
+  B2_PRESIGNED = 'b2-presigned',
 }
 
 export type FileConfig = {
@@ -18,5 +20,11 @@ export type FileConfig = {
   azureContainerName?: string;
   azureBlobSasExpirySeconds?: number;
   azureBlobPublicBaseUrl?: string;
+  // Backblaze B2
+  b2EndpointUrl?: string;
+  b2Region?: string;
   maxFileSize: number;
+  maxVideoFileSize?: number;
+  videoChunkSize?: number;
+  enableChunkedUpload?: boolean;
 };
