@@ -83,7 +83,7 @@ export class SubjectsController {
   }
 
   @ApiBearerAuth()
-  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get()
   @ApiOkResponse({

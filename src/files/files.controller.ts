@@ -32,6 +32,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../roles/roles.guard';
 import { Roles } from '../roles/roles.decorator';
 import { RoleEnum } from '../roles/roles.enum';
+import { JwtQueryParamGuard } from './guards/jwt-query-param.guard';
 import { FilesService } from './files.service';
 import { ConfigService } from '@nestjs/config';
 import { FileStorageService, FileUploadContext } from './file-storage.service';
@@ -903,9 +904,9 @@ export class FilesController {
   @Get('serve/:id')
   @ApiOperation({ summary: 'Serve file content by ID' })
   @ApiParam({ name: 'id', description: 'File ID' })
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UseGuards(JwtQueryParamGuard, RolesGuard)
   @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
-  async serveFile(@Param('id') id: string, @Req() req: any, @Res() res: any) {
+  async serveFile(@Param('id') id: string, @Req() req: any, @Res() res: any, @Query('token') token?: string) {
     try {
       const file = await this.filesService.getFileById(id);
       if (!file) {

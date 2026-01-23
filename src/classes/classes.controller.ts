@@ -102,6 +102,10 @@ export class ClassesController {
           // This prevents teachers from seeing other teachers' classes
           filters.teacherId = teacher.id;
         }
+      } else {
+        // If teacher not found, return empty result to prevent seeing all classes
+        // This is a security measure - teachers should have a teacher record
+        return infinityPagination([], { page, limit });
       }
     }
 
