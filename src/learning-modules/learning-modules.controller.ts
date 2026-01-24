@@ -53,13 +53,20 @@ export class LearningModulesController {
       payload.contentHtml = sanitizeHtml(String(payload.description));
     }
     delete payload.description;
-    // Normalize attachments (stringified JSON to array)
+    // Normalize attachments (stringified JSON to array) and strip view-only URL fields
     if (typeof payload.attachments === 'string') {
       try {
         payload.attachments = JSON.parse(payload.attachments);
       } catch {
         payload.attachments = [];
       }
+    }
+    if (Array.isArray(payload.attachments)) {
+      payload.attachments = payload.attachments.map((att: any) => {
+        if (!att || typeof att !== 'object') return att;
+        const { url, ...rest } = att;
+        return rest;
+      });
     }
     // Coerce date-like fields to null or Date
     const coerceDate = (v: any) => {
@@ -84,13 +91,20 @@ export class LearningModulesController {
       payload.contentHtml = sanitizeHtml(String(payload.description));
     }
     delete payload.description;
-    // Normalize attachments (stringified JSON to array)
+    // Normalize attachments (stringified JSON to array) and strip view-only URL fields
     if (typeof payload.attachments === 'string') {
       try {
         payload.attachments = JSON.parse(payload.attachments);
       } catch {
         payload.attachments = [];
       }
+    }
+    if (Array.isArray(payload.attachments)) {
+      payload.attachments = payload.attachments.map((att: any) => {
+        if (!att || typeof att !== 'object') return att;
+        const { url, ...rest } = att;
+        return rest;
+      });
     }
     // Coerce date-like fields to null or Date
     const coerceDate = (v: any) => {
