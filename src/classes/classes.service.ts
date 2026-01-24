@@ -25,6 +25,7 @@ import { Weekday } from './infrastructure/persistence/relational/entities/class-
 import { FileStorageService } from '../files/file-storage.service';
 import { FileDriver } from '../files/config/file-config.type';
 import { ConfigService } from '@nestjs/config';
+import { AccessControlService } from '../access-control/access-control.service';
 
 @Injectable()
 export class ClassesService {
@@ -41,6 +42,7 @@ export class ClassesService {
     private readonly teachersService: TeachersService,
     private readonly fileStorageService: FileStorageService,
     private readonly configService: ConfigService,
+    private readonly accessControlService: AccessControlService,
   ) {}
 
   /**
@@ -413,7 +415,33 @@ export class ClassesService {
     }
 
     // Get enrollments with student details
-    return this.enrollmentRepository.findByClassId(classId);
+    const enrollments = await this.enrollmentRepository.findByClassId(classId);
+    
+    // Enrich enrollments with access control information
+    const enrichedEnrollments = await Promise.all(
+      enrollments.map(async (enrollment) => {
+        // Get access status for each enrollment
+        const accessStatus = await this.accessControlService.checkCourseAccess(
+          enrollment.studentId,
+          classId,
+        );
+        
+        return {
+          ...enrollment,
+          accessStatus: {
+            hasAccess: accessStatus.hasAccess,
+            isPaid: accessStatus.isPaid,
+            requiresPayment: accessStatus.requiresPayment,
+            enrollmentStatus: accessStatus.enrollmentStatus,
+            invoiceStatus: accessStatus.invoiceStatus,
+            invoiceId: accessStatus.invoiceId,
+            message: accessStatus.message,
+          },
+        };
+      }),
+    );
+    
+    return enrichedEnrollments;
   }
 
   async bulkEnroll(
