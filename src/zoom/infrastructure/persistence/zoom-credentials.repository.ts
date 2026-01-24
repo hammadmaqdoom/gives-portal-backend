@@ -21,4 +21,11 @@ export abstract class ZoomCredentialsRepository {
   // OAuth token storage helpers
   abstract storeOAuthTokens(teacherId: number, tokens: any): Promise<void>;
   abstract getOAuthTokens(teacherId: number): Promise<any | null>;
+
+  // Statistics
+  abstract getTeacherStatistics(): Promise<{
+    totalTeachers: number;
+    connectedTeachers: number;
+    notConnectedTeachers: number;
+  }>;
 }
