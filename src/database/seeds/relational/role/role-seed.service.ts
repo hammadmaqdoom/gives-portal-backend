@@ -56,5 +56,20 @@ export class RoleSeedService {
         }),
       );
     }
+
+    const countSuperAdmin = await this.repository.count({
+      where: {
+        id: RoleEnum.superAdmin,
+      },
+    });
+
+    if (!countSuperAdmin) {
+      await this.repository.save(
+        this.repository.create({
+          id: RoleEnum.superAdmin,
+          name: 'SuperAdmin',
+        }),
+      );
+    }
   }
 }
