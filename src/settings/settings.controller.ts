@@ -31,7 +31,6 @@ import { SettingsAccessGuard } from '../feature-modules/guards/settings-access.g
   path: 'settings',
   version: '1',
 })
-@UseGuards(AuthGuard('jwt'), RolesGuard, SettingsAccessGuard)
 @ApiBearerAuth()
 export class SettingsController {
   constructor(
@@ -40,6 +39,7 @@ export class SettingsController {
   ) {}
 
   @Get()
+  @UseGuards(AuthGuard('jwt'), RolesGuard, SettingsAccessGuard)
   @Roles(RoleEnum.superAdmin, RoleEnum.admin)
   @ApiOperation({ summary: 'Get application settings' })
   @ApiResponse({
@@ -52,6 +52,7 @@ export class SettingsController {
   }
 
   @Get('app-config')
+  @UseGuards(AuthGuard('jwt'), RolesGuard, SettingsAccessGuard)
   @Roles(RoleEnum.superAdmin, RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
   @RequireSettingsAccess('app_config')
   @ApiOperation({ summary: 'Get app configuration' })
@@ -64,6 +65,7 @@ export class SettingsController {
   }
 
   @Get('business-info')
+  @UseGuards(AuthGuard('jwt'), RolesGuard, SettingsAccessGuard)
   @Roles(RoleEnum.superAdmin, RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
   @RequireSettingsAccess('business_info')
   @ApiOperation({ summary: 'Get business information' })
@@ -76,6 +78,7 @@ export class SettingsController {
   }
 
   @Get('bank-details')
+  @UseGuards(AuthGuard('jwt'), RolesGuard, SettingsAccessGuard)
   @Roles(RoleEnum.superAdmin, RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
   @RequireSettingsAccess('bank_details')
   @ApiOperation({ summary: 'Get bank account details' })
@@ -88,6 +91,7 @@ export class SettingsController {
   }
 
   @Get('smtp-config')
+  @UseGuards(AuthGuard('jwt'), RolesGuard, SettingsAccessGuard)
   @Roles(RoleEnum.superAdmin, RoleEnum.admin)
   @RequireSettingsAccess('smtp_config')
   @ApiOperation({ summary: 'Get SMTP configuration' })
@@ -100,6 +104,7 @@ export class SettingsController {
   }
 
   @Get('social-media')
+  @UseGuards(AuthGuard('jwt'), RolesGuard, SettingsAccessGuard)
   @Roles(RoleEnum.superAdmin, RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
   @RequireSettingsAccess('social_media')
   @ApiOperation({ summary: 'Get social media links' })
@@ -112,6 +117,7 @@ export class SettingsController {
   }
 
   @Get('file-storage')
+  @UseGuards(AuthGuard('jwt'), RolesGuard, SettingsAccessGuard)
   @Roles(RoleEnum.superAdmin, RoleEnum.admin)
   @RequireSettingsAccess('file_storage')
   @ApiOperation({ summary: 'Get file storage configuration' })
@@ -124,6 +130,7 @@ export class SettingsController {
   }
 
   @Get('sms-config')
+  @UseGuards(AuthGuard('jwt'), RolesGuard, SettingsAccessGuard)
   @Roles(RoleEnum.superAdmin, RoleEnum.admin)
   @RequireSettingsAccess('sms_config')
   @ApiOperation({ summary: 'Get SMS and WhatsApp configuration' })
@@ -148,6 +155,7 @@ export class SettingsController {
   }
 
   @Get('theme-config')
+  @UseGuards(AuthGuard('jwt'), RolesGuard, SettingsAccessGuard)
   @Roles(RoleEnum.superAdmin, RoleEnum.admin)
   @RequireSettingsAccess('theme')
   @ApiOperation({ summary: 'Get theme configuration' })
@@ -160,8 +168,6 @@ export class SettingsController {
   }
 
   @Get('content-protection')
-  @Roles(RoleEnum.superAdmin, RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
-  @RequireSettingsAccess('content_protection')
   @ApiOperation({ summary: 'Get content protection and watermark configuration' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -172,6 +178,7 @@ export class SettingsController {
   }
 
   @Post('currency/sync')
+  @UseGuards(AuthGuard('jwt'), RolesGuard, SettingsAccessGuard)
   @Roles(RoleEnum.superAdmin, RoleEnum.admin)
   @ApiOperation({ summary: 'Manually sync currency rates (fetch latest)' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Currency rates synced' })
@@ -181,6 +188,7 @@ export class SettingsController {
   }
 
   @Post()
+  @UseGuards(AuthGuard('jwt'), RolesGuard, SettingsAccessGuard)
   @Roles(RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Create application settings' })
   @ApiResponse({
@@ -196,6 +204,7 @@ export class SettingsController {
   }
 
   @Patch()
+  @UseGuards(AuthGuard('jwt'), RolesGuard, SettingsAccessGuard)
   @Roles(RoleEnum.superAdmin, RoleEnum.admin)
   @ApiOperation({ summary: 'Update application settings' })
   @ApiResponse({
