@@ -44,7 +44,7 @@ export class LearningModulesController {
   }
 
   @Post()
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() body: any) {
     const payload = { ...body };
@@ -82,7 +82,7 @@ export class LearningModulesController {
   }
 
   @Patch(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.OK)
   async update(@Param('id') id: string, @Body() body: any) {
     const payload = { ...body };
@@ -152,14 +152,14 @@ export class LearningModulesController {
   }
 
   @Post(':id/toggle-pinned')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.OK)
   async togglePinned(@Param('id') id: string) {
     return this.service.togglePinned(Number(id));
   }
 
   @Post(':id/link-zoom-meeting')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.OK)
   async linkZoomMeeting(
     @Param('id') id: string,
@@ -169,7 +169,7 @@ export class LearningModulesController {
   }
 
   @Post(':id/unlink-zoom-meeting')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.OK)
   async unlinkZoomMeeting(@Param('id') id: string) {
     return this.service.unlinkZoomMeeting(Number(id));
@@ -246,7 +246,7 @@ export class LearningModuleSectionsController {
   }
 
   @Post()
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   async create(
     @Body() body: { classId: number; title: string; orderIndex?: number },
   ) {
@@ -258,7 +258,7 @@ export class LearningModuleSectionsController {
   }
 
   @Patch(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   async update(
     @Param('id') id: string,
     @Body() body: { title?: string; orderIndex?: number },
@@ -298,7 +298,7 @@ export class LearningModuleSectionsController {
   }
 
   @Post(':id/modules')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   async createModuleInSection(
     @Param('id') id: string,
     @Body() body: Partial<any>,
@@ -307,7 +307,7 @@ export class LearningModuleSectionsController {
   }
 
   @Patch('move/:moduleId/:sectionId')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   async moveModule(
     @Param('moduleId') moduleId: string,
     @Param('sectionId') sectionId: string,
