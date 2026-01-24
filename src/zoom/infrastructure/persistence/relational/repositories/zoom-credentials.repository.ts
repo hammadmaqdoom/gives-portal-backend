@@ -107,22 +107,55 @@ export class RelationalZoomCredentialsRepository
     totalTeachers: number;
     connectedTeachers: number;
     notConnectedTeachers: number;
+    teachers: {
+      teacherId: number;
+      name: string;
+      email?: string | null;
+      isConnected: boolean;
+      lastUpdatedAt: Date | null;
+    }[];
   }> {
-    // Get total number of teachers
-    const totalTeachers = await this.teacherRepository.count({
-      where: { deletedAt: null as any },
-    });
+    // Get all non-deleted teachers
+    const teacherRows = await this.teacherRepository
+      .createQueryBuilder('teacher')
+      .leftJoin(
+        'zoom_credentials',
+        'zoom',
+        'zoom.teacherId = teacher.id AND zoom.isActive = :isActive',
+        { isActive: true },
+      )
+      .where('teacher.deletedAt IS NULL')
+      .select([
+        'teacher.id AS teacherId',
+        'teacher.name AS name',
+        'teacher.email AS email',
+        'zoom.id AS zoomId',
+        'zoom.updatedAt AS zoomUpdatedAt',
+      ])
+      .getRawMany<{
+        teacherId: number;
+        name: string;
+        email: string | null;
+        zoomId: number | null;
+        zoomUpdatedAt: Date | null;
+      }>();
 
-    // Get number of teachers with active Zoom credentials
-    const connectedTeachers = await this.repository
-      .createQueryBuilder('zoom_credentials')
-      .where('zoom_credentials.isActive = :isActive', { isActive: true })
-      .getCount();
+    const totalTeachers = teacherRows.length;
+    const teachers = teacherRows.map((row) => ({
+      teacherId: row.teacherId,
+      name: row.name,
+      email: row.email,
+      isConnected: !!row.zoomId,
+      lastUpdatedAt: row.zoomUpdatedAt,
+    }));
+
+    const connectedTeachers = teachers.filter((t) => t.isConnected).length;
 
     return {
       totalTeachers,
       connectedTeachers,
       notConnectedTeachers: totalTeachers - connectedTeachers,
+      teachers,
     };
   }
 }
