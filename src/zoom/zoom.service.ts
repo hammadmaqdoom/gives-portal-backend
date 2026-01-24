@@ -626,6 +626,13 @@ export class ZoomService {
     totalTeachers: number;
     connectedTeachers: number;
     notConnectedTeachers: number;
+    teachers: {
+      teacherId: number;
+      name: string;
+      email?: string | null;
+      isConnected: boolean;
+      lastUpdatedAt: Date | null;
+    }[];
   }> {
     const stats = await this.zoomCredentialsRepository.getTeacherStatistics();
     return stats;

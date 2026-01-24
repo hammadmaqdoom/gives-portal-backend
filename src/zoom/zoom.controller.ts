@@ -68,11 +68,20 @@ export class ZoomController {
     @Res() res: Response,
   ) {
     // Get frontend URL for redirect
-    const frontendUrl =
+    let frontendUrl =
       this.configService.get('app.frontendDomain', { infer: true }) ||
       this.configService.get('APP_URL', { infer: true }) ||
       this.configService.get('FRONTEND_DOMAIN', { infer: true }) ||
       'http://localhost:3000';
+
+    // Normalise frontend URL so redirects are absolute rather than relative
+    // e.g. "app.thesilver.academy" -> "https://app.thesilver.academy"
+    if (frontendUrl && !/^https?:\/\//i.test(frontendUrl)) {
+      frontendUrl = `https://${frontendUrl}`;
+    }
+
+    // Remove any trailing slash to avoid double slashes when appending paths
+    frontendUrl = frontendUrl.replace(/\/+$/, '');
 
     try {
       // If Zoom returned an error, redirect with error message
