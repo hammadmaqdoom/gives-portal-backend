@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { StudentsService } from '../students/students.service';
 import { InvoicesService } from '../invoices/invoices.service';
 import { ClassesService } from '../classes/classes.service';
@@ -20,8 +20,11 @@ export class AccessControlService {
   private readonly logger = new Logger(AccessControlService.name);
 
   constructor(
+    @Inject(forwardRef(() => StudentsService))
     private readonly studentsService: StudentsService,
+    @Inject(forwardRef(() => InvoicesService))
     private readonly invoicesService: InvoicesService,
+    @Inject(forwardRef(() => ClassesService))
     private readonly classesService: ClassesService,
     private readonly enrollmentRepository: StudentClassEnrollmentRepository,
   ) {}
