@@ -136,7 +136,12 @@ export class InvoicesController {
   }
 
   @Get('my-invoices')
-  @Roles(RoleEnum.user)
+  // Allow all authenticated portal users to view their invoices.
+  // This covers:
+  // - Students logging in directly
+  // - Parents logging in to view their children's invoices
+  // - Admins/teachers impersonating or checking their own invoices
+  @Roles(RoleEnum.user, RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.teacher)
   @ApiOperation({ summary: 'Get current user invoices' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -144,32 +149,48 @@ export class InvoicesController {
     type: [Invoice],
   })
   async getMyInvoices(@Request() req) {
-    const userRole = req.user.role?.name?.toLowerCase();
-    const userId = req.user.id;
+    const userId = Number(req.user.id);
 
-    console.log('🔍 getMyInvoices - User ID:', userId);
-    console.log('🔍 getMyInvoices - User Role:', userRole);
-    console.log(
-      '🔍 getMyInvoices - Full user object:',
-      JSON.stringify(req.user, null, 2),
-    );
+    // Try both perspectives:
+    // - Invoices where this user is the student
+    // - Invoices where this user is the parent
+    //
+    // This is more robust than relying on role name strings,
+    // and it also handles mixed setups where the same login
+    // might be linked as both student and parent in the system.
+    const [studentInvoices, parentInvoices] = await Promise.all([
+      this.invoicesService
+        .findByStudentUserId(userId)
+        .catch((error) => {
+          // Log but don't fail the whole request if one side errors
+          console.error(
+            'Error fetching invoices as student for user',
+            userId,
+            error,
+          );
+          return [];
+        }),
+      this.invoicesService
+        .findByParentUserId(userId)
+        .catch((error) => {
+          console.error(
+            'Error fetching invoices as parent for user',
+            userId,
+            error,
+          );
+          return [];
+        }),
+    ]);
 
-    if (userRole === 'parent') {
-      // Find parent by user ID first, then get their invoices
-      console.log('🔍 Getting invoices for parent with user ID:', userId);
-      const result = await this.invoicesService.findByParentUserId(userId);
-      console.log('🔍 Parent invoices result:', result);
-      return result;
-    } else if (userRole === 'student' || userRole === 'user') {
-      // Find student by user ID first, then get their invoices
-      console.log('🔍 Getting invoices for student with user ID:', userId);
-      const result = await this.invoicesService.findByStudentUserId(userId);
-      console.log('🔍 Student invoices result:', result);
-      return result;
-    }
+    // Merge and de-duplicate by invoice ID
+    const invoiceMap = new Map<number, Invoice>();
+    [...studentInvoices, ...parentInvoices].forEach((invoice) => {
+      if (invoice && typeof invoice.id === 'number') {
+        invoiceMap.set(invoice.id, invoice);
+      }
+    });
 
-    console.log('🔍 User role not recognized, returning empty array');
-    return [];
+    return Array.from(invoiceMap.values());
   }
 
   @Get('generate-number')
