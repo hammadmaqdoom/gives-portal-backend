@@ -65,7 +65,7 @@ export class FilesController {
     private readonly teachersService: TeachersService,
     @Inject(forwardRef(() => AssignmentsService))
     private readonly assignmentsService: AssignmentsService,
-  ) {}
+  ) { }
 
   /**
    * Get base URL for the current server
@@ -87,7 +87,7 @@ export class FilesController {
     const frontendDomain = this.configService.get('app.frontendDomain', {
       infer: true,
     });
-    
+
     // Construct allowed origin - use request origin if available, otherwise construct from config
     if (requestOrigin) {
       return requestOrigin;
@@ -100,7 +100,7 @@ export class FilesController {
         return `${protocol}://${frontendDomain}`;
       }
     }
-    
+
     return '*';
   }
 
@@ -148,7 +148,7 @@ export class FilesController {
         const { Repository } = require('typeorm');
         const { LearningModuleEntity } = require('../learning-modules/infrastructure/persistence/relational/entities/learning-module.entity');
         const moduleId = parseInt(file.contextId, 10);
-        
+
         // We need to query the module to get its classId
         const moduleRepository = this.configService.get('typeorm');
         // For now, we'll use the filesService to check this
@@ -759,7 +759,7 @@ export class FilesController {
         // Get student ID from user ID
         const student = await this.studentsService.findByUserId(user?.id);
         const studentId = student?.id;
-        
+
         if (studentId) {
           const accessStatus = await this.accessControlService.checkCourseAccess(
             studentId,
@@ -1016,7 +1016,10 @@ export class FilesController {
 
       // Get allowed origin for CORS
       const allowedOrigin = this.getAllowedOrigin(req);
-      
+
+      // Check if this is a video file
+      const isVideo = file.mimeType?.startsWith('video/') || /\.(mp4|webm|mov|avi|mkv|flv|wmv|m4v)$/i.test(file.path);
+
       // If using non-local storage (e.g., s3), stream via server to avoid CORS
       const isLocal = await this.fileStorageService.isLocal();
       if (!isLocal) {
@@ -1032,24 +1035,32 @@ export class FilesController {
             'Content-Disposition',
             `inline; filename="${file.originalName}"`,
           );
-          
+
           // Restrict CORS to frontend domain only
           res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
           res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
           res.setHeader(
             'Access-Control-Allow-Headers',
-            'Content-Type, Authorization, X-Frontend-Request',
+            'Content-Type, Authorization, X-Frontend-Request, Range',
           );
           res.setHeader('Access-Control-Allow-Credentials', 'true');
-          
+          res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length');
+
           // Security headers
           res.setHeader('X-Content-Type-Options', 'nosniff');
           res.setHeader('X-Frame-Options', 'SAMEORIGIN');
           res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
-          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-          res.setHeader('Pragma', 'no-cache');
-          res.setHeader('Expires', '0');
-          
+
+          // For videos, enable caching and range requests
+          if (isVideo) {
+            res.setHeader('Accept-Ranges', 'bytes');
+            res.setHeader('Cache-Control', 'public, max-age=3600');
+          } else {
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+          }
+
           stream.pipe(res);
           return;
         } catch (e) {
@@ -1081,31 +1092,83 @@ export class FilesController {
         throw new BadRequestException('File not found on disk');
       }
 
+      // Get file stats for size
+      const stat = fs.statSync(fullPath);
+      const fileSize = stat.size;
+
+      // Handle Range Requests for video streaming
+      const range = req.headers.range;
+
+      if (isVideo && range) {
+        // Parse Range header
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunksize = (end - start) + 1;
+
+        // Create read stream for the requested range
+        const fileStream = fs.createReadStream(fullPath, { start, end });
+
+        // Set 206 Partial Content status
+        res.status(206);
+        res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+        res.setHeader('Accept-Ranges', 'bytes');
+        res.setHeader('Content-Length', chunksize);
+        res.setHeader('Content-Type', file.mimeType);
+        res.setHeader('Content-Disposition', `inline; filename="${file.originalName}"`);
+
+        // CORS headers
+        res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+        res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Frontend-Request, Range');
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length');
+
+        // Security headers
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+        res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
+
+        // Enable caching for video chunks
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+
+        fileStream.pipe(res);
+        return;
+      }
+
       // Set appropriate headers with security measures
       res.setHeader('Content-Type', file.mimeType);
+      res.setHeader('Content-Length', fileSize);
       res.setHeader(
         'Content-Disposition',
         `inline; filename="${file.originalName}"`,
       );
-      
+
       // Restrict CORS to frontend domain only (already set above for non-local, set here for local)
       res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
       res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
       res.setHeader(
         'Access-Control-Allow-Headers',
-        'Content-Type, Authorization, X-Frontend-Request',
+        'Content-Type, Authorization, X-Frontend-Request, Range',
       );
       res.setHeader('Access-Control-Allow-Credentials', 'true');
-      
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length');
+
       // Security headers to prevent downloads and protect content
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('X-Frame-Options', 'SAMEORIGIN');
       res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
-      
-      // Prevent caching to ensure fresh token validation
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
+
+      // For videos, enable range requests and caching
+      if (isVideo) {
+        res.setHeader('Accept-Ranges', 'bytes');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+      } else {
+        // Prevent caching for non-video files to ensure fresh token validation
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      }
 
       // Stream the file
       const fileStream = fs.createReadStream(fullPath);
@@ -1119,15 +1182,16 @@ export class FilesController {
   @Options('serve/:id')
   @UseGuards(FrontendOriginGuard)
   async serveFileOptions(@Req() req: any, @Res() res: any) {
-      // Get allowed origin for CORS
-      const allowedOrigin = this.getAllowedOrigin(req);
-      res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    // Get allowed origin for CORS
+    const allowedOrigin = this.getAllowedOrigin(req);
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.setHeader(
       'Access-Control-Allow-Headers',
-      'Content-Type, Authorization, X-Frontend-Request',
+      'Content-Type, Authorization, X-Frontend-Request, Range',
     );
     res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length');
     res.setHeader('Access-Control-Max-Age', '86400');
     res.status(200).send();
   }
@@ -1144,7 +1208,7 @@ export class FilesController {
 
       // Get allowed origin for CORS
       const allowedOrigin = this.getAllowedOrigin(req);
-      
+
       // If using non-local storage, return headers from storage
       const isLocal = await this.fileStorageService.isLocal();
       if (!isLocal) {
@@ -1153,7 +1217,7 @@ export class FilesController {
             await this.fileStorageService.headObject(file.path);
           if (contentType) res.setHeader('Content-Type', contentType);
           if (contentLength) res.setHeader('Content-Length', contentLength);
-          
+
           // Security headers
           res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
           res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
@@ -1168,7 +1232,7 @@ export class FilesController {
           res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
           res.setHeader('Pragma', 'no-cache');
           res.setHeader('Expires', '0');
-          
+
           res.status(200).send();
           return;
         } catch (e) {
@@ -1197,7 +1261,7 @@ export class FilesController {
         'Content-Type, Authorization, X-Frontend-Request',
       );
       res.setHeader('Access-Control-Allow-Credentials', 'true');
-      
+
       // Security headers
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('X-Frame-Options', 'SAMEORIGIN');
@@ -1588,7 +1652,7 @@ export class FilesController {
       if (classId) {
         // Check if teacher is assigned to this class
         const isTeacherOfClass = await this.checkTeacherOwnsClass(userEmail, classId);
-        
+
         if (!isTeacherOfClass) {
           throw new BadRequestException(
             'You can only delete files from classes you are assigned to teach',
@@ -1669,7 +1733,7 @@ export class FilesController {
       if (classId) {
         // Check if teacher is assigned to this class
         const isTeacherOfClass = await this.checkTeacherOwnsClass(userEmail, classId);
-        
+
         if (!isTeacherOfClass) {
           throw new BadRequestException(
             'You can only delete files from classes you are assigned to teach',
