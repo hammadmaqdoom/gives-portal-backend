@@ -39,7 +39,7 @@ import { infinityPagination } from '../utils/infinity-pagination';
   version: '1',
 })
 export class AttendanceController {
-  constructor(private readonly attendanceService: AttendanceService) {}
+  constructor(private readonly attendanceService: AttendanceService) { }
 
   @Post()
   @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
@@ -100,6 +100,29 @@ export class AttendanceController {
       +studentId,
       new Date(date),
     );
+  }
+
+  @Get('student/:studentId/class/:classId')
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user, RoleEnum.superAdmin)
+  @ApiParam({
+    name: 'studentId',
+    type: String,
+  })
+  @ApiParam({
+    name: 'classId',
+    type: String,
+  })
+  @ApiOkResponse({
+    type: [Attendance],
+  })
+  @SerializeOptions({
+    groups: ['admin'],
+  })
+  findByStudentAndClass(
+    @Param('studentId') studentId: string,
+    @Param('classId') classId: string,
+  ): Promise<Attendance[]> {
+    return this.attendanceService.findByStudentAndClass(+studentId, +classId);
   }
 
   @Get('class/:classId/date/:date')
