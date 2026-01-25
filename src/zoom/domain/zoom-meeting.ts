@@ -36,9 +36,9 @@ export class ZoomMeeting {
 }
 
 export class CreateZoomMeetingDto {
+  @IsOptional()
   @IsNumber()
-  @Min(1)
-  classId: number;
+  classId?: number;
 
   @IsNumber()
   teacherId: number;
