@@ -399,11 +399,25 @@ export class ZoomService {
     });
 
     if (!res.ok) {
-      const text = await res.text();
+      let errorDetails: any;
+      try {
+        errorDetails = await res.json();
+      } catch {
+        errorDetails = await res.text();
+      }
+      
       this.logger.error(
-        `Failed to create Zoom meeting: ${res.status} ${res.statusText} - ${text}`,
+        `Failed to create Zoom meeting: ${res.status} ${res.statusText} - ${JSON.stringify(errorDetails)}`,
       );
-      throw new BadRequestException('Failed to create Zoom meeting');
+      
+      const errorMessage = 
+        typeof errorDetails === 'object' && errorDetails?.message
+          ? errorDetails.message
+          : typeof errorDetails === 'string'
+          ? errorDetails
+          : 'Failed to create Zoom meeting';
+      
+      throw new BadRequestException(`Failed to create Zoom meeting: ${errorMessage}`);
     }
 
     const data = await res.json();
@@ -440,10 +454,22 @@ export class ZoomService {
       );
       accessToken = stored?.access_token;
       if (!accessToken) throw new Error('No access token');
-    } catch {
+    } catch (error) {
       // No token yet: respond with authorize URL info via error
-      const authorizeUrl = await this.getOAuthAuthorizeUrl(createDto.teacherId);
-      throw new BadRequestException(`ZOOM_OAUTH_REQUIRED:${authorizeUrl}`);
+      this.logger.warn(`No OAuth token found for teacher ${createDto.teacherId}, redirecting to OAuth`);
+      try {
+        const authorizeUrl = await this.getOAuthAuthorizeUrl(createDto.teacherId);
+        throw new BadRequestException(`ZOOM_OAUTH_REQUIRED:${authorizeUrl}`);
+      } catch (oauthError: any) {
+        // If getting OAuth URL fails, return a more helpful error
+        if (oauthError.message?.includes('ZOOM_OAUTH_REQUIRED')) {
+          throw oauthError;
+        }
+        this.logger.error('Failed to get OAuth authorize URL:', oauthError);
+        throw new BadRequestException(
+          'Zoom OAuth is not configured. Please contact your administrator.',
+        );
+      }
     }
 
     const defaultSettings = {
@@ -468,6 +494,7 @@ export class ZoomService {
 
     const meeting = await this.zoomMeetingRepository.create({
       ...createDto,
+      classId: createDto.classId ?? 0, // Use 0 as default if classId is not provided
       meetingId: String(zoomMeeting.id),
       meetingPassword: zoomMeeting.password || '',
       meetingUrl: zoomMeeting.join_url,
