@@ -22,6 +22,7 @@ import {
   StudentAnalyticsDto,
 } from './dto/student-dashboard.dto';
 import { ParentStatsDto, ParentAnalyticsDto } from './dto/parent-dashboard.dto';
+import { SuperAdminStatsDto } from './dto/super-admin-dashboard.dto';
 
 @ApiTags('Dashboard')
 @Controller({
@@ -34,7 +35,7 @@ export class DashboardController {
   @Get('admin/stats')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.OK)
   @ApiResponse({
     status: HttpStatus.OK,
@@ -48,7 +49,7 @@ export class DashboardController {
   @Get('admin/analytics')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.OK)
   @ApiResponse({
     status: HttpStatus.OK,
@@ -70,12 +71,14 @@ export class DashboardController {
     type: TeacherStatsDto,
   })
   async getTeacherStats(@Request() req): Promise<TeacherStatsDto> {
-    // Find teacher by user email
-    const teacher = await this.dashboardService.findTeacherByUserEmail(
-      req.user.email,
+    // Find teacher by user ID (since JWT payload only contains id, not email)
+    const teacher = await this.dashboardService.findTeacherByUserId(
+      req.user.id,
     );
     if (!teacher) {
-      throw new Error('Teacher not found for this user');
+      throw new Error(
+        `Teacher not found for this user. User ID: ${req.user.id}, Role: ${req.user.role?.id || req.user.role}`,
+      );
     }
     return this.dashboardService.getTeacherStats(teacher.id);
   }
@@ -91,12 +94,14 @@ export class DashboardController {
     type: TeacherAnalyticsDto,
   })
   async getTeacherAnalytics(@Request() req): Promise<TeacherAnalyticsDto> {
-    // Find teacher by user email
-    const teacher = await this.dashboardService.findTeacherByUserEmail(
-      req.user.email,
+    // Find teacher by user ID (since JWT payload only contains id, not email)
+    const teacher = await this.dashboardService.findTeacherByUserId(
+      req.user.id,
     );
     if (!teacher) {
-      throw new Error('Teacher not found for this user');
+      throw new Error(
+        `Teacher not found for this user. User ID: ${req.user.id}, Role: ${req.user.role?.id || req.user.role}`,
+      );
     }
     return this.dashboardService.getTeacherAnalytics(teacher.id);
   }
@@ -104,7 +109,7 @@ export class DashboardController {
   @Get('student/stats')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.user)
+  @Roles(RoleEnum.user, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.OK)
   @ApiResponse({
     status: HttpStatus.OK,
@@ -133,7 +138,7 @@ export class DashboardController {
   @Get('student/analytics')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.user)
+  @Roles(RoleEnum.user, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.OK)
   @ApiResponse({
     status: HttpStatus.OK,
@@ -190,5 +195,19 @@ export class DashboardController {
       throw new Error('Parent not found for this user');
     }
     return this.dashboardService.getParentAnalytics(parent.id);
+  }
+
+  @Get('super-admin/stats')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.superAdmin)
+  @HttpCode(HttpStatus.OK)
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Super admin dashboard stats retrieved successfully',
+    type: SuperAdminStatsDto,
+  })
+  getSuperAdminStats(): Promise<SuperAdminStatsDto> {
+    return this.dashboardService.getSuperAdminStats();
   }
 }
