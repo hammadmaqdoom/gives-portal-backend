@@ -3,6 +3,8 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import {
   CreateZoomCredentialsDto,
@@ -17,6 +19,7 @@ import {
 } from './domain/zoom-meeting';
 import { ZoomCredentialsRepository } from './infrastructure/persistence/zoom-credentials.repository';
 import { ZoomMeetingRepository } from './infrastructure/persistence/zoom-meeting.repository';
+import { SettingsService } from '../settings/settings.service';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -26,6 +29,8 @@ export class ZoomService {
   constructor(
     private readonly zoomCredentialsRepository: ZoomCredentialsRepository,
     private readonly zoomMeetingRepository: ZoomMeetingRepository,
+    @Inject(forwardRef(() => SettingsService))
+    private readonly settingsService: SettingsService,
   ) {}
 
   // Encryption/Decryption methods for sensitive data
@@ -147,16 +152,54 @@ export class ZoomService {
       await this.zoomCredentialsRepository.findByTeacherId(teacherId);
     if (!credentials) return null;
 
+    // Check if this is an OAuth-only connection (has OAuth tokens)
+    const oauthTokens = await this.zoomCredentialsRepository.getOAuthTokens(teacherId);
+    const isPlaceholder = credentials.zoomApiKey === 'oauth-only';
+
     // Return decrypted data (excluding secrets)
-    return {
-      ...credentials,
-      zoomApiKey: this.decrypt(credentials.zoomApiKey),
-      zoomApiSecret: '***HIDDEN***',
-      zoomAccountId: this.decrypt(credentials.zoomAccountId),
-      zoomWebhookSecret: credentials.zoomWebhookSecret
-        ? this.decrypt(credentials.zoomWebhookSecret)
-        : undefined,
-    };
+    // For OAuth-only connections, skip decryption of placeholder values
+    try {
+      // Handle zoomWebhookSecret - it might contain OAuth tokens (JSON) or encrypted webhook secret
+      let webhookSecret: string | undefined = undefined;
+      if (credentials.zoomWebhookSecret) {
+        // If it's OAuth tokens (starts with '{' or '['), return as-is
+        // Otherwise, try to decrypt it (it's a webhook secret)
+        if (credentials.zoomWebhookSecret.trim().startsWith('{') || credentials.zoomWebhookSecret.trim().startsWith('[')) {
+          // It's OAuth tokens JSON, return as-is (but don't expose it)
+          webhookSecret = '***OAUTH_TOKENS_STORED***';
+        } else {
+          // It's an encrypted webhook secret, try to decrypt
+          try {
+            webhookSecret = this.decrypt(credentials.zoomWebhookSecret);
+          } catch {
+            // If decryption fails, it might be OAuth tokens stored without JSON wrapper
+            webhookSecret = '***HIDDEN***';
+          }
+        }
+      }
+      
+      return {
+        ...credentials,
+        zoomApiKey: isPlaceholder ? 'oauth-only' : this.decrypt(credentials.zoomApiKey),
+        zoomApiSecret: '***HIDDEN***',
+        zoomAccountId: isPlaceholder ? 'oauth-only' : this.decrypt(credentials.zoomAccountId),
+        zoomWebhookSecret: webhookSecret,
+      };
+    } catch (error) {
+      // If decryption fails, check if OAuth tokens exist (OAuth-only connection)
+      if (oauthTokens || isPlaceholder) {
+        return {
+          ...credentials,
+          zoomApiKey: 'oauth-only',
+          zoomApiSecret: '***HIDDEN***',
+          zoomAccountId: 'oauth-only',
+          zoomWebhookSecret: credentials.zoomWebhookSecret ? '***OAUTH_TOKENS_STORED***' : undefined,
+        };
+      }
+      // If no OAuth tokens and decryption fails, return null
+      this.logger.error('Failed to decrypt Zoom credentials', error);
+      return null;
+    }
   }
 
   async deleteCredentials(teacherId: number): Promise<void> {
@@ -216,25 +259,51 @@ export class ZoomService {
   }
 
   // --- OAuth (Authorization Code) ---
-  private getAppOAuthConfig() {
-    const clientId = process.env.ZOOM_OAUTH_CLIENT_ID;
-    const clientSecret = process.env.ZOOM_OAUTH_CLIENT_SECRET;
-    const redirectUri = process.env.ZOOM_OAUTH_REDIRECT_URI;
-    if (!clientId || !clientSecret || !redirectUri) {
-      throw new BadRequestException('Zoom OAuth env not configured');
+  private async getAppOAuthConfig() {
+    // First try to get from settings
+    const settings = await this.settingsService.getSettings();
+    
+    // Get values from settings, trimming whitespace and checking for empty strings
+    let clientId = settings?.zoomClientId?.trim() || null;
+    let clientSecret = settings?.zoomClientSecret?.trim() || null;
+    let redirectUri = settings?.zoomRedirectUri?.trim() || null;
+    
+    // Fall back to environment variables if not in settings (check each field individually)
+    if (!clientId || clientId === '') {
+      clientId = process.env.ZOOM_OAUTH_CLIENT_ID?.trim() || null;
     }
+    
+    if (!clientSecret || clientSecret === '') {
+      clientSecret = process.env.ZOOM_OAUTH_CLIENT_SECRET?.trim() || null;
+    }
+    
+    if (!redirectUri || redirectUri === '') {
+      redirectUri = process.env.ZOOM_OAUTH_REDIRECT_URI?.trim() || null;
+    }
+    
+    // Validate all required fields are present
+    if (!clientId || !clientSecret || !redirectUri) {
+      this.logger.error('Zoom OAuth configuration missing:', {
+        hasClientId: !!clientId,
+        hasClientSecret: !!clientSecret,
+        hasRedirectUri: !!redirectUri,
+        settingsExists: !!settings,
+      });
+      throw new BadRequestException('Zoom OAuth configuration not found in settings or environment variables');
+    }
+    
     return { clientId, clientSecret, redirectUri };
   }
 
   async getOAuthAuthorizeUrl(teacherId: number): Promise<string> {
-    const { clientId, redirectUri } = this.getAppOAuthConfig();
+    const { clientId, redirectUri } = await this.getAppOAuthConfig();
     const state = String(teacherId);
     const url = `https://zoom.us/oauth/authorize?response_type=code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
     return url;
   }
 
   async exchangeOAuthCode(code: string, state: string): Promise<void> {
-    const { clientId, clientSecret, redirectUri } = this.getAppOAuthConfig();
+    const { clientId, clientSecret, redirectUri } = await this.getAppOAuthConfig();
     const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
     const tokenUrl = 'https://zoom.us/oauth/token';
     const body = new URLSearchParams({
@@ -255,15 +324,27 @@ export class ZoomService {
       this.logger.error(
         `OAuth code exchange failed: ${res.status} ${res.statusText} - ${txt}`,
       );
-      throw new BadRequestException('Zoom OAuth exchange failed');
+      throw new BadRequestException(`Zoom OAuth exchange failed: ${txt}`);
     }
     const tokens = await res.json();
     const teacherId = parseInt(state, 10);
-    await this.zoomCredentialsRepository.storeOAuthTokens(teacherId, tokens);
+    
+    if (isNaN(teacherId)) {
+      this.logger.error(`Invalid teacher ID in OAuth state: ${state}`);
+      throw new BadRequestException('Invalid OAuth state parameter');
+    }
+    
+    try {
+      await this.zoomCredentialsRepository.storeOAuthTokens(teacherId, tokens);
+      this.logger.log(`Successfully stored OAuth tokens for teacher ${teacherId}`);
+    } catch (error) {
+      this.logger.error(`Failed to store OAuth tokens for teacher ${teacherId}:`, error);
+      throw new BadRequestException('Failed to store Zoom OAuth tokens');
+    }
   }
 
   private async refreshOAuthToken(teacherId: number): Promise<string> {
-    const { clientId, clientSecret } = this.getAppOAuthConfig();
+    const { clientId, clientSecret } = await this.getAppOAuthConfig();
     const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
     const current =
       await this.zoomCredentialsRepository.getOAuthTokens(teacherId);
@@ -318,11 +399,25 @@ export class ZoomService {
     });
 
     if (!res.ok) {
-      const text = await res.text();
+      let errorDetails: any;
+      try {
+        errorDetails = await res.json();
+      } catch {
+        errorDetails = await res.text();
+      }
+      
       this.logger.error(
-        `Failed to create Zoom meeting: ${res.status} ${res.statusText} - ${text}`,
+        `Failed to create Zoom meeting: ${res.status} ${res.statusText} - ${JSON.stringify(errorDetails)}`,
       );
-      throw new BadRequestException('Failed to create Zoom meeting');
+      
+      const errorMessage = 
+        typeof errorDetails === 'object' && errorDetails?.message
+          ? errorDetails.message
+          : typeof errorDetails === 'string'
+          ? errorDetails
+          : 'Failed to create Zoom meeting';
+      
+      throw new BadRequestException(`Failed to create Zoom meeting: ${errorMessage}`);
     }
 
     const data = await res.json();
@@ -359,10 +454,22 @@ export class ZoomService {
       );
       accessToken = stored?.access_token;
       if (!accessToken) throw new Error('No access token');
-    } catch {
+    } catch (error) {
       // No token yet: respond with authorize URL info via error
-      const authorizeUrl = await this.getOAuthAuthorizeUrl(createDto.teacherId);
-      throw new BadRequestException(`ZOOM_OAUTH_REQUIRED:${authorizeUrl}`);
+      this.logger.warn(`No OAuth token found for teacher ${createDto.teacherId}, redirecting to OAuth`);
+      try {
+        const authorizeUrl = await this.getOAuthAuthorizeUrl(createDto.teacherId);
+        throw new BadRequestException(`ZOOM_OAUTH_REQUIRED:${authorizeUrl}`);
+      } catch (oauthError: any) {
+        // If getting OAuth URL fails, return a more helpful error
+        if (oauthError.message?.includes('ZOOM_OAUTH_REQUIRED')) {
+          throw oauthError;
+        }
+        this.logger.error('Failed to get OAuth authorize URL:', oauthError);
+        throw new BadRequestException(
+          'Zoom OAuth is not configured. Please contact your administrator.',
+        );
+      }
     }
 
     const defaultSettings = {
@@ -387,6 +494,7 @@ export class ZoomService {
 
     const meeting = await this.zoomMeetingRepository.create({
       ...createDto,
+      classId: createDto.classId ?? 0, // Use 0 as default if classId is not provided
       meetingId: String(zoomMeeting.id),
       meetingPassword: zoomMeeting.password || '',
       meetingUrl: zoomMeeting.join_url,
@@ -519,12 +627,41 @@ export class ZoomService {
       const credentials = await this.getCredentials(teacherId);
       if (!credentials) return false;
 
-      // Here you would make a test API call to Zoom
-      // For now, we'll just return true if credentials exist
-      return true;
+      // Check if OAuth tokens exist (for OAuth Authorization Code flow)
+      const oauthTokens = await this.zoomCredentialsRepository.getOAuthTokens(teacherId);
+      if (oauthTokens) {
+        // OAuth connection exists - verify token is still valid by attempting to refresh if needed
+        // For now, just check if tokens exist
+        return true;
+      }
+
+      // If no OAuth tokens, check if S2S credentials exist (not placeholder)
+      if (credentials.zoomApiKey && credentials.zoomApiKey !== 'oauth-only') {
+        // S2S credentials exist
+        return true;
+      }
+
+      return false;
     } catch (error) {
       this.logger.error('Failed to test Zoom connection', error);
       return false;
     }
+  }
+
+  // Get teacher Zoom statistics for admin
+  async getTeacherZoomStatistics(): Promise<{
+    totalTeachers: number;
+    connectedTeachers: number;
+    notConnectedTeachers: number;
+    teachers: {
+      teacherId: number;
+      name: string;
+      email?: string | null;
+      isConnected: boolean;
+      lastUpdatedAt: Date | null;
+    }[];
+  }> {
+    const stats = await this.zoomCredentialsRepository.getTeacherStatistics();
+    return stats;
   }
 }
