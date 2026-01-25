@@ -45,7 +45,7 @@ export class AnnotationsController {
   }
 
   @Get(':id')
-  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiOperation({ summary: 'Get annotation document by ID' })
   @ApiResponse({
     status: 200,
@@ -56,7 +56,7 @@ export class AnnotationsController {
   }
 
   @Get('submission/:submissionId')
-  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiOperation({ summary: 'Get annotation document by submission ID' })
   @ApiResponse({
     status: 200,
@@ -67,7 +67,7 @@ export class AnnotationsController {
   }
 
   @Get('file/:fileId')
-  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiOperation({ summary: 'Get annotation document by file ID' })
   @ApiResponse({
     status: 200,
