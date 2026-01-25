@@ -218,7 +218,7 @@ export class SubmissionsController {
   @SerializeOptions({
     groups: ['admin'],
   })
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin, RoleEnum.user)
   getAnnotations(@Param('id') id: string) {
     // For now, return empty annotations
     // In a real implementation, you'd fetch from a database
@@ -239,7 +239,7 @@ export class SubmissionsController {
   @SerializeOptions({
     groups: ['admin'],
   })
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   saveAnnotations(
     @Param('id') id: string,
     @Body() annotationData: { fileId: string; annotations: any[] },
