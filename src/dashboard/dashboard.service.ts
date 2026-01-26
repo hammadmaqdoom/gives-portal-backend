@@ -600,25 +600,51 @@ export class DashboardService {
   private async getAttendanceRateForStudent(
     studentId: number,
   ): Promise<number> {
-    const result = await this.attendanceRepository
-      .createQueryBuilder('attendance')
-      .select(
-        'AVG(CASE WHEN attendance.status = :present THEN 100 ELSE 0 END)',
-        'rate',
-      )
-      .setParameter('present', AttendanceStatus.PRESENT)
-      .where('attendance.student.id = :studentId', { studentId })
-      .getRawOne();
-    return parseFloat(result?.rate || '0');
+    try {
+      const result = await this.attendanceRepository
+        .createQueryBuilder('attendance')
+        .select(
+          'AVG(CASE WHEN attendance.status = :present THEN 100 ELSE 0 END)',
+          'rate',
+        )
+        .setParameter('present', AttendanceStatus.PRESENT)
+        .where('attendance.student.id = :studentId', { studentId })
+        .andWhere('attendance.deletedAt IS NULL')
+        .getRawOne();
+      
+      // Handle null result (no attendance records) or null rate value
+      const rate = result?.rate ?? null;
+      if (rate === null || rate === undefined) {
+        return 0;
+      }
+      const parsed = parseFloat(String(rate));
+      return isNaN(parsed) ? 0 : parsed;
+    } catch (error) {
+      console.error(`Error calculating attendance rate for student ${studentId}:`, error);
+      return 0;
+    }
   }
 
   private async getAverageGradeForStudent(studentId: number): Promise<number> {
-    const result = await this.performanceRepository
-      .createQueryBuilder('performance')
-      .select('AVG(performance.score)', 'average')
-      .where('performance.student.id = :studentId', { studentId })
-      .getRawOne();
-    return parseFloat(result?.average || '0');
+    try {
+      const result = await this.performanceRepository
+        .createQueryBuilder('performance')
+        .select('AVG(performance.score)', 'average')
+        .where('performance.student.id = :studentId', { studentId })
+        .andWhere('performance.deletedAt IS NULL')
+        .getRawOne();
+      
+      // Handle null result (no performance records) or null average value
+      const average = result?.average ?? null;
+      if (average === null || average === undefined) {
+        return 0;
+      }
+      const parsed = parseFloat(String(average));
+      return isNaN(parsed) ? 0 : parsed;
+    } catch (error) {
+      console.error(`Error calculating average grade for student ${studentId}:`, error);
+      return 0;
+    }
   }
 
   private async getPendingAssignmentsForStudent(

@@ -4,11 +4,12 @@ import { AssignmentsService } from './assignments.service';
 import { SubmissionsController } from './submissions.controller';
 import { SubmissionsService } from './submissions.service';
 import { RelationalAssignmentPersistenceModule } from './infrastructure/persistence/relational/relational-persistence.module';
+import { AnnotationsModule } from '../annotations/annotations.module';
 
 const infrastructurePersistenceModule = RelationalAssignmentPersistenceModule;
 
 @Module({
-  imports: [infrastructurePersistenceModule],
+  imports: [infrastructurePersistenceModule, AnnotationsModule],
   controllers: [AssignmentsController, SubmissionsController],
   providers: [AssignmentsService, SubmissionsService],
   exports: [
