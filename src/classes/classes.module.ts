@@ -10,6 +10,7 @@ import { FilesModule } from '../files/files.module';
 import { LearningModuleEntity } from '../learning-modules/infrastructure/persistence/relational/entities/learning-module.entity';
 import { LearningModuleSectionEntity } from '../learning-modules/infrastructure/persistence/relational/entities/learning-module-section.entity';
 import { AssignmentEntity } from '../assignments/infrastructure/persistence/relational/entities/assignment.entity';
+import { AccessControlModule } from '../access-control/access-control.module';
 
 const infrastructurePersistenceModule = RelationalClassPersistenceModule;
 
@@ -17,9 +18,10 @@ const infrastructurePersistenceModule = RelationalClassPersistenceModule;
   imports: [
     infrastructurePersistenceModule,
     forwardRef(() => StudentsModule),
-    SubjectsModule,
-    TeachersModule,
-    FilesModule,
+    forwardRef(() => SubjectsModule),
+    forwardRef(() => TeachersModule),
+    forwardRef(() => FilesModule),
+    forwardRef(() => AccessControlModule),
     TypeOrmModule.forFeature([
       LearningModuleEntity,
       LearningModuleSectionEntity,
