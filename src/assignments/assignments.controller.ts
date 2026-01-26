@@ -12,6 +12,8 @@ import {
   HttpCode,
   SerializeOptions,
   Req,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
 import { UpdateAssignmentDto } from './dto/update-assignment.dto';
@@ -35,6 +37,10 @@ import { Assignment } from './domain/assignment';
 import { AssignmentsService } from './assignments.service';
 import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
+import { FilesService } from '../files/files.service';
+import { FileStorageService } from '../files/file-storage.service';
+import { ConfigService } from '@nestjs/config';
+import { FileDriver } from '../files/config/file-config.type';
 
 @ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -44,7 +50,13 @@ import { infinityPagination } from '../utils/infinity-pagination';
   version: '1',
 })
 export class AssignmentsController {
-  constructor(private readonly assignmentsService: AssignmentsService) {}
+  constructor(
+    private readonly assignmentsService: AssignmentsService,
+    @Inject(forwardRef(() => FilesService))
+    private readonly filesService: FilesService,
+    private readonly fileStorageService: FileStorageService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Post()
   @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
@@ -110,8 +122,104 @@ export class AssignmentsController {
   @SerializeOptions({
     groups: ['admin'],
   })
-  findOne(@Param('id') id: string): Promise<NullableType<Assignment>> {
-    return this.assignmentsService.findById(+id);
+  async findOne(@Param('id') id: string): Promise<any> {
+    const assignment = await this.assignmentsService.findById(+id);
+    
+    if (!assignment) {
+      return null;
+    }
+
+    // Fetch files associated with this assignment
+    const files = await this.filesService.getFilesByContext('assignment', id);
+    
+    // Generate URLs for all files
+    const filesWithUrls = await Promise.all(
+      files.map(async (file) => {
+        const fileDriver = await this.fileStorageService.getDriver();
+        const baseUrl = this.getBaseUrl();
+        const isVideo = file.mimeType?.startsWith('video/') ||
+          /\.(mp4|webm|mov|avi|mkv|flv|wmv|m4v)$/i.test(file.path);
+
+        // For videos or local files, use serve endpoint
+        if (isVideo || fileDriver === FileDriver.LOCAL) {
+          return {
+            id: file.id,
+            filename: file.filename,
+            originalName: file.originalName,
+            path: file.path,
+            size: file.size,
+            mimeType: file.mimeType,
+            uploadedAt: file.uploadedAt,
+            url: `${baseUrl}/api/v1/files/serve/${file.id}`,
+          };
+        }
+
+        // For S3/B2 non-video files, generate presigned URL
+        if (
+          fileDriver === FileDriver.S3 ||
+          fileDriver === FileDriver.S3_PRESIGNED ||
+          fileDriver === FileDriver.B2 ||
+          fileDriver === FileDriver.B2_PRESIGNED
+        ) {
+          try {
+            const presignedUrl = await this.fileStorageService.getPresignedFileUrl(
+              file.path,
+              86400, // 24 hours expiry
+            );
+            return {
+              id: file.id,
+              filename: file.filename,
+              originalName: file.originalName,
+              path: file.path,
+              size: file.size,
+              mimeType: file.mimeType,
+              uploadedAt: file.uploadedAt,
+              url: presignedUrl,
+            };
+          } catch (error) {
+            console.error('Error generating presigned URL:', error);
+            return {
+              id: file.id,
+              filename: file.filename,
+              originalName: file.originalName,
+              path: file.path,
+              size: file.size,
+              mimeType: file.mimeType,
+              uploadedAt: file.uploadedAt,
+              url: `${baseUrl}/api/v1/files/serve/${file.id}`,
+            };
+          }
+        }
+
+        // Fallback
+        return {
+          id: file.id,
+          filename: file.filename,
+          originalName: file.originalName,
+          path: file.path,
+          size: file.size,
+          mimeType: file.mimeType,
+          uploadedAt: file.uploadedAt,
+          url: `${baseUrl}/api/v1/files/serve/${file.id}`,
+        };
+      }),
+    );
+
+    // Return assignment with files included
+    return {
+      ...assignment,
+      attachments: filesWithUrls,
+    };
+  }
+
+  /**
+   * Get base URL for the current server
+   */
+  private getBaseUrl(): string {
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const host = process.env.HOST || 'localhost';
+    const port = process.env.PORT || '3000';
+    return `${protocol}://${host}:${port}`;
   }
 
   @Patch(':id')
