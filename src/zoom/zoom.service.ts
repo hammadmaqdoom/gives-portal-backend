@@ -335,7 +335,12 @@ export class ZoomService {
     }
     
     try {
-      await this.zoomCredentialsRepository.storeOAuthTokens(teacherId, tokens);
+      // Store tokens with timestamp for expiration tracking
+      const tokensWithTimestamp = {
+        ...tokens,
+        _issued_at: Date.now(), // Store when token was issued
+      };
+      await this.zoomCredentialsRepository.storeOAuthTokens(teacherId, tokensWithTimestamp);
       this.logger.log(`Successfully stored OAuth tokens for teacher ${teacherId}`);
     } catch (error) {
       this.logger.error(`Failed to store OAuth tokens for teacher ${teacherId}:`, error);
@@ -370,8 +375,46 @@ export class ZoomService {
       throw new BadRequestException('Zoom OAuth refresh failed');
     }
     const tokens = await res.json();
-    await this.zoomCredentialsRepository.storeOAuthTokens(teacherId, tokens);
+    // Store tokens with timestamp for expiration tracking
+    const tokensWithTimestamp = {
+      ...tokens,
+      _issued_at: Date.now(), // Store when token was issued
+    };
+    await this.zoomCredentialsRepository.storeOAuthTokens(teacherId, tokensWithTimestamp);
     return tokens.access_token as string;
+  }
+
+  /**
+   * Gets a valid access token for the teacher, automatically refreshing if expired or about to expire
+   * @param teacherId The teacher ID
+   * @returns A valid access token
+   */
+  private async getValidAccessToken(teacherId: number): Promise<string> {
+    const stored = await this.zoomCredentialsRepository.getOAuthTokens(teacherId);
+    
+    if (!stored?.access_token) {
+      throw new BadRequestException('No access token found');
+    }
+
+    // Check if token is expired or about to expire (within 5 minutes)
+    const expiresIn = stored.expires_in || 3600; // Default to 1 hour if not provided
+    const issuedAt = stored._issued_at || Date.now(); // Use stored timestamp or assume just issued
+    const expirationTime = issuedAt + (expiresIn * 1000); // Convert to milliseconds
+    const now = Date.now();
+    const fiveMinutesInMs = 5 * 60 * 1000;
+
+    // If token is expired or will expire within 5 minutes, refresh it
+    if (now >= expirationTime - fiveMinutesInMs) {
+      this.logger.log(`Access token expired or expiring soon for teacher ${teacherId}, refreshing...`);
+      try {
+        return await this.refreshOAuthToken(teacherId);
+      } catch (error) {
+        this.logger.error(`Failed to refresh token for teacher ${teacherId}:`, error);
+        throw new BadRequestException('Access token expired and refresh failed. Please reconnect your Zoom account.');
+      }
+    }
+
+    return stored.access_token;
   }
 
   private async createZoomMeetingOnZoom(
@@ -382,6 +425,8 @@ export class ZoomService {
       duration: number;
       settings?: any;
     },
+    teacherId?: number,
+    retryWithRefresh: boolean = true,
   ): Promise<{ id: number; password?: string; join_url: string }> {
     const res = await fetch('https://api.zoom.us/v2/users/me/meetings', {
       method: 'POST',
@@ -397,6 +442,19 @@ export class ZoomService {
         settings: payload.settings || {},
       }),
     });
+
+    // Handle 401 Unauthorized - token expired, try refreshing and retrying
+    if (res.status === 401 && retryWithRefresh && teacherId) {
+      this.logger.warn(`Access token expired during API call for teacher ${teacherId}, refreshing and retrying...`);
+      try {
+        const refreshedToken = await this.refreshOAuthToken(teacherId);
+        // Retry once with refreshed token
+        return this.createZoomMeetingOnZoom(refreshedToken, payload, teacherId, false);
+      } catch (refreshError) {
+        this.logger.error(`Failed to refresh token during API retry:`, refreshError);
+        throw new BadRequestException('Access token expired and refresh failed. Please reconnect your Zoom account.');
+      }
+    }
 
     if (!res.ok) {
       let errorDetails: any;
@@ -447,29 +505,29 @@ export class ZoomService {
     }
 
     // Create meeting on Zoom using teacher OAuth token (Authorization Code)
-    let accessToken: string | undefined;
+    // Get valid access token (auto-refreshes if expired)
+    let accessToken: string;
     try {
-      const stored = await this.zoomCredentialsRepository.getOAuthTokens(
-        createDto.teacherId,
-      );
-      accessToken = stored?.access_token;
-      if (!accessToken) throw new Error('No access token');
-    } catch (error) {
-      // No token yet: respond with authorize URL info via error
-      this.logger.warn(`No OAuth token found for teacher ${createDto.teacherId}, redirecting to OAuth`);
-      try {
-        const authorizeUrl = await this.getOAuthAuthorizeUrl(createDto.teacherId);
-        throw new BadRequestException(`ZOOM_OAUTH_REQUIRED:${authorizeUrl}`);
-      } catch (oauthError: any) {
-        // If getting OAuth URL fails, return a more helpful error
-        if (oauthError.message?.includes('ZOOM_OAUTH_REQUIRED')) {
-          throw oauthError;
+      accessToken = await this.getValidAccessToken(createDto.teacherId);
+    } catch (error: any) {
+      // No token or refresh failed: respond with authorize URL info via error
+      if (error.message?.includes('No access token') || error.message?.includes('refresh failed')) {
+        this.logger.warn(`No valid OAuth token for teacher ${createDto.teacherId}, redirecting to OAuth`);
+        try {
+          const authorizeUrl = await this.getOAuthAuthorizeUrl(createDto.teacherId);
+          throw new BadRequestException(`ZOOM_OAUTH_REQUIRED:${authorizeUrl}`);
+        } catch (oauthError: any) {
+          // If getting OAuth URL fails, return a more helpful error
+          if (oauthError.message?.includes('ZOOM_OAUTH_REQUIRED')) {
+            throw oauthError;
+          }
+          this.logger.error('Failed to get OAuth authorize URL:', oauthError);
+          throw new BadRequestException(
+            'Zoom OAuth is not configured. Please contact your administrator.',
+          );
         }
-        this.logger.error('Failed to get OAuth authorize URL:', oauthError);
-        throw new BadRequestException(
-          'Zoom OAuth is not configured. Please contact your administrator.',
-        );
       }
+      throw error;
     }
 
     const defaultSettings = {
@@ -481,12 +539,16 @@ export class ZoomService {
       join_before_host: false,
     };
 
-    const zoomMeeting = await this.createZoomMeetingOnZoom(accessToken, {
-      topic: createDto.topic,
-      start_time: createDto.startTime.toISOString(),
-      duration: createDto.duration,
-      settings: defaultSettings,
-    });
+    const zoomMeeting = await this.createZoomMeetingOnZoom(
+      accessToken,
+      {
+        topic: createDto.topic,
+        start_time: createDto.startTime.toISOString(),
+        duration: createDto.duration,
+        settings: defaultSettings,
+      },
+      createDto.teacherId, // Pass teacherId for automatic retry on 401
+    );
 
     const endTime = new Date(
       createDto.startTime.getTime() + createDto.duration * 60000,
