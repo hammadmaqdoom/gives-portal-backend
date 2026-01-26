@@ -2,6 +2,8 @@ import {
   HttpStatus,
   Injectable,
   UnprocessableEntityException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
 import { NullableType } from '../utils/types/nullable.type';
@@ -13,10 +15,15 @@ import { AssignmentRepository } from './infrastructure/persistence/assignment.re
 import { Assignment, AssignmentStatus } from './domain/assignment';
 import { IPaginationOptions } from '../utils/types/pagination-options';
 import { UpdateAssignmentDto } from './dto/update-assignment.dto';
+import { FilesService } from '../files/files.service';
 
 @Injectable()
 export class AssignmentsService {
-  constructor(private readonly assignmentsRepository: AssignmentRepository) {}
+  constructor(
+    private readonly assignmentsRepository: AssignmentRepository,
+    @Inject(forwardRef(() => FilesService))
+    private readonly filesService: FilesService,
+  ) {}
 
   async create(
     createAssignmentDto: CreateAssignmentDto,
