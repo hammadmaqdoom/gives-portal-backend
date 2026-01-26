@@ -61,8 +61,47 @@ export class SettingsMapper {
     domainEntity.azureContainerName = raw.azureContainerName;
     domainEntity.azureBlobSasExpirySeconds = raw.azureBlobSasExpirySeconds;
     domainEntity.azureBlobPublicBaseUrl = raw.azureBlobPublicBaseUrl;
+    domainEntity.b2EndpointUrl = raw.b2EndpointUrl;
+    domainEntity.b2Region = raw.b2Region;
     domainEntity.themeColorPreset = raw.themeColorPreset;
     domainEntity.themeCustomColor = raw.themeCustomColor;
+    // Zoom Configuration
+    domainEntity.zoomClientId = raw.zoomClientId;
+    domainEntity.zoomClientSecret = raw.zoomClientSecret;
+    domainEntity.zoomRedirectUri = raw.zoomRedirectUri;
+    domainEntity.zoomAdminAccess = raw.zoomAdminAccess;
+    // Content Protection
+    domainEntity.contentProtectionEnabled = raw.contentProtectionEnabled;
+    domainEntity.blockDevTools = raw.blockDevTools;
+    domainEntity.blockKeyboardShortcuts = raw.blockKeyboardShortcuts;
+    domainEntity.blockRightClick = raw.blockRightClick;
+    domainEntity.blockTextSelection = raw.blockTextSelection;
+    domainEntity.protectionAction = raw.protectionAction;
+    // Watermark Settings
+    domainEntity.watermarkEnabled = raw.watermarkEnabled;
+    domainEntity.watermarkShowInstitution = raw.watermarkShowInstitution;
+    domainEntity.watermarkShowInstructor = raw.watermarkShowInstructor;
+    domainEntity.watermarkShowStudentEmail = raw.watermarkShowStudentEmail;
+    domainEntity.watermarkShowStudentId = raw.watermarkShowStudentId;
+    domainEntity.watermarkOpacity = raw.watermarkOpacity;
+    domainEntity.watermarkPosition = raw.watermarkPosition;
+    // Disable-DevTool Configuration
+    domainEntity.disableDevToolMd5 = raw.disableDevToolMd5;
+    domainEntity.disableDevToolTkName = raw.disableDevToolTkName;
+    domainEntity.disableDevToolUrl = raw.disableDevToolUrl;
+    try {
+      domainEntity.disableDevToolDetectors = raw.disableDevToolDetectors
+        ? JSON.parse(raw.disableDevToolDetectors)
+        : null;
+    } catch {
+      domainEntity.disableDevToolDetectors = null;
+    }
+    domainEntity.disableDevToolInterval = raw.disableDevToolInterval;
+    domainEntity.disableDevToolClearLog = raw.disableDevToolClearLog;
+    // Clipboard protection
+    domainEntity.blockCopy = raw.blockCopy;
+    domainEntity.blockCut = raw.blockCut;
+    domainEntity.blockPaste = raw.blockPaste;
     domainEntity.createdAt = raw.createdAt;
     domainEntity.updatedAt = raw.updatedAt;
     return domainEntity;
@@ -140,8 +179,66 @@ export class SettingsMapper {
       domainEntity.azureBlobSasExpirySeconds || null;
     persistenceEntity.azureBlobPublicBaseUrl =
       domainEntity.azureBlobPublicBaseUrl || null;
+    persistenceEntity.b2EndpointUrl = domainEntity.b2EndpointUrl || null;
+    persistenceEntity.b2Region = domainEntity.b2Region || null;
     persistenceEntity.themeColorPreset = domainEntity.themeColorPreset || null;
     persistenceEntity.themeCustomColor = domainEntity.themeCustomColor || null;
+    // Zoom Configuration
+    persistenceEntity.zoomClientId = domainEntity.zoomClientId || null;
+    persistenceEntity.zoomClientSecret = domainEntity.zoomClientSecret || null;
+    persistenceEntity.zoomRedirectUri = domainEntity.zoomRedirectUri || null;
+    persistenceEntity.zoomAdminAccess = domainEntity.zoomAdminAccess ?? false;
+    // Content Protection
+    persistenceEntity.contentProtectionEnabled =
+      domainEntity.contentProtectionEnabled ?? false;
+    persistenceEntity.blockDevTools = domainEntity.blockDevTools ?? false;
+    persistenceEntity.blockKeyboardShortcuts =
+      domainEntity.blockKeyboardShortcuts ?? true;
+    persistenceEntity.blockRightClick =
+      domainEntity.blockRightClick ?? true;
+    persistenceEntity.blockTextSelection =
+      domainEntity.blockTextSelection ?? true;
+    persistenceEntity.protectionAction =
+      domainEntity.protectionAction || 'warn';
+    // Watermark Settings
+    persistenceEntity.watermarkEnabled =
+      domainEntity.watermarkEnabled ?? false;
+    persistenceEntity.watermarkShowInstitution =
+      domainEntity.watermarkShowInstitution ?? true;
+    persistenceEntity.watermarkShowInstructor =
+      domainEntity.watermarkShowInstructor ?? true;
+    persistenceEntity.watermarkShowStudentEmail =
+      domainEntity.watermarkShowStudentEmail ?? true;
+    persistenceEntity.watermarkShowStudentId =
+      domainEntity.watermarkShowStudentId ?? false;
+    persistenceEntity.watermarkOpacity =
+      domainEntity.watermarkOpacity ?? 0.4;
+    persistenceEntity.watermarkPosition =
+      domainEntity.watermarkPosition || 'random';
+    // Disable-DevTool Configuration
+    persistenceEntity.disableDevToolMd5 =
+      domainEntity.disableDevToolMd5 || null;
+    persistenceEntity.disableDevToolTkName =
+      domainEntity.disableDevToolTkName || 'ddtk';
+    persistenceEntity.disableDevToolUrl =
+      domainEntity.disableDevToolUrl || null;
+    if (Array.isArray(domainEntity.disableDevToolDetectors)) {
+      persistenceEntity.disableDevToolDetectors = JSON.stringify(
+        domainEntity.disableDevToolDetectors,
+      );
+    } else {
+      // allow passing pre-serialized string via any casts
+      persistenceEntity.disableDevToolDetectors =
+        (domainEntity as any).disableDevToolDetectors || null;
+    }
+    persistenceEntity.disableDevToolInterval =
+      domainEntity.disableDevToolInterval ?? 200;
+    persistenceEntity.disableDevToolClearLog =
+      domainEntity.disableDevToolClearLog ?? false;
+    // Clipboard protection
+    persistenceEntity.blockCopy = domainEntity.blockCopy ?? false;
+    persistenceEntity.blockCut = domainEntity.blockCut ?? false;
+    persistenceEntity.blockPaste = domainEntity.blockPaste ?? false;
     persistenceEntity.createdAt = domainEntity.createdAt;
     persistenceEntity.updatedAt = domainEntity.updatedAt;
     return persistenceEntity;

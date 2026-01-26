@@ -53,6 +53,14 @@ export class SubjectsRelationalRepository implements SubjectRepository {
   }): Promise<Subject[]> {
     const queryBuilder = this.subjectsRepository.createQueryBuilder('subject');
 
+    // Add unified search filter
+    if (filterOptions?.search) {
+      queryBuilder.andWhere(
+        '(subject.name ILIKE :search OR subject.description ILIKE :search)',
+        { search: `%${filterOptions.search}%` },
+      );
+    }
+
     if (filterOptions?.name) {
       queryBuilder.andWhere('subject.name ILIKE :name', {
         name: `%${filterOptions.name}%`,
