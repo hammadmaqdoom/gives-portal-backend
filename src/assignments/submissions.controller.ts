@@ -76,8 +76,17 @@ export class SubmissionsController {
     const page = query?.page ?? 1;
     const limit = query?.limit ?? 10;
 
+    let filterOptions = query?.filters ?? null;
+    if (typeof filterOptions === 'string') {
+      try {
+        filterOptions = JSON.parse(filterOptions);
+      } catch {
+        filterOptions = null;
+      }
+    }
+
     const data = await this.submissionsService.findManyWithPagination({
-      filterOptions: query?.filters ?? null,
+      filterOptions,
       sortOptions: query?.sort ?? null,
       paginationOptions: {
         page,

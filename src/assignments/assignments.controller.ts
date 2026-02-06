@@ -129,69 +129,92 @@ export class AssignmentsController {
       return null;
     }
 
-    // Fetch files associated with this assignment
-    const files = await this.filesService.getFilesByContext('assignment', id);
-    
-    // Generate URLs for all files
-    const filesWithUrls = await Promise.all(
-      files.map(async (file) => {
-        const fileDriver = await this.fileStorageService.getDriver();
-        const baseUrl = this.getBaseUrl();
-        const isVideo = file.mimeType?.startsWith('video/') ||
-          /\.(mp4|webm|mov|avi|mkv|flv|wmv|m4v)$/i.test(file.path);
+    // Fetch files by context (assignment, id)
+    let files = await this.filesService.getFilesByContext('assignment', id);
+    const seenIds = new Set(files.map((f) => f.id));
 
-        // For videos or local files, use serve endpoint
-        if (isVideo || fileDriver === FileDriver.LOCAL) {
-          return {
-            id: file.id,
-            filename: file.filename,
-            originalName: file.originalName,
-            path: file.path,
-            size: file.size,
-            mimeType: file.mimeType,
-            uploadedAt: file.uploadedAt,
-            url: `${baseUrl}/api/v1/files/serve/${file.id}`,
-          };
-        }
-
-        // For S3/B2 non-video files, generate presigned URL
-        if (
-          fileDriver === FileDriver.S3 ||
-          fileDriver === FileDriver.S3_PRESIGNED ||
-          fileDriver === FileDriver.B2 ||
-          fileDriver === FileDriver.B2_PRESIGNED
-        ) {
+    // Also include assignment.attachments from DB (e.g. from class page) so PDFs always show
+    const dbAttachments = assignment?.attachments;
+    if (Array.isArray(dbAttachments) && dbAttachments.length > 0) {
+      for (const att of dbAttachments) {
+        const fileId = att != null && att !== '' ? String(att) : null;
+        if (fileId && !seenIds.has(fileId)) {
           try {
-            const presignedUrl = await this.fileStorageService.getPresignedFileUrl(
-              file.path,
-              86400, // 24 hours expiry
-            );
-            return {
-              id: file.id,
-              filename: file.filename,
-              originalName: file.originalName,
-              path: file.path,
-              size: file.size,
-              mimeType: file.mimeType,
-              uploadedAt: file.uploadedAt,
-              url: presignedUrl,
-            };
-          } catch (error) {
-            console.error('Error generating presigned URL:', error);
-            return {
-              id: file.id,
-              filename: file.filename,
-              originalName: file.originalName,
-              path: file.path,
-              size: file.size,
-              mimeType: file.mimeType,
-              uploadedAt: file.uploadedAt,
-              url: `${baseUrl}/api/v1/files/serve/${file.id}`,
-            };
+            const file = await this.filesService.getFileById(fileId);
+            if (file) {
+              files = files.concat(file);
+              seenIds.add(fileId);
+            }
+          } catch {
+            // Skip invalid refs
           }
         }
+      }
+    }
 
-        // Fallback
+    // Generate URLs for all files
+    const filesWithUrls = await Promise.all(
+      files.map(async (file) => this.buildFileWithUrl(file)),
+    );
+
+    // Return assignment with files included
+    return {
+      ...assignment,
+      attachments: filesWithUrls,
+    };
+  }
+
+  /**
+   * Build a file object with resolved URL for viewing/download.
+   */
+  private async buildFileWithUrl(file: {
+    id: string;
+    filename: string;
+    originalName: string;
+    path: string;
+    size: number;
+    mimeType: string;
+    uploadedAt: Date;
+  }): Promise<{
+    id: string;
+    filename: string;
+    originalName: string;
+    path: string;
+    size: number;
+    mimeType: string;
+    uploadedAt: Date;
+    url: string;
+  }> {
+    const fileDriver = await this.fileStorageService.getDriver();
+    const baseUrl = this.getBaseUrl();
+    const isVideo =
+      file.mimeType?.startsWith('video/') ||
+      /\.(mp4|webm|mov|avi|mkv|flv|wmv|m4v)$/i.test(file.path);
+
+    if (isVideo || fileDriver === FileDriver.LOCAL) {
+      return {
+        id: file.id,
+        filename: file.filename,
+        originalName: file.originalName,
+        path: file.path,
+        size: file.size,
+        mimeType: file.mimeType,
+        uploadedAt: file.uploadedAt,
+        url: `${baseUrl}/api/v1/files/serve/${file.id}`,
+      };
+    }
+
+    if (
+      fileDriver === FileDriver.S3 ||
+      fileDriver === FileDriver.S3_PRESIGNED ||
+      fileDriver === FileDriver.B2 ||
+      fileDriver === FileDriver.B2_PRESIGNED
+    ) {
+      try {
+        const presignedUrl = await this.fileStorageService.getPresignedFileUrl(
+          file.path,
+          86400,
+        );
         return {
           id: file.id,
           filename: file.filename,
@@ -200,15 +223,22 @@ export class AssignmentsController {
           size: file.size,
           mimeType: file.mimeType,
           uploadedAt: file.uploadedAt,
-          url: `${baseUrl}/api/v1/files/serve/${file.id}`,
+          url: presignedUrl,
         };
-      }),
-    );
+      } catch (error) {
+        console.error('Error generating presigned URL:', error);
+      }
+    }
 
-    // Return assignment with files included
     return {
-      ...assignment,
-      attachments: filesWithUrls,
+      id: file.id,
+      filename: file.filename,
+      originalName: file.originalName,
+      path: file.path,
+      size: file.size,
+      mimeType: file.mimeType,
+      uploadedAt: file.uploadedAt,
+      url: `${baseUrl}/api/v1/files/serve/${file.id}`,
     };
   }
 

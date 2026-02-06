@@ -19,6 +19,7 @@ import {
   ApiCreatedResponse,
   ApiOkResponse,
   ApiParam,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { Roles } from '../roles/roles.decorator';
@@ -137,6 +138,13 @@ export class UsersController {
     @Body() updateProfileDto: UpdateUserDto,
   ): Promise<User | null> {
     return this.usersService.update(id, updateProfileDto);
+  }
+
+  @Delete('by-email')
+  @ApiQuery({ name: 'email', required: true, description: 'User email to delete' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeByEmail(@Query('email') email: string): Promise<void> {
+    return this.usersService.removeByEmail(email ?? null);
   }
 
   @Delete(':id')

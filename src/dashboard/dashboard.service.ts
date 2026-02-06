@@ -522,24 +522,56 @@ export class DashboardService {
 
   private async getAssignmentStatusForTeacher(teacherId: number) {
     try {
-      const result = await this.assignmentRepository
+      // Assignment entity has no totalStudents; total = enrolled students in assignment's class
+      const assignmentsWithSubmissions = await this.assignmentRepository
         .createQueryBuilder('assignment')
-        // Some deployments may not have submissions; guard join in try/catch
         .leftJoin('assignment.submissions', 'submission')
-        .select('assignment.title', 'assignmentTitle')
+        .select('assignment.id', 'id')
+        .addSelect('assignment.title', 'assignmentTitle')
+        .addSelect('assignment.classId', 'classId')
         .addSelect('COUNT(submission.id)', 'submitted')
-        .addSelect('assignment.totalStudents', 'total')
         .where('assignment.teacher.id = :teacherId', { teacherId })
         .groupBy('assignment.id')
+        .addGroupBy('assignment.title')
+        .addGroupBy('assignment.classId')
         .getRawMany();
 
-      return result.map((item) => ({
+      const classIds = [
+        ...new Set(
+          (assignmentsWithSubmissions as { classId: number }[])
+            .map((a) => a.classId)
+            .filter((id) => id != null),
+        ),
+      ];
+      if (classIds.length === 0) {
+        return assignmentsWithSubmissions.map((item: any) => ({
+          assignment: item.assignmentTitle,
+          submitted: parseInt(item.submitted, 10) || 0,
+          total: 0,
+        }));
+      }
+
+      const enrollmentCounts = await this.enrollmentRepository
+        .createQueryBuilder('enrollment')
+        .select('enrollment.classId', 'classId')
+        .addSelect('COUNT(enrollment.id)', 'total')
+        .where('enrollment.classId IN (:...classIds)', { classIds })
+        .andWhere('enrollment.status = :status', { status: 'active' })
+        .groupBy('enrollment.classId')
+        .getRawMany();
+
+      const totalByClassId = new Map<number, number>();
+      for (const row of enrollmentCounts as { classId: number; total: string }[]) {
+        totalByClassId.set(row.classId, parseInt(row.total, 10) || 0);
+      }
+
+      return assignmentsWithSubmissions.map((item: any) => ({
         assignment: item.assignmentTitle,
-        submitted: parseInt(item.submitted),
-        total: parseInt(item.total),
+        submitted: parseInt(item.submitted, 10) || 0,
+        total: totalByClassId.get(item.classId) ?? 0,
       }));
     } catch (error) {
-      // Fallback when submissions table or assignment columns are missing
+      // Fallback when submissions table or relations are missing
       return [];
     }
   }
@@ -608,7 +640,7 @@ export class DashboardService {
           'rate',
         )
         .setParameter('present', AttendanceStatus.PRESENT)
-        .where('attendance.student.id = :studentId', { studentId })
+        .where('attendance.studentId = :studentId', { studentId })
         .andWhere('attendance.deletedAt IS NULL')
         .getRawOne();
       
@@ -630,7 +662,7 @@ export class DashboardService {
       const result = await this.performanceRepository
         .createQueryBuilder('performance')
         .select('AVG(performance.score)', 'average')
-        .where('performance.student.id = :studentId', { studentId })
+        .where('performance.studentId = :studentId', { studentId })
         .andWhere('performance.deletedAt IS NULL')
         .getRawOne();
       
@@ -688,21 +720,25 @@ export class DashboardService {
   }
 
   private async getGradeProgressForStudent(studentId: number) {
-    const result = await this.performanceRepository
-      .createQueryBuilder('performance')
-      .leftJoin('performance.assignment', 'assignment')
+    // Use Submission table (where teachers actually grade) so dashboard stays in sync
+    const result = await this.submissionRepository
+      .createQueryBuilder('submission')
+      .leftJoin('submission.assignment', 'assignment')
       .leftJoin('assignment.class', 'klass')
       .leftJoin('klass.subject', 'subject')
       .select('subject.name', 'subjectName')
-      .addSelect('AVG(performance.score)', 'grade')
-      .where('performance.student.id = :studentId', { studentId })
+      .addSelect('AVG(submission.score)', 'grade')
+      .where('submission.student.id = :studentId', { studentId })
+      .andWhere('submission.score IS NOT NULL')
       .groupBy('subject.name')
       .getRawMany();
 
-    return result.map((item) => ({
-      subject: item.subjectName,
-      grade: parseFloat(item.grade),
-    }));
+    return result
+      .filter((item) => item.subjectName != null)
+      .map((item) => ({
+        subject: item.subjectName,
+        grade: item.grade != null ? parseFloat(item.grade) : 0,
+      }));
   }
 
   private async getAttendanceCalendarForStudent(studentId: number) {
@@ -734,11 +770,19 @@ export class DashboardService {
       .where('submission.student.id = :studentId', { studentId })
       .getRawMany();
 
-    return result.map((item) => ({
-      assignment: item.assignmentTitle,
-      status: item.status,
-      grade: item.grade ? parseFloat(item.grade) : undefined,
-    }));
+    return result.map((item) => {
+      // Map backend status to dashboard display: graded/submitted -> completed
+      const rawStatus = item.status as string;
+      const displayStatus =
+        rawStatus === 'graded' || rawStatus === 'submitted'
+          ? 'completed'
+          : rawStatus ?? 'pending';
+      return {
+        assignment: item.assignmentTitle,
+        status: displayStatus,
+        grade: item.grade != null ? parseFloat(item.grade) : undefined,
+      };
+    });
   }
 
   // Helper methods for parent analytics

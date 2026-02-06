@@ -71,14 +71,20 @@ export class DashboardController {
     type: TeacherStatsDto,
   })
   async getTeacherStats(@Request() req): Promise<TeacherStatsDto> {
-    // Find teacher by user ID (since JWT payload only contains id, not email)
+    // Find teacher by user ID (email match between user and teacher record)
     const teacher = await this.dashboardService.findTeacherByUserId(
       req.user.id,
     );
     if (!teacher) {
-      throw new Error(
-        `Teacher not found for this user. User ID: ${req.user.id}, Role: ${req.user.role?.id || req.user.role}`,
-      );
+      // Return empty stats so dashboard renders; ensure user email matches teacher record
+      return {
+        myClasses: 0,
+        totalStudents: 0,
+        averageAttendance: 0,
+        pendingAssignments: 0,
+        completedAssignments: 0,
+        averageGrade: 0,
+      };
     }
     return this.dashboardService.getTeacherStats(teacher.id);
   }
@@ -94,14 +100,17 @@ export class DashboardController {
     type: TeacherAnalyticsDto,
   })
   async getTeacherAnalytics(@Request() req): Promise<TeacherAnalyticsDto> {
-    // Find teacher by user ID (since JWT payload only contains id, not email)
+    // Find teacher by user ID (email match between user and teacher record)
     const teacher = await this.dashboardService.findTeacherByUserId(
       req.user.id,
     );
     if (!teacher) {
-      throw new Error(
-        `Teacher not found for this user. User ID: ${req.user.id}, Role: ${req.user.role?.id || req.user.role}`,
-      );
+      // Return empty analytics so dashboard renders; ensure user email matches teacher record
+      return {
+        classAttendance: [],
+        studentPerformance: [],
+        assignmentStatus: [],
+      };
     }
     return this.dashboardService.getTeacherAnalytics(teacher.id);
   }
