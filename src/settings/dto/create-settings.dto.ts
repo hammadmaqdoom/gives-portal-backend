@@ -7,7 +7,10 @@ import {
   IsNumber,
   IsEmail,
   IsUrl,
+  IsArray,
   MaxLength,
+  Min,
+  Max,
 } from 'class-validator';
 
 export class CreateSettingsDto {
@@ -285,6 +288,19 @@ export class CreateSettingsDto {
   @IsString()
   azureBlobPublicBaseUrl?: string;
 
+  // Backblaze B2
+  @ApiPropertyOptional({ example: 'https://s3.us-west-001.backblazeb2.com' })
+  @IsOptional()
+  @IsUrl()
+  @MaxLength(500)
+  b2EndpointUrl?: string;
+
+  @ApiPropertyOptional({ example: 'us-west-001' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  b2Region?: string;
+
   // SMS Configuration
   @ApiPropertyOptional({ example: false })
   @IsOptional()
@@ -366,4 +382,228 @@ export class CreateSettingsDto {
   @IsString()
   @MaxLength(7)
   themeCustomColor?: string;
+
+  // Zoom Configuration
+  @ApiPropertyOptional({
+    example: 'your_zoom_client_id',
+    description: 'Zoom OAuth Client ID for app-level integration',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  zoomClientId?: string;
+
+  @ApiPropertyOptional({
+    example: 'your_zoom_client_secret',
+    description: 'Zoom OAuth Client Secret for app-level integration',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  zoomClientSecret?: string;
+
+  @ApiPropertyOptional({
+    example: 'https://your-domain.com/api/v1/zoom/oauth/callback',
+    description: 'Zoom OAuth Redirect URI - must exactly match the redirect URI configured in your Zoom app',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  zoomRedirectUri?: string;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Allow admins to access and configure Zoom settings (superadmin always has access)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  zoomAdminAccess?: boolean;
+
+  // Video Content Protection Settings
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Enable video content protection features',
+  })
+  @IsOptional()
+  @IsBoolean()
+  contentProtectionEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Block DevTools access during video playback',
+  })
+  @IsOptional()
+  @IsBoolean()
+  blockDevTools?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Block keyboard shortcuts like F12, Ctrl+U, etc.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  blockKeyboardShortcuts?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Block right-click context menu on video',
+  })
+  @IsOptional()
+  @IsBoolean()
+  blockRightClick?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Block text selection on video content area',
+  })
+  @IsOptional()
+  @IsBoolean()
+  blockTextSelection?: boolean;
+
+  @ApiPropertyOptional({
+    example: 'warn',
+    description: 'Action to take on protection violation: warn | redirect | log',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  protectionAction?: string;
+
+  // Video Watermark Settings
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Enable watermark overlay on videos',
+  })
+  @IsOptional()
+  @IsBoolean()
+  watermarkEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Show institution name in watermark',
+  })
+  @IsOptional()
+  @IsBoolean()
+  watermarkShowInstitution?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Show instructor name in watermark',
+  })
+  @IsOptional()
+  @IsBoolean()
+  watermarkShowInstructor?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Show student email in watermark',
+  })
+  @IsOptional()
+  @IsBoolean()
+  watermarkShowStudentEmail?: boolean;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Show student ID in watermark',
+  })
+  @IsOptional()
+  @IsBoolean()
+  watermarkShowStudentId?: boolean;
+
+  @ApiPropertyOptional({
+    example: 0.4,
+    description: 'Watermark opacity (0.2 - 0.6)',
+  })
+  @IsOptional()
+  @IsNumber()
+  watermarkOpacity?: number;
+
+  @ApiPropertyOptional({
+    example: 'random',
+    description: 'Watermark position mode: random | fixed-corner | center',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  watermarkPosition?: string;
+
+  // Disable-DevTool Configuration
+  @ApiPropertyOptional({
+    example: '5d41402abc4b2a76b9719d911017c592',
+    description: 'MD5 hash for developer bypass (generate using DisableDevtool.md5())',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  disableDevToolMd5?: string;
+
+  @ApiPropertyOptional({
+    example: 'ddtk',
+    description: 'Custom bypass parameter name (default: ddtk)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  disableDevToolTkName?: string;
+
+  @ApiPropertyOptional({
+    example: 'https://example.com/blocked',
+    description: 'Redirect URL when devtools detected (optional)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  disableDevToolUrl?: string;
+
+  @ApiPropertyOptional({
+    example: [0, 1, 2, 3, 4, 5, 6, 7],
+    description: 'Array of detector types to enable (0-7, default: all)',
+    type: [Number],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsNumber({}, { each: true })
+  disableDevToolDetectors?: number[];
+
+  @ApiPropertyOptional({
+    example: 200,
+    description: 'Detection interval in milliseconds (default: 200)',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(50)
+  @Max(5000)
+  disableDevToolInterval?: number;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Whether to clear console logs',
+  })
+  @IsOptional()
+  @IsBoolean()
+  disableDevToolClearLog?: boolean;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Whether to disable copying',
+  })
+  @IsOptional()
+  @IsBoolean()
+  blockCopy?: boolean;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Whether to disable cutting',
+  })
+  @IsOptional()
+  @IsBoolean()
+  blockCut?: boolean;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Whether to disable pasting',
+  })
+  @IsOptional()
+  @IsBoolean()
+  blockPaste?: boolean;
 }
