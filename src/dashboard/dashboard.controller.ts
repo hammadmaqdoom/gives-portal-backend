@@ -5,6 +5,7 @@ import {
   Request,
   HttpStatus,
   HttpCode,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
@@ -30,6 +31,8 @@ import { SuperAdminStatsDto } from './dto/super-admin-dashboard.dto';
   version: '1',
 })
 export class DashboardController {
+  private readonly logger = new Logger(DashboardController.name);
+
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get('admin/stats')
@@ -76,6 +79,9 @@ export class DashboardController {
       req.user.id,
     );
     if (!teacher) {
+      this.logger.warn(
+        `Teacher not found for user ${req.user.id} (email: ${req.user.email || 'N/A'}). Returning empty stats.`,
+      );
       // Return empty stats so dashboard renders; ensure user email matches teacher record
       return {
         myClasses: 0,
@@ -86,6 +92,10 @@ export class DashboardController {
         averageGrade: 0,
       };
     }
+
+    this.logger.debug(
+      `Fetching stats for teacher ${teacher.id} (user ${req.user.id})`,
+    );
     return this.dashboardService.getTeacherStats(teacher.id);
   }
 
@@ -105,6 +115,9 @@ export class DashboardController {
       req.user.id,
     );
     if (!teacher) {
+      this.logger.warn(
+        `Teacher not found for user ${req.user.id} (email: ${req.user.email || 'N/A'}). Returning empty analytics.`,
+      );
       // Return empty analytics so dashboard renders; ensure user email matches teacher record
       return {
         classAttendance: [],
@@ -112,7 +125,20 @@ export class DashboardController {
         assignmentStatus: [],
       };
     }
-    return this.dashboardService.getTeacherAnalytics(teacher.id);
+
+    this.logger.debug(
+      `Fetching analytics for teacher ${teacher.id} (user ${req.user.id})`,
+    );
+    const analytics = await this.dashboardService.getTeacherAnalytics(teacher.id);
+    
+    this.logger.debug(
+      `Teacher analytics for ${teacher.id}: ` +
+      `${analytics.classAttendance.length} classes, ` +
+      `${analytics.studentPerformance.length} students, ` +
+      `${analytics.assignmentStatus.length} assignments`,
+    );
+    
+    return analytics;
   }
 
   @Get('student/stats')

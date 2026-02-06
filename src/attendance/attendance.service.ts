@@ -19,18 +19,19 @@ export class AttendanceService {
   constructor(private readonly attendanceRepository: AttendanceRepository) { }
 
   async create(createAttendanceDto: CreateAttendanceDto): Promise<Attendance> {
-    // Check if attendance already exists for this student and date
+    // Check if attendance already exists for this student, date, and class
     const existingAttendance =
-      await this.attendanceRepository.findByStudentAndDate(
+      await this.attendanceRepository.findByStudentDateAndClass(
         createAttendanceDto.student,
         createAttendanceDto.date,
+        createAttendanceDto.class,
       );
 
     if (existingAttendance) {
       throw new UnprocessableEntityException({
         status: HttpStatus.UNPROCESSABLE_ENTITY,
         errors: {
-          attendance: 'attendanceAlreadyExistsForDate',
+          attendance: 'attendanceAlreadyExistsForDateAndClass',
         },
       });
     }
@@ -136,9 +137,15 @@ export class AttendanceService {
         await this.attendanceRepository.update(item.id, item);
         updated += 1;
       } else if (item.student && item.class && item.date) {
-        const existing = await this.attendanceRepository.findByStudentAndDate(
-          (item.student as any).id ?? (item as any).student,
-          item.date as any,
+        const studentId = (item.student as any).id ?? (item as any).student;
+        const classId = (item.class as any).id ?? (item as any).class;
+        const date = item.date as any;
+        
+        // Use the more accurate check by student+date+class when class is available
+        const existing = await this.attendanceRepository.findByStudentDateAndClass(
+          studentId,
+          date,
+          classId,
         );
         if (existing) {
           await this.attendanceRepository.update(existing.id, item);
