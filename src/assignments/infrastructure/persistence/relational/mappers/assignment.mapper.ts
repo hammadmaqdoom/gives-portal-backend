@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AssignmentEntity } from '../entities/assignment.entity';
 import { Assignment } from '../../../../domain/assignment';
 import { Class } from '../../../../../classes/domain/class';
+import { Subject } from '../../../../../subjects/domain/subject';
 
 @Injectable()
 export class AssignmentMapper {
@@ -32,6 +33,21 @@ export class AssignmentMapper {
         updatedAt: raw.class.updatedAt,
         deletedAt: raw.class.deletedAt,
       } as Class;
+      
+      // Include subject if available (eager loaded)
+      if (raw.class.subject) {
+        assignment.class.subject = {
+          id: raw.class.subject.id,
+          name: raw.class.subject.name,
+          description: raw.class.subject.description,
+          syllabusCode: raw.class.subject.syllabusCode,
+          level: raw.class.subject.level,
+          officialLink: raw.class.subject.officialLink,
+          createdAt: raw.class.subject.createdAt,
+          updatedAt: raw.class.subject.updatedAt,
+          deletedAt: raw.class.subject.deletedAt,
+        } as Subject;
+      }
     }
 
     return assignment;
