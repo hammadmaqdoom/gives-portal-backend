@@ -242,23 +242,38 @@
             color: #2C3E50;
         }
         
+        .col-class-name {
+            width: 18%;
+            padding-right: 6px;
+        }
+        
+        .col-class-id {
+            width: 8%;
+            text-align: center;
+        }
+        
+        .col-teacher {
+            width: 15%;
+            padding-right: 6px;
+        }
+        
         .col-description {
-            width: 50%;
-            padding-right: 10px;
+            width: 24%;
+            padding-right: 6px;
         }
         
         .col-quantity {
-            width: 15%;
+            width: 7%;
             text-align: center;
         }
         
         .col-unit-price {
-            width: 17.5%;
+            width: 14%;
             text-align: right;
         }
         
         .col-total {
-            width: 17.5%;
+            width: 14%;
             text-align: right;
             font-weight: bold;
         }
@@ -440,7 +455,7 @@
     {{#if studentId}}
     <div class="student-id-section">
         <div class="student-id-label">Student ID</div>
-        <div class="student-id-value">STU-{{studentId}}</div>
+        <div class="student-id-value">{{studentId}}</div>
     </div>
     {{/if}}
     
@@ -478,8 +493,11 @@
     <!-- Invoice Items Table -->
     <div class="table-section">
         <div class="table">
-            <!-- Table Header -->
+            <!-- Table Header: Class details + fee -->
             <div class="table-header">
+                <div class="table-header-cell col-class-name">Class Name</div>
+                <div class="table-header-cell col-class-id">Class ID</div>
+                <div class="table-header-cell col-teacher">Teacher</div>
                 <div class="table-header-cell col-description">Description</div>
                 <div class="table-header-cell col-quantity">Qty</div>
                 <div class="table-header-cell col-unit-price">Unit Price</div>
@@ -490,6 +508,9 @@
             {{#if items}}
                 {{#each items}}
                 <div class="table-row {{#if @index}}{{#if (mod @index 2)}}table-row-alt{{/if}}{{/if}}">
+                    <div class="table-cell col-class-name">{{className}}</div>
+                    <div class="table-cell col-class-id">{{classId}}</div>
+                    <div class="table-cell col-teacher">{{teacherName}}</div>
                     <div class="table-cell col-description">{{description}}</div>
                     <div class="table-cell col-quantity text-center">{{quantity}}</div>
                     <div class="table-cell col-unit-price text-right">{{formatCurrency unitPrice ../currency}}</div>
@@ -498,6 +519,9 @@
                 {{/each}}
             {{else}}
                 <div class="table-row">
+                    <div class="table-cell col-class-name">-</div>
+                    <div class="table-cell col-class-id">-</div>
+                    <div class="table-cell col-teacher">-</div>
                     <div class="table-cell col-description">No items found</div>
                     <div class="table-cell col-quantity text-center">-</div>
                     <div class="table-cell col-unit-price text-right">-</div>

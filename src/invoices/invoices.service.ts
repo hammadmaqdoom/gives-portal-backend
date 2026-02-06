@@ -106,6 +106,9 @@ export class InvoicesService {
               quantity: item.quantity,
               unitPrice: item.unitPrice,
               total: item.total,
+              classId: item.classId,
+              className: item.className,
+              teacherName: item.teacherName,
               createdAt: new Date(),
               updatedAt: new Date(),
             })) || [],
@@ -534,7 +537,7 @@ export class InvoicesService {
       issueDate: formatDate(invoice.generatedDate),
       dueDate: formatDate(invoice.dueDate),
       status: invoice.status.toUpperCase(),
-      studentId: String(student.id).padStart(6, '0'),
+      studentId: student.studentId || String(student.id).padStart(6, '0'),
       student: {
         name: student.name,
         email: student.email || '',
@@ -700,7 +703,7 @@ export class InvoicesService {
       doc.text('STUDENT ID', leftMargin + 5, yPosition + 5);
       doc.setFontSize(11);
       doc.setTextColor(44, 62, 80);
-      doc.text(`STU-${templateData.studentId}`, leftMargin + 5, yPosition + 9);
+      doc.text(String(templateData.studentId), leftMargin + 5, yPosition + 9);
       yPosition += 20;
     }
 
@@ -759,18 +762,25 @@ export class InvoicesService {
 
     yPosition += 45;
 
-    // Invoice Items Table
+    // Invoice Items Table (Class Name | Class ID | Teacher | Description | Qty | Unit Price | Total)
+    const tableWidth = pageWidth - 30;
+    const colClassName = leftMargin + 2;
+    const colClassId = colClassName + tableWidth * 0.18;
+    const colTeacher = colClassId + tableWidth * 0.08;
+    const colDesc = colTeacher + tableWidth * 0.15;
+    const colQty = colDesc + tableWidth * 0.24;
+    const colUnit = colQty + tableWidth * 0.07;
+    const colTotal = colUnit + tableWidth * 0.14;
+
     doc.setFontSize(8);
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFillColor(25, 118, 210); // #1976D2
-    doc.rect(leftMargin, yPosition, pageWidth - 30, 8, 'F');
-    
-    const colDesc = leftMargin + 2;
-    const colQty = colDesc + (pageWidth - 30) * 0.5;
-    const colUnit = colQty + (pageWidth - 30) * 0.15;
-    const colTotal = colUnit + (pageWidth - 30) * 0.175;
+    doc.rect(leftMargin, yPosition, tableWidth, 8, 'F');
 
+    doc.text('Class Name', colClassName, yPosition + 5.5);
+    doc.text('Class ID', colClassId, yPosition + 5.5);
+    doc.text('Teacher', colTeacher, yPosition + 5.5);
     doc.text('Description', colDesc, yPosition + 5.5);
     doc.text('Qty', colQty, yPosition + 5.5);
     doc.text('Unit Price', colUnit, yPosition + 5.5);
@@ -783,25 +793,30 @@ export class InvoicesService {
       templateData.items.forEach((item: any, index: number) => {
         if (index % 2 === 1) {
           doc.setFillColor(248, 249, 250);
-          doc.rect(leftMargin, yPosition - 2, pageWidth - 30, 8, 'F');
+          doc.rect(leftMargin, yPosition - 2, tableWidth, 8, 'F');
         }
-        
+
         doc.setFontSize(9);
         doc.setTextColor(44, 62, 80);
         doc.setFont('helvetica', 'normal');
-        const descLines = doc.splitTextToSize(item.description, (pageWidth - 30) * 0.5 - 4);
+        doc.text(String(item.className || '-'), colClassName, yPosition + 4);
+        doc.text(String(item.classId ?? '-'), colClassId, yPosition + 4);
+        doc.text(String(item.teacherName || '-'), colTeacher, yPosition + 4);
+        const descLines = doc.splitTextToSize(item.description || '-', tableWidth * 0.24 - 4);
         doc.text(descLines, colDesc, yPosition + 4);
-        
         doc.text(String(item.quantity), colQty, yPosition + 4);
         doc.text(`${templateData.currency} ${Number(item.unitPrice).toFixed(2)}`, colUnit, yPosition + 4, { align: 'right' });
         doc.setFont('helvetica', 'bold');
         doc.text(`${templateData.currency} ${Number(item.total).toFixed(2)}`, colTotal, yPosition + 4, { align: 'right' });
-        
+
         yPosition += Math.max(8, descLines.length * 4);
       });
     } else {
       doc.setFontSize(9);
       doc.setTextColor(44, 62, 80);
+      doc.text('-', colClassName, yPosition + 4);
+      doc.text('-', colClassId, yPosition + 4);
+      doc.text('-', colTeacher, yPosition + 4);
       doc.text('No items found', colDesc, yPosition + 4);
     }
 
