@@ -489,17 +489,42 @@ export class InvoicesService {
     const bankDetails = await this.settingsService.getBankDetails();
 
     // Read and compile HTML template
-    const templatePath = path.join(
-      this.configService.getOrThrow<string>('app.workingDirectory', {
-        infer: true,
-      }),
-      'src',
-      'invoices',
-      'templates',
-      'invoice-pdf.hbs',
-    );
+    // Try multiple paths to support both development and production environments
+    const workingDir = this.configService.getOrThrow<string>('app.workingDirectory', {
+      infer: true,
+    });
+    
+    const possiblePaths = [
+      // Development: source location
+      path.join(workingDir, 'src', 'invoices', 'templates', 'invoice-pdf.hbs'),
+      // Production: dist location (when templates are copied as assets)
+      path.join(workingDir, 'dist', 'invoices', 'templates', 'invoice-pdf.hbs'),
+      // Production: relative to compiled service file
+      path.join(__dirname, 'templates', 'invoice-pdf.hbs'),
+      // Fallback: relative path from service location
+      path.join(__dirname, '..', 'templates', 'invoice-pdf.hbs'),
+    ];
 
-    const templateContent = await fs.readFile(templatePath, 'utf-8');
+    let templatePath: string | null = null;
+    let templateContent: string | null = null;
+
+    for (const possiblePath of possiblePaths) {
+      try {
+        await fs.access(possiblePath);
+        templatePath = possiblePath;
+        templateContent = await fs.readFile(possiblePath, 'utf-8');
+        break;
+      } catch (error) {
+        // Continue to next path
+        continue;
+      }
+    }
+
+    if (!templateContent) {
+      throw new NotFoundException(
+        `Invoice template not found. Tried paths: ${possiblePaths.join(', ')}`,
+      );
+    }
 
     // Register Handlebars helpers
     Handlebars.registerHelper('formatCurrency', (amount: number, currency: string = 'USD') => {
