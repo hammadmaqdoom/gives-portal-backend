@@ -629,28 +629,26 @@ export class InvoicesService {
     const leftMargin = 15;
     const rightColumnStart = pageWidth - 100;
 
-    // Company Logo and Name
+    // Company Logo (bigger size)
     if (settings.logoNavbar && settings.logoNavbar.startsWith('data:image/')) {
       try {
-        doc.addImage(settings.logoNavbar, 'PNG', leftMargin, yPosition, 20, 20);
+        doc.addImage(settings.logoNavbar, 'PNG', leftMargin, yPosition, 50, 50);
       } catch (error) {
         console.warn('Failed to load company logo:', error);
       }
     }
 
-    doc.setFontSize(16);
-    doc.setTextColor(25, 118, 210); // #1976D2
-    doc.setFont('helvetica', 'bold');
-    doc.text(templateData.companyName, leftMargin + (settings.logoNavbar ? 25 : 0), yPosition + 8);
+    // Position company details below logo
+    yPosition += (settings.logoNavbar ? 60 : 10);
     
-    doc.setFontSize(8);
-    doc.setTextColor(127, 140, 141); // #7F8C8D
-    doc.setFont('helvetica', 'italic');
-    doc.text(templateData.tagline, leftMargin + (settings.logoNavbar ? 25 : 0), yPosition + 12);
-
-    yPosition += 15;
-    doc.setFontSize(8);
+    // Company name as small bold text above address
+    doc.setFontSize(9);
     doc.setTextColor(52, 73, 94); // #34495E
+    doc.setFont('helvetica', 'bold');
+    doc.text(templateData.companyName, leftMargin, yPosition);
+    
+    yPosition += 5;
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     doc.text(templateData.address, leftMargin, yPosition);
     yPosition += 4;
@@ -714,26 +712,9 @@ export class InvoicesService {
 
     yPosition = 70;
 
-    // Student ID Section
-    if (templateData.studentId) {
-      doc.setFillColor(250, 250, 250); // #FAFAFA
-      doc.setDrawColor(52, 73, 94); // #34495E
-      doc.rect(leftMargin, yPosition, pageWidth - 30, 12, 'FD');
-      doc.setFillColor(52, 73, 94);
-      doc.rect(leftMargin, yPosition, 2, 12, 'F');
-      
-      doc.setFontSize(7);
-      doc.setTextColor(127, 140, 141);
-      doc.setFont('helvetica', 'bold');
-      doc.text('STUDENT ID', leftMargin + 5, yPosition + 5);
-      doc.setFontSize(11);
-      doc.setTextColor(44, 62, 80);
-      doc.text(String(templateData.studentId), leftMargin + 5, yPosition + 9);
-      yPosition += 20;
-    }
-
-    // Bill To Section - Two Cards
-    const cardWidth = (pageWidth - 30 - 10) / 2;
+    // Bill To Section - Two Cards (compact layout)
+    const cardGap = 10;
+    const cardWidth = (pageWidth - 30 - cardGap) / 2;
     
     if (templateData.parent) {
       doc.setFillColor(250, 250, 250);
@@ -764,38 +745,53 @@ export class InvoicesService {
 
     if (templateData.student) {
       doc.setFillColor(250, 250, 250);
-      doc.rect(leftMargin + cardWidth + 10, yPosition, cardWidth, 35, 'F');
+      doc.rect(leftMargin + cardWidth + cardGap, yPosition, cardWidth, 35, 'F');
       doc.setFontSize(9);
       doc.setTextColor(52, 73, 94);
       doc.setFont('helvetica', 'bold');
-      doc.text('STUDENT', leftMargin + cardWidth + 15, yPosition + 8);
+      doc.text('STUDENT', leftMargin + cardWidth + cardGap + 5, yPosition + 8);
       doc.setLineWidth(0.5);
       doc.setDrawColor(25, 118, 210);
-      doc.line(leftMargin + cardWidth + 15, yPosition + 10, leftMargin + cardWidth * 2 + 5, yPosition + 10);
+      doc.line(leftMargin + cardWidth + cardGap + 5, yPosition + 10, leftMargin + cardWidth * 2 + cardGap - 5, yPosition + 10);
       
       let cardY = yPosition + 15;
+      
+      // Student ID inline with student info
+      if (templateData.studentId) {
+        doc.setFontSize(7);
+        doc.setTextColor(127, 140, 141);
+        doc.setFont('helvetica', 'bold');
+        doc.text('STUDENT ID: ', leftMargin + cardWidth + cardGap + 5, cardY);
+        doc.setFontSize(9);
+        doc.setTextColor(44, 62, 80);
+        doc.text(String(templateData.studentId), leftMargin + cardWidth + cardGap + 5 + 25, cardY);
+        cardY += 6;
+      }
+      
       doc.setFontSize(10);
       doc.setTextColor(44, 62, 80);
       doc.setFont('helvetica', 'bold');
-      doc.text(templateData.student.name, leftMargin + cardWidth + 15, cardY);
+      doc.text(templateData.student.name, leftMargin + cardWidth + cardGap + 5, cardY);
       cardY += 5;
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(52, 73, 94);
-      doc.text(templateData.student.email, leftMargin + cardWidth + 15, cardY);
+      doc.text(templateData.student.email, leftMargin + cardWidth + cardGap + 5, cardY);
     }
 
     yPosition += 45;
 
-    // Invoice Items Table (Class Name | Class ID | Teacher | Description | Qty | Unit Price | Total)
+    // Invoice Items Table (Class Name | Description | Qty | Unit Price | Total)
     const tableWidth = pageWidth - 30;
     const colClassName = leftMargin + 2;
-    const colClassId = colClassName + tableWidth * 0.18;
-    const colTeacher = colClassId + tableWidth * 0.08;
-    const colDesc = colTeacher + tableWidth * 0.15;
-    const colQty = colDesc + tableWidth * 0.24;
-    const colUnit = colQty + tableWidth * 0.07;
-    const colTotal = colUnit + tableWidth * 0.14;
+    const colDesc = colClassName + tableWidth * 0.22 + 8;
+    const colQty = colDesc + tableWidth * 0.36 + 8;
+    const colUnitStart = colQty + tableWidth * 0.08 + 8;
+    const colUnitWidth = tableWidth * 0.18;
+    const colUnitRight = colUnitStart + colUnitWidth;
+    const colTotalStart = colUnitRight + 8;
+    const colTotalWidth = tableWidth * 0.16;
+    const colTotalRight = colTotalStart + colTotalWidth;
 
     doc.setFontSize(8);
     doc.setTextColor(255, 255, 255);
@@ -804,44 +800,53 @@ export class InvoicesService {
     doc.rect(leftMargin, yPosition, tableWidth, 8, 'F');
 
     doc.text('Class Name', colClassName, yPosition + 5.5);
-    doc.text('Class ID', colClassId, yPosition + 5.5);
-    doc.text('Teacher', colTeacher, yPosition + 5.5);
     doc.text('Description', colDesc, yPosition + 5.5);
     doc.text('Qty', colQty, yPosition + 5.5);
-    doc.text('Unit Price', colUnit, yPosition + 5.5);
-    doc.text('Total', colTotal, yPosition + 5.5);
+    doc.text('Unit Price', colUnitRight, yPosition + 5.5, { align: 'right' });
+    doc.text('Total', colTotalRight, yPosition + 5.5, { align: 'right' });
 
     yPosition += 10;
 
     // Table Rows
     if (templateData.items && templateData.items.length > 0) {
       templateData.items.forEach((item: any, index: number) => {
+        const rowHeight = Math.max(12, (item.teacherName ? 16 : 12));
+        
         if (index % 2 === 1) {
           doc.setFillColor(248, 249, 250);
-          doc.rect(leftMargin, yPosition - 2, tableWidth, 8, 'F');
+          doc.rect(leftMargin, yPosition - 2, tableWidth, rowHeight, 'F');
         }
 
         doc.setFontSize(9);
         doc.setTextColor(44, 62, 80);
         doc.setFont('helvetica', 'normal');
+        
+        // Class Name with Teacher below
         doc.text(String(item.className || '-'), colClassName, yPosition + 4);
-        doc.text(String(item.classId ?? '-'), colClassId, yPosition + 4);
-        doc.text(String(item.teacherName || '-'), colTeacher, yPosition + 4);
-        const descLines = doc.splitTextToSize(item.description || '-', tableWidth * 0.24 - 4);
+        if (item.teacherName) {
+          doc.setFontSize(8);
+          doc.setTextColor(127, 140, 141); // #7F8C8D
+          doc.text(String(item.teacherName), colClassName, yPosition + 8);
+        }
+        
+        // Description
+        doc.setFontSize(9);
+        doc.setTextColor(44, 62, 80);
+        const descLines = doc.splitTextToSize(item.description || '-', tableWidth * 0.36 - 4);
         doc.text(descLines, colDesc, yPosition + 4);
+        
+        // Quantity, Unit Price, Total
         doc.text(String(item.quantity), colQty, yPosition + 4);
-        doc.text(`${templateData.currency} ${Number(item.unitPrice).toFixed(2)}`, colUnit, yPosition + 4, { align: 'right' });
+        doc.text(`${templateData.currency} ${Number(item.unitPrice).toFixed(2)}`, colUnitRight, yPosition + 4, { align: 'right' });
         doc.setFont('helvetica', 'bold');
-        doc.text(`${templateData.currency} ${Number(item.total).toFixed(2)}`, colTotal, yPosition + 4, { align: 'right' });
+        doc.text(`${templateData.currency} ${Number(item.total).toFixed(2)}`, colTotalRight, yPosition + 4, { align: 'right' });
 
-        yPosition += Math.max(8, descLines.length * 4);
+        yPosition += Math.max(rowHeight, descLines.length * 4);
       });
     } else {
       doc.setFontSize(9);
       doc.setTextColor(44, 62, 80);
       doc.text('-', colClassName, yPosition + 4);
-      doc.text('-', colClassId, yPosition + 4);
-      doc.text('-', colTeacher, yPosition + 4);
       doc.text('No items found', colDesc, yPosition + 4);
     }
 

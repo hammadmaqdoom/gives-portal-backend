@@ -43,38 +43,25 @@
             padding-right: 30px;
         }
         
-        .logo-and-name {
-            display: flex;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-        
         .logo {
-            width: 55px;
-            height: 55px;
-            margin-right: 12px;
+            width: 90px;
+            height: 90px;
+            margin-bottom: 15px;
             object-fit: contain;
         }
         
         .company-name {
-            font-size: 16pt;
+            font-size: 9pt;
             font-weight: bold;
-            color: #1976D2;
-            margin-bottom: 2px;
-            letter-spacing: 0.5px;
-        }
-        
-        .company-tagline {
-            font-size: 8pt;
-            color: #7F8C8D;
-            font-style: italic;
+            color: #34495E;
+            margin-bottom: 5px;
         }
         
         .company-details {
             font-size: 8pt;
             color: #34495E;
             line-height: 1.6;
-            margin-top: 8px;
+            margin-top: 20px;
         }
         
         .company-detail-line {
@@ -133,41 +120,17 @@
             text-transform: uppercase;
         }
         
-        /* Student ID Section */
-        .student-id-section {
-            background-color: #FAFAFA;
-            padding: 12px;
-            margin-bottom: 25px;
-            border-radius: 4px;
-            border-left: 3px solid #34495E;
-        }
-        
-        .student-id-label {
-            font-size: 7pt;
-            color: #7F8C8D;
-            font-weight: bold;
-            text-transform: uppercase;
-            margin-bottom: 4px;
-            letter-spacing: 0.5px;
-        }
-        
-        .student-id-value {
-            font-size: 11pt;
-            color: #2C3E50;
-            font-weight: bold;
-        }
-        
         /* Bill To Section */
         .bill-to-section {
             display: flex;
-            margin-bottom: 30px;
-            gap: 20px;
+            margin-bottom: 25px;
+            gap: 15px;
         }
         
         .bill-to-card {
             flex: 1;
             background-color: #FAFAFA;
-            padding: 15px;
+            padding: 12px;
             border-radius: 4px;
         }
         
@@ -175,11 +138,30 @@
             font-size: 9pt;
             font-weight: bold;
             color: #34495E;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             padding-bottom: 6px;
             border-bottom: 2px solid #1976D2;
+        }
+        
+        .student-id-inline {
+            margin-bottom: 6px;
+        }
+        
+        .student-id-inline-label {
+            font-size: 7pt;
+            color: #7F8C8D;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .student-id-inline-value {
+            font-size: 9pt;
+            color: #2C3E50;
+            font-weight: bold;
+            margin-left: 4px;
         }
         
         .bill-to-content {
@@ -243,39 +225,38 @@
         }
         
         .col-class-name {
-            width: 18%;
-            padding-right: 6px;
+            width: 22%;
+            padding-right: 8px;
         }
         
-        .col-class-id {
-            width: 8%;
-            text-align: center;
-        }
-        
-        .col-teacher {
-            width: 15%;
-            padding-right: 6px;
+        .teacher-name {
+            font-size: 8pt;
+            color: #7F8C8D;
+            margin-top: 2px;
         }
         
         .col-description {
-            width: 24%;
-            padding-right: 6px;
+            width: 36%;
+            padding-right: 8px;
         }
         
         .col-quantity {
-            width: 7%;
+            width: 8%;
             text-align: center;
+            padding-right: 8px;
         }
         
         .col-unit-price {
-            width: 14%;
+            width: 18%;
             text-align: right;
+            padding-right: 8px;
         }
         
         .col-total {
-            width: 14%;
+            width: 16%;
             text-align: right;
             font-weight: bold;
+            padding-right: 0;
         }
         
         /* Totals Section */
@@ -403,16 +384,11 @@
         <div class="header-row">
             <!-- Left: Company Information -->
             <div class="company-section">
-                <div class="logo-and-name">
-                    {{#if logo}}
-                    <img src="{{logo}}" alt="Company Logo" class="logo" />
-                    {{/if}}
-                    <div>
-                        <div class="company-name">{{companyName}}</div>
-                        <div class="company-tagline">{{tagline}}</div>
-                    </div>
-                </div>
+                {{#if logo}}
+                <img src="{{logo}}" alt="Company Logo" class="logo" />
+                {{/if}}
                 <div class="company-details">
+                    <div class="company-name">{{companyName}}</div>
                     <div class="company-detail-line">{{address}}</div>
                     <div class="company-detail-line">Phone: {{phone}}</div>
                     <div class="company-detail-line">Email: {{email}}</div>
@@ -451,14 +427,6 @@
         </div>
     </div>
     
-    <!-- Student ID Section -->
-    {{#if studentId}}
-    <div class="student-id-section">
-        <div class="student-id-label">Student ID</div>
-        <div class="student-id-value">{{studentId}}</div>
-    </div>
-    {{/if}}
-    
     <!-- Bill To Section - Two Column Cards -->
     <div class="bill-to-section">
         <!-- Parent Information -->
@@ -478,11 +446,17 @@
         </div>
         {{/if}}
         
-        <!-- Student Information -->
+        <!-- Student Information with Student ID -->
         {{#if student}}
         <div class="bill-to-card">
             <div class="bill-to-title">Student</div>
             <div class="bill-to-content">
+                {{#if studentId}}
+                <div class="student-id-inline">
+                    <span class="student-id-inline-label">Student ID:</span>
+                    <span class="student-id-inline-value">{{studentId}}</span>
+                </div>
+                {{/if}}
                 <div class="bill-to-name">{{student.name}}</div>
                 <div class="bill-to-detail">{{student.email}}</div>
             </div>
@@ -496,8 +470,6 @@
             <!-- Table Header: Class details + fee -->
             <div class="table-header">
                 <div class="table-header-cell col-class-name">Class Name</div>
-                <div class="table-header-cell col-class-id">Class ID</div>
-                <div class="table-header-cell col-teacher">Teacher</div>
                 <div class="table-header-cell col-description">Description</div>
                 <div class="table-header-cell col-quantity">Qty</div>
                 <div class="table-header-cell col-unit-price">Unit Price</div>
@@ -508,9 +480,12 @@
             {{#if items}}
                 {{#each items}}
                 <div class="table-row {{#if @index}}{{#if (mod @index 2)}}table-row-alt{{/if}}{{/if}}">
-                    <div class="table-cell col-class-name">{{className}}</div>
-                    <div class="table-cell col-class-id">{{classId}}</div>
-                    <div class="table-cell col-teacher">{{teacherName}}</div>
+                    <div class="table-cell col-class-name">
+                        <div>{{className}}</div>
+                        {{#if teacherName}}
+                        <div class="teacher-name">{{teacherName}}</div>
+                        {{/if}}
+                    </div>
                     <div class="table-cell col-description">{{description}}</div>
                     <div class="table-cell col-quantity text-center">{{quantity}}</div>
                     <div class="table-cell col-unit-price text-right">{{formatCurrency unitPrice ../currency}}</div>
@@ -520,8 +495,6 @@
             {{else}}
                 <div class="table-row">
                     <div class="table-cell col-class-name">-</div>
-                    <div class="table-cell col-class-id">-</div>
-                    <div class="table-cell col-teacher">-</div>
                     <div class="table-cell col-description">No items found</div>
                     <div class="table-cell col-quantity text-center">-</div>
                     <div class="table-cell col-unit-price text-right">-</div>
