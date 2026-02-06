@@ -498,6 +498,8 @@ export class StudentsService {
         ? new Date(createEnrollmentDto.enrollmentDate)
         : new Date(),
       status: createEnrollmentDto.status || 'active',
+      customFeePKR: createEnrollmentDto.customFeePKR ?? null,
+      customFeeUSD: createEnrollmentDto.customFeeUSD ?? null,
     });
 
     // Generate monthly invoice for the enrollment

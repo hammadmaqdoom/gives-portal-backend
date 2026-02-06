@@ -1,6 +1,7 @@
 import {
   HttpStatus,
   Injectable,
+  NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -286,5 +287,16 @@ export class UsersService {
 
   async remove(id: User['id']): Promise<void> {
     await this.usersRepository.remove(id);
+  }
+
+  async removeByEmail(email: User['email']): Promise<void> {
+    if (!email) {
+      throw new NotFoundException('Email is required');
+    }
+    const user = await this.usersRepository.findByEmail(email);
+    if (!user) {
+      throw new NotFoundException(`User with email "${email}" not found`);
+    }
+    await this.usersRepository.remove(user.id);
   }
 }

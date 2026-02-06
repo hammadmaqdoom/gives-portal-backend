@@ -487,7 +487,7 @@ export class InvoicesService {
 
     // Read and compile HTML template
     const templatePath = path.join(
-      this.configService.getOrThrow('app.workingDirectory', {
+      this.configService.getOrThrow<string>('app.workingDirectory', {
         infer: true,
       }),
       'src',
