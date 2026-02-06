@@ -70,25 +70,35 @@
         
         /* Invoice Info Box */
         .invoice-info-box {
-            width: 200px;
+            width: 220px;
             background-color: #F8F9FA;
             padding: 15px;
             border-radius: 4px;
             border-left: 4px solid #1976D2;
         }
         
+        .invoice-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+            min-height: 28px;
+        }
+        
         .invoice-title {
             font-size: 22pt;
             font-weight: bold;
             color: #1976D2;
-            margin-bottom: 10px;
             letter-spacing: 1px;
+            line-height: 28px;
         }
         
         .invoice-meta-row {
             display: flex;
             justify-content: space-between;
             margin-bottom: 6px;
+            width: 100%;
+            flex-wrap: wrap;
         }
         
         .invoice-meta-label {
@@ -97,16 +107,19 @@
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 0.3px;
+            flex-shrink: 0;
         }
         
         .invoice-meta-value {
             font-size: 9pt;
             color: #2C3E50;
             font-weight: bold;
+            max-width: 60%;
+            text-align: right;
+            flex-shrink: 1;
         }
         
         .status-badge {
-            margin-top: 8px;
             padding: 4px 10px;
             background-color: #E8F5E9;
             border-radius: 3px;
@@ -210,7 +223,7 @@
         
         .table-row {
             display: flex;
-            padding: 12px;
+            padding: 8px;
             border-bottom: 1px solid #ECF0F1;
             background-color: #FFFFFF;
         }
@@ -225,8 +238,8 @@
         }
         
         .col-class-name {
-            width: 22%;
-            padding-right: 8px;
+            width: 20%;
+            padding-right: 4px;
         }
         
         .teacher-name {
@@ -236,27 +249,27 @@
         }
         
         .col-description {
-            width: 36%;
-            padding-right: 8px;
+            width: 33%;
+            padding-right: 4px;
         }
         
         .col-quantity {
-            width: 8%;
+            width: 5%;
             text-align: center;
-            padding-right: 8px;
+            padding-right: 0;
         }
         
         .col-unit-price {
-            width: 18%;
+            width: 20%;
             text-align: right;
-            padding-right: 8px;
+            padding-right: 24px;
         }
         
         .col-total {
-            width: 16%;
+            width: 17%;
             text-align: right;
             font-weight: bold;
-            padding-right: 0;
+            padding-right: 8px;
         }
         
         /* Totals Section */
@@ -403,7 +416,12 @@
             
             <!-- Right: Invoice Information Box -->
             <div class="invoice-info-box">
-                <div class="invoice-title">INVOICE</div>
+                <div class="invoice-title-row">
+                    <div class="invoice-title">INVOICE</div>
+                    <div class="status-badge">
+                        <span class="status-text">{{status}}</span>
+                    </div>
+                </div>
                 
                 <div class="invoice-meta-row">
                     <span class="invoice-meta-label">Invoice #:</span>
@@ -418,10 +436,6 @@
                 <div class="invoice-meta-row">
                     <span class="invoice-meta-label">Due Date:</span>
                     <span class="invoice-meta-value">{{dueDate}}</span>
-                </div>
-                
-                <div class="status-badge">
-                    <span class="status-text">{{status}}</span>
                 </div>
             </div>
         </div>
@@ -471,7 +485,7 @@
             <div class="table-header">
                 <div class="table-header-cell col-class-name">Class Name</div>
                 <div class="table-header-cell col-description">Description</div>
-                <div class="table-header-cell col-quantity">Qty</div>
+                <div class="table-header-cell col-quantity text-center">Qty</div>
                 <div class="table-header-cell col-unit-price">Unit Price</div>
                 <div class="table-header-cell col-total">Total</div>
             </div>
