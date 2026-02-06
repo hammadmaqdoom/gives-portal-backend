@@ -42,7 +42,7 @@ export class AddPayFastGateway1768603651000 implements MigrationInterface {
           {"name": "merchantId", "type": "text", "required": true, "label": "Merchant ID", "description": "Your PayFast Merchant ID"},
           {"name": "securedKey", "type": "password", "required": true, "label": "Secured Key", "encrypted": true, "description": "Your PayFast Secured Key"},
           {"name": "environment", "type": "select", "required": true, "label": "Environment", "options": [{"value": "sandbox", "label": "Sandbox (Testing)"}, {"value": "production", "label": "Production (Live)"}]},
-          {"name": "sandboxUrl", "type": "text", "required": false, "label": "Sandbox API URL", "description": "PayFast Sandbox API URL", "default": "https://sandbox.gopayfast.com/api"},
+          {"name": "sandboxUrl", "type": "text", "required": false, "label": "Sandbox API URL", "description": "PayFast Sandbox API URL (uses same URL as production: https://api.gopayfast.com/api)", "default": "https://api.gopayfast.com/api"},
           {"name": "productionUrl", "type": "text", "required": false, "label": "Production API URL", "description": "PayFast Production API URL", "default": "https://api.gopayfast.com/api"}
         ]}',
         true
