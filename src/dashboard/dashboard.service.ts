@@ -439,7 +439,9 @@ export class DashboardService {
         'average',
       )
       .setParameter('present', AttendanceStatus.PRESENT)
-      .where('class.teacher.id = :teacherId', { teacherId })
+      .where('class.teacherId = :teacherId', { teacherId })
+      .andWhere('attendance.deletedAt IS NULL')
+      .andWhere('class.deletedAt IS NULL')
       .getRawOne();
     return parseFloat(result?.average || '0');
   }
@@ -448,12 +450,18 @@ export class DashboardService {
     teacherId: number,
   ): Promise<number> {
     try {
-      return await this.assignmentRepository.count({
-        where: {
-          teacher: { id: teacherId },
-          status: AssignmentStatus.PUBLISHED,
-        },
-      });
+      // Check both direct teacher assignment and assignments via class
+      const result = await this.assignmentRepository
+        .createQueryBuilder('assignment')
+        .leftJoin('assignment.class', 'class')
+        .where('assignment.status = :status', { status: AssignmentStatus.PUBLISHED })
+        .andWhere('assignment.deletedAt IS NULL')
+        .andWhere(
+          '(assignment.teacherId = :teacherId OR class.teacherId = :teacherId)',
+          { teacherId },
+        )
+        .getCount();
+      return result;
     } catch (error) {
       // Fallback when assignment table/columns are missing
       return 0;
@@ -464,9 +472,18 @@ export class DashboardService {
     teacherId: number,
   ): Promise<number> {
     try {
-      return await this.assignmentRepository.count({
-        where: { teacher: { id: teacherId }, status: AssignmentStatus.CLOSED },
-      });
+      // Check both direct teacher assignment and assignments via class
+      const result = await this.assignmentRepository
+        .createQueryBuilder('assignment')
+        .leftJoin('assignment.class', 'class')
+        .where('assignment.status = :status', { status: AssignmentStatus.CLOSED })
+        .andWhere('assignment.deletedAt IS NULL')
+        .andWhere(
+          '(assignment.teacherId = :teacherId OR class.teacherId = :teacherId)',
+          { teacherId },
+        )
+        .getCount();
+      return result;
     } catch (error) {
       // Fallback when assignment table/columns are missing
       return 0;
@@ -477,8 +494,14 @@ export class DashboardService {
     const result = await this.performanceRepository
       .createQueryBuilder('performance')
       .leftJoin('performance.assignment', 'assignment')
+      .leftJoin('assignment.class', 'class')
       .select('AVG(performance.score)', 'average')
-      .where('assignment.teacher.id = :teacherId', { teacherId })
+      .where(
+        '(assignment.teacherId = :teacherId OR class.teacherId = :teacherId)',
+        { teacherId },
+      )
+      .andWhere('performance.deletedAt IS NULL')
+      .andWhere('assignment.deletedAt IS NULL')
       .getRawOne();
     return parseFloat(result?.average || '0');
   }
@@ -493,14 +516,18 @@ export class DashboardService {
         'attendance',
       )
       .setParameter('present', AttendanceStatus.PRESENT)
-      .where('class.teacher.id = :teacherId', { teacherId })
+      .where('class.teacherId = :teacherId', { teacherId })
+      .andWhere('attendance.deletedAt IS NULL')
+      .andWhere('class.deletedAt IS NULL')
       .groupBy('class.name')
       .getRawMany();
 
-    return result.map((item) => ({
-      class: item.className,
-      attendance: parseFloat(item.attendance),
-    }));
+    return result
+      .filter((item) => item.className != null)
+      .map((item) => ({
+        class: item.className,
+        attendance: parseFloat(item.attendance || '0'),
+      }));
   }
 
   private async getStudentPerformanceForTeacher(teacherId: number) {
@@ -508,9 +535,15 @@ export class DashboardService {
       .createQueryBuilder('performance')
       .leftJoin('performance.student', 'student')
       .leftJoin('performance.assignment', 'assignment')
+      .leftJoin('assignment.class', 'class')
       .select('student.name', 'studentName')
       .addSelect('AVG(performance.score)', 'grade')
-      .where('assignment.teacher.id = :teacherId', { teacherId })
+      .where(
+        '(assignment.teacherId = :teacherId OR class.teacherId = :teacherId)',
+        { teacherId },
+      )
+      .andWhere('performance.deletedAt IS NULL')
+      .andWhere('assignment.deletedAt IS NULL')
       .groupBy('student.name')
       .getRawMany();
 
@@ -526,11 +559,16 @@ export class DashboardService {
       const assignmentsWithSubmissions = await this.assignmentRepository
         .createQueryBuilder('assignment')
         .leftJoin('assignment.submissions', 'submission')
+        .leftJoin('assignment.class', 'class')
         .select('assignment.id', 'id')
         .addSelect('assignment.title', 'assignmentTitle')
         .addSelect('assignment.classId', 'classId')
         .addSelect('COUNT(submission.id)', 'submitted')
-        .where('assignment.teacher.id = :teacherId', { teacherId })
+        .where(
+          '(assignment.teacherId = :teacherId OR class.teacherId = :teacherId)',
+          { teacherId },
+        )
+        .andWhere('assignment.deletedAt IS NULL')
         .groupBy('assignment.id')
         .addGroupBy('assignment.title')
         .addGroupBy('assignment.classId')
