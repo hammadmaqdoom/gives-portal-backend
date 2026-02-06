@@ -26,6 +26,12 @@ export abstract class AttendanceRepository {
     date: Date,
   ): Promise<Attendance[]>;
 
+  abstract findByStudentDateAndClass(
+    studentId: number,
+    date: Date,
+    classId: number,
+  ): Promise<NullableType<Attendance>>;
+
   abstract findManyWithPagination({
     filterOptions,
     sortOptions,

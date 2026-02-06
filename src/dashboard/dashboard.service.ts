@@ -34,9 +34,13 @@ import { ConfigService } from '@nestjs/config';
 import { RoleEnum } from '../roles/roles.enum';
 import { FileDriver } from '../files/config/file-config.type';
 import { RedisService } from '../cache/redis.service';
+import { TeachersService } from '../teachers/teachers.service';
+import { Logger } from '@nestjs/common';
 
 @Injectable()
 export class DashboardService {
+  private readonly logger = new Logger(DashboardService.name);
+
   constructor(
     @InjectRepository(StudentEntity)
     private studentRepository: Repository<StudentEntity>,
@@ -66,6 +70,7 @@ export class DashboardService {
     private readonly settingsService: SettingsService,
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
+    private readonly teachersService: TeachersService,
   ) {}
 
   async getAdminStats(): Promise<AdminStatsDto> {
@@ -507,50 +512,106 @@ export class DashboardService {
   }
 
   private async getClassAttendanceForTeacher(teacherId: number) {
-    const result = await this.attendanceRepository
-      .createQueryBuilder('attendance')
-      .leftJoin('attendance.class', 'class')
-      .select('class.name', 'className')
-      .addSelect(
-        'AVG(CASE WHEN attendance.status = :present THEN 100 ELSE 0 END)',
-        'attendance',
-      )
-      .setParameter('present', AttendanceStatus.PRESENT)
-      .where('class.teacherId = :teacherId', { teacherId })
-      .andWhere('attendance.deletedAt IS NULL')
-      .andWhere('class.deletedAt IS NULL')
-      .groupBy('class.name')
-      .getRawMany();
+    try {
+      const result = await this.attendanceRepository
+        .createQueryBuilder('attendance')
+        .leftJoin('attendance.class', 'class')
+        .leftJoin('class.teacher', 'teacher')
+        .select('class.name', 'className')
+        .addSelect(
+          'AVG(CASE WHEN attendance.status = :present THEN 100 ELSE 0 END)',
+          'attendance',
+        )
+        .setParameter('present', AttendanceStatus.PRESENT)
+        .where('(class.teacherId = :teacherId OR teacher.id = :teacherId)', { teacherId })
+        .andWhere('attendance.deletedAt IS NULL')
+        .andWhere('class.deletedAt IS NULL')
+        .andWhere('(teacher.deletedAt IS NULL OR teacher.deletedAt IS NULL)')
+        .groupBy('class.name')
+        .getRawMany();
 
-    return result
-      .filter((item) => item.className != null)
-      .map((item) => ({
-        class: item.className,
-        attendance: parseFloat(item.attendance || '0'),
-      }));
+      const mapped = result
+        .filter((item) => item.className != null)
+        .map((item) => ({
+          class: item.className,
+          attendance: parseFloat(item.attendance || '0'),
+        }));
+
+      this.logger.debug(`getClassAttendanceForTeacher(${teacherId}): Found ${mapped.length} classes with attendance data`);
+      return mapped;
+    } catch (error) {
+      this.logger.error(`Error getting class attendance for teacher ${teacherId}:`, error);
+      return [];
+    }
   }
 
   private async getStudentPerformanceForTeacher(teacherId: number) {
-    const result = await this.performanceRepository
-      .createQueryBuilder('performance')
-      .leftJoin('performance.student', 'student')
-      .leftJoin('performance.assignment', 'assignment')
-      .leftJoin('assignment.class', 'class')
-      .select('student.name', 'studentName')
-      .addSelect('AVG(performance.score)', 'grade')
-      .where(
-        '(assignment.teacherId = :teacherId OR class.teacherId = :teacherId)',
-        { teacherId },
-      )
-      .andWhere('performance.deletedAt IS NULL')
-      .andWhere('assignment.deletedAt IS NULL')
-      .groupBy('student.name')
-      .getRawMany();
+    try {
+      // Try using Performance entity first
+      const result = await this.performanceRepository
+        .createQueryBuilder('performance')
+        .leftJoin('performance.student', 'student')
+        .leftJoin('performance.assignment', 'assignment')
+        .leftJoin('assignment.class', 'class')
+        .leftJoin('assignment.teacher', 'assignmentTeacher')
+        .leftJoin('class.teacher', 'classTeacher')
+        .select('student.name', 'studentName')
+        .addSelect('AVG(performance.score)', 'grade')
+        .where(
+          '(assignment.teacherId = :teacherId OR class.teacherId = :teacherId OR assignmentTeacher.id = :teacherId OR classTeacher.id = :teacherId)',
+          { teacherId },
+        )
+        .andWhere('performance.deletedAt IS NULL')
+        .andWhere('assignment.deletedAt IS NULL')
+        .andWhere('performance.score IS NOT NULL')
+        .groupBy('student.name')
+        .getRawMany();
 
-    return result.map((item) => ({
-      student: item.studentName,
-      grade: parseFloat(item.grade),
-    }));
+      // If no results from Performance entity, try using Submission entity (where teachers actually grade)
+      if (result.length === 0) {
+        const submissionResult = await this.submissionRepository
+          .createQueryBuilder('submission')
+          .leftJoin('submission.student', 'student')
+          .leftJoin('submission.assignment', 'assignment')
+          .leftJoin('assignment.class', 'class')
+          .leftJoin('assignment.teacher', 'assignmentTeacher')
+          .leftJoin('class.teacher', 'classTeacher')
+          .select('student.name', 'studentName')
+          .addSelect('AVG(submission.score)', 'grade')
+          .where(
+            '(assignment.teacherId = :teacherId OR class.teacherId = :teacherId OR assignmentTeacher.id = :teacherId OR classTeacher.id = :teacherId)',
+            { teacherId },
+          )
+          .andWhere('submission.deletedAt IS NULL')
+          .andWhere('assignment.deletedAt IS NULL')
+          .andWhere('submission.score IS NOT NULL')
+          .groupBy('student.name')
+          .getRawMany();
+
+        const mapped = submissionResult
+          .filter((item) => item.studentName != null)
+          .map((item) => ({
+            student: item.studentName,
+            grade: parseFloat(item.grade || '0'),
+          }));
+
+        this.logger.debug(`getStudentPerformanceForTeacher(${teacherId}): Found ${mapped.length} students via submissions`);
+        return mapped;
+      }
+
+      const mapped = result
+        .filter((item) => item.studentName != null)
+        .map((item) => ({
+          student: item.studentName,
+          grade: parseFloat(item.grade || '0'),
+        }));
+
+      this.logger.debug(`getStudentPerformanceForTeacher(${teacherId}): Found ${mapped.length} students via performance`);
+      return mapped;
+    } catch (error) {
+      this.logger.error(`Error getting student performance for teacher ${teacherId}:`, error);
+      return [];
+    }
   }
 
   private async getAssignmentStatusForTeacher(teacherId: number) {
@@ -558,17 +619,20 @@ export class DashboardService {
       // Assignment entity has no totalStudents; total = enrolled students in assignment's class
       const assignmentsWithSubmissions = await this.assignmentRepository
         .createQueryBuilder('assignment')
-        .leftJoin('assignment.submissions', 'submission')
+        .leftJoin('assignment.submissions', 'submission', 'submission.deletedAt IS NULL')
         .leftJoin('assignment.class', 'class')
+        .leftJoin('assignment.teacher', 'assignmentTeacher')
+        .leftJoin('class.teacher', 'classTeacher')
         .select('assignment.id', 'id')
         .addSelect('assignment.title', 'assignmentTitle')
         .addSelect('assignment.classId', 'classId')
-        .addSelect('COUNT(submission.id)', 'submitted')
+        .addSelect('COUNT(DISTINCT submission.id)', 'submitted')
         .where(
-          '(assignment.teacherId = :teacherId OR class.teacherId = :teacherId)',
+          '(assignment.teacherId = :teacherId OR class.teacherId = :teacherId OR assignmentTeacher.id = :teacherId OR classTeacher.id = :teacherId)',
           { teacherId },
         )
         .andWhere('assignment.deletedAt IS NULL')
+        .andWhere('(class.deletedAt IS NULL OR class.deletedAt IS NULL)')
         .groupBy('assignment.id')
         .addGroupBy('assignment.title')
         .addGroupBy('assignment.classId')
@@ -581,20 +645,24 @@ export class DashboardService {
             .filter((id) => id != null),
         ),
       ];
+
       if (classIds.length === 0) {
-        return assignmentsWithSubmissions.map((item: any) => ({
-          assignment: item.assignmentTitle,
+        const result = assignmentsWithSubmissions.map((item: any) => ({
+          assignment: item.assignmentTitle || 'Untitled Assignment',
           submitted: parseInt(item.submitted, 10) || 0,
           total: 0,
         }));
+        this.logger.debug(`getAssignmentStatusForTeacher(${teacherId}): Found ${result.length} assignments but no class enrollments`);
+        return result;
       }
 
       const enrollmentCounts = await this.enrollmentRepository
         .createQueryBuilder('enrollment')
         .select('enrollment.classId', 'classId')
-        .addSelect('COUNT(enrollment.id)', 'total')
+        .addSelect('COUNT(DISTINCT enrollment.id)', 'total')
         .where('enrollment.classId IN (:...classIds)', { classIds })
-        .andWhere('enrollment.status = :status', { status: 'active' })
+        .andWhere('(enrollment.status = :status OR enrollment.status IS NULL)', { status: 'active' })
+        .andWhere('enrollment.deletedAt IS NULL')
         .groupBy('enrollment.classId')
         .getRawMany();
 
@@ -603,12 +671,16 @@ export class DashboardService {
         totalByClassId.set(row.classId, parseInt(row.total, 10) || 0);
       }
 
-      return assignmentsWithSubmissions.map((item: any) => ({
-        assignment: item.assignmentTitle,
+      const result = assignmentsWithSubmissions.map((item: any) => ({
+        assignment: item.assignmentTitle || 'Untitled Assignment',
         submitted: parseInt(item.submitted, 10) || 0,
         total: totalByClassId.get(item.classId) ?? 0,
       }));
+
+      this.logger.debug(`getAssignmentStatusForTeacher(${teacherId}): Found ${result.length} assignments with status data`);
+      return result;
     } catch (error) {
+      this.logger.error(`Error getting assignment status for teacher ${teacherId}:`, error);
       // Fallback when submissions table or relations are missing
       return [];
     }
@@ -636,29 +708,85 @@ export class DashboardService {
     return await this.teacherRepository
       .createQueryBuilder('teacher')
       .where('LOWER(teacher.email) = LOWER(:email)', { email: userEmail })
+      .andWhere('teacher.deletedAt IS NULL')
       .getOne();
   }
 
   async findTeacherByUserId(
     userId: number,
   ): Promise<TeacherEntity | null> {
-    // First, get the user to retrieve their email
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-    });
+    try {
+      // First try using the teachers service method (which uses email matching)
+      const teacher = await this.teachersService.findByUserId(userId);
+      if (teacher) {
+        // Convert domain Teacher to entity if needed, or return entity directly
+        const teacherEntity = await this.teacherRepository.findOne({
+          where: { id: teacher.id },
+        });
+        if (teacherEntity) {
+          this.logger.debug(`Found teacher ${teacherEntity.id} for user ${userId} via email matching`);
+          return teacherEntity;
+        }
+      }
 
-    if (!user || !user.email) {
-      console.warn(
-        `User not found or has no email. User ID: ${userId}`,
-      );
+      // Fallback: Try to find teacher by checking classes they teach
+      // This handles cases where email might not match but teacher is assigned to classes
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        this.logger.warn(`User not found. User ID: ${userId}`);
+        return null;
+      }
+
+      // Try to find teacher by checking if any classes are assigned to a teacher with matching email
+      if (user.email) {
+        const teacherByEmail = await this.teacherRepository
+          .createQueryBuilder('teacher')
+          .where('LOWER(teacher.email) = LOWER(:email)', { email: user.email })
+          .andWhere('teacher.deletedAt IS NULL')
+          .getOne();
+        
+        if (teacherByEmail) {
+          this.logger.debug(`Found teacher ${teacherByEmail.id} for user ${userId} via email fallback`);
+          return teacherByEmail;
+        }
+      }
+
+      // Last resort: Find teacher by checking classes - if user has teacher role and classes exist
+      // This is less reliable but might help in edge cases
+      const classesWithTeacher = await this.classRepository
+        .createQueryBuilder('class')
+        .leftJoin('class.teacher', 'teacher')
+        .where('teacher.deletedAt IS NULL')
+        .andWhere('class.deletedAt IS NULL')
+        .select('teacher.id', 'teacherId')
+        .addSelect('teacher.email', 'teacherEmail')
+        .distinct(true)
+        .getRawMany();
+
+      // Try to match by checking if any teacher email matches user email
+      if (user.email) {
+        for (const row of classesWithTeacher) {
+          if (row.teacherEmail && row.teacherEmail.toLowerCase() === user.email.toLowerCase()) {
+            const foundTeacher = await this.teacherRepository.findOne({
+              where: { id: row.teacherId },
+            });
+            if (foundTeacher) {
+              this.logger.debug(`Found teacher ${foundTeacher.id} for user ${userId} via class lookup`);
+              return foundTeacher;
+            }
+          }
+        }
+      }
+
+      this.logger.warn(`Could not find teacher for user ${userId}. User email: ${user.email || 'N/A'}`);
+      return null;
+    } catch (error) {
+      this.logger.error(`Error finding teacher for user ${userId}:`, error);
       return null;
     }
-
-    // Then find teacher by email (case-insensitive)
-    return await this.teacherRepository
-      .createQueryBuilder('teacher')
-      .where('LOWER(teacher.email) = LOWER(:email)', { email: user.email })
-      .getOne();
   }
 
   private async getEnrolledClassCount(studentId: number): Promise<number> {

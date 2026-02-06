@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
@@ -18,6 +18,7 @@ import { CurrencyModule } from '../currency/currency.module';
 import { SettingsModule } from '../settings/settings.module';
 import { ConfigModule } from '@nestjs/config';
 import { CacheModule } from '../cache/cache.module';
+import { TeachersModule } from '../teachers/teachers.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { CacheModule } from '../cache/cache.module';
     SettingsModule,
     ConfigModule,
     CacheModule,
+    forwardRef(() => TeachersModule),
   ],
   controllers: [DashboardController],
   providers: [DashboardService],

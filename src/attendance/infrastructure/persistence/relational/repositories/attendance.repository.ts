@@ -78,6 +78,21 @@ export class AttendancesRelationalRepository implements AttendanceRepository {
     );
   }
 
+  async findByStudentDateAndClass(
+    studentId: number,
+    date: Date,
+    classId: number,
+  ): Promise<NullableType<Attendance>> {
+    const attendance = await this.attendancesRepository.findOne({
+      where: {
+        student: { id: studentId },
+        class: { id: classId },
+        date: date,
+      },
+    });
+    return attendance ? this.attendanceMapper.toDomain(attendance) : null;
+  }
+
   async findManyWithPagination({
     filterOptions,
     sortOptions,
