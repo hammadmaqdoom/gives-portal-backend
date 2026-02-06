@@ -141,6 +141,21 @@ export class TeachersService {
     return this.teachersRepository.findByPhone(phone);
   }
 
+  async findByUserId(userId: number): Promise<NullableType<Teacher>> {
+    // First, get the user to retrieve their email
+    const user = await this.usersService.findById(userId);
+    
+    if (!user || !user.email) {
+      console.warn(
+        `User not found or has no email. User ID: ${userId}`,
+      );
+      return null;
+    }
+
+    // Then find teacher by email (case-insensitive)
+    return this.teachersRepository.findByEmail(user.email);
+  }
+
   async update(
     id: Teacher['id'],
     updateTeacherDto: UpdateTeacherDto,

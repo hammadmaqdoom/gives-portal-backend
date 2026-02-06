@@ -85,6 +85,12 @@ export class SubmissionsRelationalRepository implements SubmissionRepository {
       .leftJoinAndSelect('submission.student', 'student')
       .leftJoinAndSelect('submission.assignment', 'assignment');
 
+    if (filterOptions?.classId != null) {
+      queryBuilder.andWhere('assignment.classId = :classId', {
+        classId: filterOptions.classId,
+      });
+    }
+
     if (filterOptions?.assignmentId) {
       queryBuilder.andWhere('assignment.id = :assignmentId', {
         assignmentId: filterOptions.assignmentId,
