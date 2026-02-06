@@ -30,6 +30,15 @@ export class InvoiceItemEntity {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   total: number;
 
+  @Column({ type: 'int', nullable: true })
+  classId?: number;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  className?: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  teacherName?: string;
+
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
 

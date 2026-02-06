@@ -52,6 +52,12 @@ export class FilterPerformanceDto {
   @Type(() => Date)
   @IsDate()
   submittedTo?: Date;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  classId?: number;
 }
 
 export class SortPerformanceDto {
