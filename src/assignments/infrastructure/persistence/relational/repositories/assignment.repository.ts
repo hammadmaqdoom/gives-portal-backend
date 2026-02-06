@@ -69,6 +69,12 @@ export class AssignmentsRelationalRepository implements AssignmentRepository {
       });
     }
 
+    if (filterOptions?.classId) {
+      queryBuilder.andWhere('class.id = :classId', {
+        classId: filterOptions.classId,
+      });
+    }
+
     if (filterOptions?.type) {
       queryBuilder.andWhere('assignment.type = :type', {
         type: filterOptions.type,

@@ -16,7 +16,7 @@ import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 
 @Injectable()
 export class AttendanceService {
-  constructor(private readonly attendanceRepository: AttendanceRepository) {}
+  constructor(private readonly attendanceRepository: AttendanceRepository) { }
 
   async create(createAttendanceDto: CreateAttendanceDto): Promise<Attendance> {
     // Check if attendance already exists for this student and date
@@ -76,6 +76,13 @@ export class AttendanceService {
 
   async findByClassAndDate(classId: number, date: Date): Promise<Attendance[]> {
     return this.attendanceRepository.findByClassAndDate(classId, date);
+  }
+
+  async findByStudentAndClass(
+    studentId: number,
+    classId: number,
+  ): Promise<Attendance[]> {
+    return this.attendanceRepository.findByStudentAndClass(studentId, classId);
   }
 
   async findByDate(

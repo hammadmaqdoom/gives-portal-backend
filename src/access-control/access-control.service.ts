@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { StudentsService } from '../students/students.service';
 import { InvoicesService } from '../invoices/invoices.service';
 import { ClassesService } from '../classes/classes.service';
@@ -20,8 +20,11 @@ export class AccessControlService {
   private readonly logger = new Logger(AccessControlService.name);
 
   constructor(
+    @Inject(forwardRef(() => StudentsService))
     private readonly studentsService: StudentsService,
+    @Inject(forwardRef(() => InvoicesService))
     private readonly invoicesService: InvoicesService,
+    @Inject(forwardRef(() => ClassesService))
     private readonly classesService: ClassesService,
     private readonly enrollmentRepository: StudentClassEnrollmentRepository,
   ) {}
@@ -65,18 +68,20 @@ export class AccessControlService {
 
     // Check enrollment status
     if (enrollment.status === 'active') {
-      // Active enrollment - check if payment is required
+      // Active enrollment - for manually enrolled students, grant access by default
+      // Payment is not required for manually enrolled students unless specifically restricted
       const paymentStatus = await this.getPaymentStatus(studentId, classId);
-      if (paymentStatus.isPaid) {
-        return {
-          hasAccess: true,
-          isPaid: true,
-          enrollmentStatus: enrollment.status,
-          invoiceStatus: paymentStatus.invoiceStatus,
-          invoiceId: paymentStatus.invoiceId,
-          requiresPayment: false,
-        };
-      }
+      return {
+        hasAccess: true,
+        isPaid: paymentStatus.isPaid,
+        enrollmentStatus: enrollment.status,
+        invoiceStatus: paymentStatus.invoiceStatus,
+        invoiceId: paymentStatus.invoiceId,
+        requiresPayment: false,
+        message: paymentStatus.isPaid 
+          ? 'Access granted' 
+          : 'Access granted (manual enrollment)',
+      };
     }
 
     // Check if enrollment is pending payment
