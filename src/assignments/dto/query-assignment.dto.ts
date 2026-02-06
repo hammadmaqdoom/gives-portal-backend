@@ -23,6 +23,12 @@ export class FilterAssignmentDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  classId?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsEnum(AssignmentType)
   type?: AssignmentType;
 
