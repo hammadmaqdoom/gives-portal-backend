@@ -16,6 +16,11 @@ export abstract class AttendanceRepository {
     date: Date,
   ): Promise<NullableType<Attendance>>;
 
+  abstract findByStudentAndClass(
+    studentId: number,
+    classId: number,
+  ): Promise<Attendance[]>;
+
   abstract findByClassAndDate(
     classId: number,
     date: Date,

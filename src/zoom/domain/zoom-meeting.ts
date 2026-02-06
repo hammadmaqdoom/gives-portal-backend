@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsDate,
   IsObject,
+  Min,
 } from 'class-validator';
 
 export class ZoomMeeting {
@@ -35,8 +36,9 @@ export class ZoomMeeting {
 }
 
 export class CreateZoomMeetingDto {
+  @IsOptional()
   @IsNumber()
-  classId: number;
+  classId?: number;
 
   @IsNumber()
   teacherId: number;

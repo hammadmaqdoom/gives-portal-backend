@@ -20,6 +20,10 @@ import { jsPDF } from 'jspdf';
 import { MailService } from '../mail/mail.service';
 import { SettingsService } from '../settings/settings.service';
 import { PaymentsService } from '../payments/payments.service';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import Handlebars from 'handlebars';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class InvoicesService {
@@ -34,6 +38,7 @@ export class InvoicesService {
     private readonly settingsService: SettingsService,
     @Inject(forwardRef(() => PaymentsService))
     private readonly paymentsService: PaymentsService,
+    private readonly configService: ConfigService,
   ) {}
 
   async create(createInvoiceDto: CreateInvoiceDto): Promise<Invoice> {
@@ -193,16 +198,9 @@ export class InvoicesService {
       userId,
     );
 
-    // First find the student by user ID
-    const student = await this.studentsService.findByUserId(userId);
-    console.log('🔍 findByStudentUserId - Found student:', student);
-
-    if (!student) {
-      console.log(
-        '🔍 findByStudentUserId - No student found, returning empty array',
-      );
-      return [];
-    }
+    // First find the student by user ID, auto-create if doesn't exist
+    const student = await this.studentsService.ensureStudentProfileForUser(userId);
+    console.log('🔍 findByStudentUserId - Found/created student:', student);
 
     // Then get invoices for that student
     console.log(
@@ -487,334 +485,400 @@ export class InvoicesService {
     const businessInfo = await this.settingsService.getBusinessInfo();
     const bankDetails = await this.settingsService.getBankDetails();
 
-    // Get active payment gateways
-    const activeGateways = await this.paymentsService.getActiveGateways();
+    // Read and compile HTML template
+    const templatePath = path.join(
+      this.configService.getOrThrow<string>('app.workingDirectory', {
+        infer: true,
+      }),
+      'src',
+      'invoices',
+      'templates',
+      'invoice-pdf.hbs',
+    );
 
-    const doc = new jsPDF();
+    const templateContent = await fs.readFile(templatePath, 'utf-8');
+
+    // Register Handlebars helpers
+    Handlebars.registerHelper('formatCurrency', (amount: number, currency: string = 'USD') => {
+      return `${currency} ${Number(amount).toFixed(2)}`;
+    });
+
+    Handlebars.registerHelper('mod', (a: number, b: number) => {
+      return a % b === 0;
+    });
+
+    const template = Handlebars.compile(templateContent);
+
+    // Calculate totals
+    let subtotal = invoice.amount;
+    if (invoice.items && invoice.items.length > 0) {
+      subtotal = invoice.items.reduce((sum, item) => sum + Number(item.total), 0);
+    }
+
+    const tax = 0; // Add tax calculation if needed
+    const total = subtotal + tax;
+
+    // Format dates
+    const formatDate = (date: Date | string) => {
+      const d = typeof date === 'string' ? new Date(date) : date;
+      return d.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    };
+
+    // Prepare template data
+    const templateData = {
+      invoiceNumber: invoice.invoiceNumber,
+      issueDate: formatDate(invoice.generatedDate),
+      dueDate: formatDate(invoice.dueDate),
+      status: invoice.status.toUpperCase(),
+      studentId: String(student.id).padStart(6, '0'),
+      student: {
+        name: student.name,
+        email: student.email || '',
+      },
+      parent: parent
+        ? {
+            name: parent.fullName || 'Parent',
+            email: parent.email || '',
+            address: parent.address || '',
+            city: parent.city || '',
+            country: parent.country || '',
+          }
+        : null,
+      items: invoice.items || [],
+      subtotal,
+      tax,
+      total,
+      currency: invoice.currency || 'USD',
+      companyName: settings.appName || businessInfo.companyLegalName || 'Education Management System',
+      tagline: 'Comprehensive Learning Solutions',
+      address: businessInfo.businessAddress || '123 Education Street, Learning City, LC 12345',
+      phone: businessInfo.contactPhone || '+1 (555) 123-4567',
+      email: businessInfo.contactEmail || 'info@educationportal.com',
+      website: businessInfo.contactWebsite || '',
+      taxNumber: businessInfo.taxRegistrationNumber || '',
+      logo: settings.logoNavbar || '',
+      bankDetails: bankDetails.bankName
+        ? {
+            name: bankDetails.bankName || '',
+            accountNumber: bankDetails.bankAccountNumber || '',
+            iban: bankDetails.bankIban || '',
+            swiftCode: bankDetails.bankSwiftCode || '',
+          }
+        : null,
+    };
+
+    // Render HTML
+    const html = template(templateData);
+
+    // For server-side HTML to PDF, we need to use a library that works in Node.js
+    // Since jsPDF html() requires browser APIs, we'll use a workaround
+    // If you have a service/API for HTML to PDF conversion, use it here
+    // Otherwise, we'll render the HTML template and you can configure a PDF service
+    
+    // For now, let's use jsPDF programmatically but with the new design structure
+    // This ensures the PDF matches the updated design from the HTML template
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
+
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    let yPosition = 20;
+    let yPosition = 0;
 
-    // Helper function to add text with word wrapping
-    const addTextWithWrap = (
-      text: string,
-      x: number,
-      y: number,
-      maxWidth: number,
-      fontSize: number = 12,
-      fontStyle: string = 'normal',
-    ) => {
-      doc.setFontSize(fontSize);
-      doc.setFont('helvetica', fontStyle);
-      const lines = doc.splitTextToSize(text, maxWidth);
-      doc.text(lines, x, y);
-      return y + lines.length * (fontSize * 0.4);
-    };
+    // Header Accent Bar (Blue bar at top)
+    doc.setFillColor(25, 118, 210); // #1976D2
+    doc.rect(0, 0, pageWidth, 3, 'F');
+    yPosition = 10;
 
-    // Helper function to draw a line
-    const drawLine = (y: number) => {
-      doc.setLineWidth(0.5);
-      doc.line(20, y, pageWidth - 20, y);
-    };
+    // Header Section - Two Column Layout
+    // Left: Company Information
+    const leftMargin = 15;
+    const rightColumnStart = pageWidth - 100;
 
-    // Header Section with Company Logo and Info
-    doc.setFillColor(240, 240, 240);
-    doc.rect(0, 0, pageWidth, 60, 'F');
-
-    // Company Logo (if available)
-    if (settings.logoNavbar) {
+    // Company Logo and Name
+    if (settings.logoNavbar && settings.logoNavbar.startsWith('data:image/')) {
       try {
-        // Try to add logo if it's a base64 image
-        if (settings.logoNavbar.startsWith('data:image/')) {
-          doc.addImage(settings.logoNavbar, 'PNG', 20, 10, 40, 40);
-        }
+        doc.addImage(settings.logoNavbar, 'PNG', leftMargin, yPosition, 20, 20);
       } catch (error) {
-        // If logo fails to load, continue without it
         console.warn('Failed to load company logo:', error);
       }
     }
 
-    // Company Information
-    const companyX = settings.logoNavbar ? 70 : 20;
-    yPosition = 15;
-
-    doc.setFontSize(18);
+    doc.setFontSize(16);
+    doc.setTextColor(25, 118, 210); // #1976D2
     doc.setFont('helvetica', 'bold');
-    doc.text(settings.appName || 'Company Name', companyX, yPosition);
-    yPosition += 8;
+    doc.text(templateData.companyName, leftMargin + (settings.logoNavbar ? 25 : 0), yPosition + 8);
+    
+    doc.setFontSize(8);
+    doc.setTextColor(127, 140, 141); // #7F8C8D
+    doc.setFont('helvetica', 'italic');
+    doc.text(templateData.tagline, leftMargin + (settings.logoNavbar ? 25 : 0), yPosition + 12);
 
-    if (businessInfo.companyLegalName) {
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'normal');
-      doc.text(businessInfo.companyLegalName, companyX, yPosition);
-      yPosition += 6;
-    }
-
-    if (businessInfo.businessAddress) {
-      yPosition = addTextWithWrap(
-        businessInfo.businessAddress,
-        companyX,
-        yPosition,
-        80,
-        10,
-      );
-    }
-
-    // Contact Information
-    if (businessInfo.contactPhone) {
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Phone: ${businessInfo.contactPhone}`, companyX, yPosition);
-      yPosition += 5;
-    }
-
-    if (businessInfo.contactEmail) {
-      doc.text(`Email: ${businessInfo.contactEmail}`, companyX, yPosition);
-      yPosition += 5;
-    }
-
-    if (businessInfo.contactWebsite) {
-      doc.text(`Website: ${businessInfo.contactWebsite}`, companyX, yPosition);
-      yPosition += 5;
-    }
-
-    // Tax Information
-    if (businessInfo.taxRegistrationNumber) {
-      const taxLabel = businessInfo.taxRegistrationLabel || 'Tax ID';
-      doc.text(
-        `${taxLabel}: ${businessInfo.taxRegistrationNumber}`,
-        companyX,
-        yPosition,
-      );
-      yPosition += 5;
-    }
-
-    if (businessInfo.companyNumber) {
-      doc.text(`Company #: ${businessInfo.companyNumber}`, companyX, yPosition);
-    }
-
-    // Invoice Header (Right side)
-    const invoiceHeaderX = pageWidth - 80;
-    yPosition = 15;
-
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.text('INVOICE', invoiceHeaderX, yPosition);
-    yPosition += 12;
-
-    doc.setFontSize(12);
+    yPosition += 15;
+    doc.setFontSize(8);
+    doc.setTextColor(52, 73, 94); // #34495E
     doc.setFont('helvetica', 'normal');
-    doc.text(`Invoice #: ${invoice.invoiceNumber}`, invoiceHeaderX, yPosition);
-    yPosition += 6;
-    doc.text(
-      `Date: ${new Date(invoice.generatedDate).toLocaleDateString()}`,
-      invoiceHeaderX,
-      yPosition,
-    );
-    yPosition += 6;
-    doc.text(
-      `Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}`,
-      invoiceHeaderX,
-      yPosition,
-    );
-    yPosition += 6;
-    doc.text(
-      `Status: ${invoice.status.toUpperCase()}`,
-      invoiceHeaderX,
-      yPosition,
-    );
+    doc.text(templateData.address, leftMargin, yPosition);
+    yPosition += 4;
+    doc.text(`Phone: ${templateData.phone}`, leftMargin, yPosition);
+    yPosition += 4;
+    doc.text(`Email: ${templateData.email}`, leftMargin, yPosition);
+    if (templateData.website) {
+      yPosition += 4;
+      doc.text(`Website: ${templateData.website}`, leftMargin, yPosition);
+    }
+    if (templateData.taxNumber) {
+      yPosition += 4;
+      doc.text(`Tax ID: ${templateData.taxNumber}`, leftMargin, yPosition);
+    }
+
+    // Right: Invoice Info Box
+    const infoBoxY = 10;
+    doc.setFillColor(248, 249, 250); // #F8F9FA
+    doc.setDrawColor(25, 118, 210); // #1976D2
+    doc.setLineWidth(0.5);
+    doc.rect(rightColumnStart - 5, infoBoxY, 90, 50, 'FD');
+    
+    // Left border accent
+    doc.setFillColor(25, 118, 210);
+    doc.rect(rightColumnStart - 5, infoBoxY, 2, 50, 'F');
+
+    let infoY = infoBoxY + 8;
+    doc.setFontSize(22);
+    doc.setTextColor(25, 118, 210);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INVOICE', rightColumnStart, infoY);
+    infoY += 10;
+
+    doc.setFontSize(8);
+    doc.setTextColor(127, 140, 141);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Invoice #:', rightColumnStart, infoY);
+    doc.setTextColor(44, 62, 80); // #2C3E50
+    doc.text(templateData.invoiceNumber, rightColumnStart + 35, infoY);
+    infoY += 6;
+
+    doc.setTextColor(127, 140, 141);
+    doc.text('Date:', rightColumnStart, infoY);
+    doc.setTextColor(44, 62, 80);
+    doc.text(templateData.issueDate, rightColumnStart + 35, infoY);
+    infoY += 6;
+
+    doc.setTextColor(127, 140, 141);
+    doc.text('Due Date:', rightColumnStart, infoY);
+    doc.setTextColor(44, 62, 80);
+    doc.text(templateData.dueDate, rightColumnStart + 35, infoY);
+    infoY += 8;
+
+    // Status Badge
+    doc.setFillColor(232, 245, 233); // #E8F5E9
+    doc.rect(rightColumnStart, infoY, 30, 6, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(46, 125, 50); // #2E7D32
+    doc.setFont('helvetica', 'bold');
+    doc.text(templateData.status, rightColumnStart + 2, infoY + 4.5);
 
     yPosition = 70;
 
-    // Bill To Section
-    doc.setFillColor(248, 249, 250);
-    doc.rect(20, yPosition, pageWidth - 40, 50, 'F');
-
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Bill To:', 25, yPosition + 10);
-
-    yPosition += 20;
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-
-    if (parent) {
-      doc.text(parent.fullName || 'Parent', 25, yPosition);
-      yPosition += 6;
-      if (parent.email) {
-        doc.text(parent.email, 25, yPosition);
-        yPosition += 6;
-      }
-      if (parent.phone) {
-        doc.text(parent.phone, 25, yPosition);
-        yPosition += 6;
-      }
-    }
-    doc.text(`Student: ${student.name}`, 25, yPosition);
-    yPosition += 6;
-    if (student.email) {
-      doc.text(`Student Email: ${student.email}`, 25, yPosition);
+    // Student ID Section
+    if (templateData.studentId) {
+      doc.setFillColor(250, 250, 250); // #FAFAFA
+      doc.setDrawColor(52, 73, 94); // #34495E
+      doc.rect(leftMargin, yPosition, pageWidth - 30, 12, 'FD');
+      doc.setFillColor(52, 73, 94);
+      doc.rect(leftMargin, yPosition, 2, 12, 'F');
+      
+      doc.setFontSize(7);
+      doc.setTextColor(127, 140, 141);
+      doc.setFont('helvetica', 'bold');
+      doc.text('STUDENT ID', leftMargin + 5, yPosition + 5);
+      doc.setFontSize(11);
+      doc.setTextColor(44, 62, 80);
+      doc.text(`STU-${templateData.studentId}`, leftMargin + 5, yPosition + 9);
+      yPosition += 20;
     }
 
-    yPosition += 40;
+    // Bill To Section - Two Cards
+    const cardWidth = (pageWidth - 30 - 10) / 2;
+    
+    if (templateData.parent) {
+      doc.setFillColor(250, 250, 250);
+      doc.rect(leftMargin, yPosition, cardWidth, 35, 'F');
+      doc.setFontSize(9);
+      doc.setTextColor(52, 73, 94);
+      doc.setFont('helvetica', 'bold');
+      doc.text('BILL TO', leftMargin + 5, yPosition + 8);
+      doc.setLineWidth(0.5);
+      doc.setDrawColor(25, 118, 210);
+      doc.line(leftMargin + 5, yPosition + 10, leftMargin + cardWidth - 5, yPosition + 10);
+      
+      let cardY = yPosition + 15;
+      doc.setFontSize(10);
+      doc.setTextColor(44, 62, 80);
+      doc.setFont('helvetica', 'bold');
+      doc.text(templateData.parent.name, leftMargin + 5, cardY);
+      cardY += 5;
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(52, 73, 94);
+      doc.text(templateData.parent.email, leftMargin + 5, cardY);
+      if (templateData.parent.address) {
+        cardY += 4;
+        doc.text(templateData.parent.address, leftMargin + 5, cardY);
+      }
+    }
+
+    if (templateData.student) {
+      doc.setFillColor(250, 250, 250);
+      doc.rect(leftMargin + cardWidth + 10, yPosition, cardWidth, 35, 'F');
+      doc.setFontSize(9);
+      doc.setTextColor(52, 73, 94);
+      doc.setFont('helvetica', 'bold');
+      doc.text('STUDENT', leftMargin + cardWidth + 15, yPosition + 8);
+      doc.setLineWidth(0.5);
+      doc.setDrawColor(25, 118, 210);
+      doc.line(leftMargin + cardWidth + 15, yPosition + 10, leftMargin + cardWidth * 2 + 5, yPosition + 10);
+      
+      let cardY = yPosition + 15;
+      doc.setFontSize(10);
+      doc.setTextColor(44, 62, 80);
+      doc.setFont('helvetica', 'bold');
+      doc.text(templateData.student.name, leftMargin + cardWidth + 15, cardY);
+      cardY += 5;
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(52, 73, 94);
+      doc.text(templateData.student.email, leftMargin + cardWidth + 15, cardY);
+    }
+
+    yPosition += 45;
 
     // Invoice Items Table
-    doc.setFontSize(14);
+    doc.setFontSize(8);
+    doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.text('Invoice Details', 20, yPosition);
+    doc.setFillColor(25, 118, 210); // #1976D2
+    doc.rect(leftMargin, yPosition, pageWidth - 30, 8, 'F');
+    
+    const colDesc = leftMargin + 2;
+    const colQty = colDesc + (pageWidth - 30) * 0.5;
+    const colUnit = colQty + (pageWidth - 30) * 0.15;
+    const colTotal = colUnit + (pageWidth - 30) * 0.175;
+
+    doc.text('Description', colDesc, yPosition + 5.5);
+    doc.text('Qty', colQty, yPosition + 5.5);
+    doc.text('Unit Price', colUnit, yPosition + 5.5);
+    doc.text('Total', colTotal, yPosition + 5.5);
+
     yPosition += 10;
 
-    // Table Header
-    doc.setFillColor(52, 58, 64);
-    doc.rect(20, yPosition, pageWidth - 40, 15, 'F');
+    // Table Rows
+    if (templateData.items && templateData.items.length > 0) {
+      templateData.items.forEach((item: any, index: number) => {
+        if (index % 2 === 1) {
+          doc.setFillColor(248, 249, 250);
+          doc.rect(leftMargin, yPosition - 2, pageWidth - 30, 8, 'F');
+        }
+        
+        doc.setFontSize(9);
+        doc.setTextColor(44, 62, 80);
+        doc.setFont('helvetica', 'normal');
+        const descLines = doc.splitTextToSize(item.description, (pageWidth - 30) * 0.5 - 4);
+        doc.text(descLines, colDesc, yPosition + 4);
+        
+        doc.text(String(item.quantity), colQty, yPosition + 4);
+        doc.text(`${templateData.currency} ${Number(item.unitPrice).toFixed(2)}`, colUnit, yPosition + 4, { align: 'right' });
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${templateData.currency} ${Number(item.total).toFixed(2)}`, colTotal, yPosition + 4, { align: 'right' });
+        
+        yPosition += Math.max(8, descLines.length * 4);
+      });
+    } else {
+      doc.setFontSize(9);
+      doc.setTextColor(44, 62, 80);
+      doc.text('No items found', colDesc, yPosition + 4);
+    }
 
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Description', 25, yPosition + 10);
-    doc.text('Amount', pageWidth - 60, yPosition + 10);
-
-    yPosition += 20;
-    doc.setTextColor(0, 0, 0);
-
-    // Invoice Item
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'normal');
-    const descriptionLines = doc.splitTextToSize(
-      invoice.description,
-      pageWidth - 100,
-    );
-    const itemHeight = Math.max(15, descriptionLines.length * 5);
-
-    doc.rect(20, yPosition, pageWidth - 40, itemHeight);
-    doc.text(descriptionLines, 25, yPosition + 8);
-    doc.text(
-      `${invoice.currency} ${invoice.amount.toFixed(2)}`,
-      pageWidth - 60,
-      yPosition + 8,
-    );
-
-    yPosition += itemHeight + 10;
-
-    // Total Section
-    const totalX = pageWidth - 100;
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text(
-      `Total Amount: ${invoice.currency} ${invoice.amount.toFixed(2)}`,
-      totalX,
-      yPosition,
-    );
-
-    yPosition += 30;
-
-    // Payment Information Section
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Payment Information', 20, yPosition);
     yPosition += 15;
 
-    // Bank Transfer Details
-    if (bankDetails.bankName) {
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Bank Transfer Details:', 20, yPosition);
-      yPosition += 10;
-
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'normal');
-
-      if (bankDetails.bankName) {
-        doc.text(`Bank Name: ${bankDetails.bankName}`, 20, yPosition);
-        yPosition += 6;
-      }
-      if (bankDetails.bankAccountTitle) {
-        doc.text(
-          `Account Title: ${bankDetails.bankAccountTitle}`,
-          20,
-          yPosition,
-        );
-        yPosition += 6;
-      }
-      if (bankDetails.bankAccountNumber) {
-        doc.text(
-          `Account Number: ${bankDetails.bankAccountNumber}`,
-          20,
-          yPosition,
-        );
-        yPosition += 6;
-      }
-      if (bankDetails.bankIban) {
-        doc.text(`IBAN: ${bankDetails.bankIban}`, 20, yPosition);
-        yPosition += 6;
-      }
-      if (bankDetails.bankSwiftCode) {
-        doc.text(`SWIFT Code: ${bankDetails.bankSwiftCode}`, 20, yPosition);
-        yPosition += 6;
-      }
-      if (bankDetails.bankAccountCurrency) {
-        doc.text(`Currency: ${bankDetails.bankAccountCurrency}`, 20, yPosition);
-        yPosition += 6;
-      }
-
-      yPosition += 10;
-    }
-
-    // Online Payment Options
-    if (activeGateways && activeGateways.length > 0) {
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Online Payment Options:', 20, yPosition);
-      yPosition += 10;
-
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'normal');
-
-      activeGateways.forEach((gateway) => {
-        if (gateway.name !== 'bank_transfer') {
-          // Exclude bank transfer from online options
-          doc.text(`• ${gateway.displayName}`, 25, yPosition);
-          if (gateway.description) {
-            yPosition += 5;
-            doc.setFontSize(10);
-            doc.text(`  ${gateway.description}`, 25, yPosition);
-            doc.setFontSize(11);
-          }
-          yPosition += 8;
-        }
-      });
-
-      yPosition += 10;
-    }
-
-    // Notes Section
-    if (invoice.notes) {
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Notes:', 20, yPosition);
-      yPosition += 10;
-
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'normal');
-      yPosition = addTextWithWrap(invoice.notes, 20, yPosition, pageWidth - 40);
-      yPosition += 10;
-    }
-
-    // Footer
-    const footerY = pageHeight - 40;
-    drawLine(footerY);
-
-    doc.setFontSize(10);
+    // Totals Section
+    const totalsX = pageWidth - 100;
+    doc.setFontSize(9);
+    doc.setTextColor(52, 73, 94);
     doc.setFont('helvetica', 'normal');
-    doc.text('Thank you for your business!', 20, footerY + 10);
+    doc.text('Subtotal:', totalsX, yPosition);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${templateData.currency} ${templateData.subtotal.toFixed(2)}`, pageWidth - 20, yPosition, { align: 'right' });
+    yPosition += 6;
 
-    if (businessInfo.contactEmail) {
-      doc.text(
-        `For any queries, please contact us at ${businessInfo.contactEmail}`,
-        20,
-        footerY + 20,
-      );
+    if (templateData.tax > 0) {
+      doc.setFont('helvetica', 'normal');
+      doc.text('Tax:', totalsX, yPosition);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${templateData.currency} ${templateData.tax.toFixed(2)}`, pageWidth - 20, yPosition, { align: 'right' });
+      yPosition += 6;
     }
+
+    // Grand Total
+    doc.setFillColor(25, 118, 210);
+    doc.rect(totalsX - 5, yPosition - 3, pageWidth - totalsX + 5, 10, 'F');
+    doc.setFontSize(11);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TOTAL AMOUNT', totalsX, yPosition + 3);
+    doc.setFontSize(13);
+    doc.text(`${templateData.currency} ${templateData.total.toFixed(2)}`, pageWidth - 20, yPosition + 3, { align: 'right' });
+    yPosition += 20;
+
+    // Footer - Payment Information
+    doc.setFillColor(248, 249, 250);
+    doc.rect(leftMargin, yPosition, pageWidth - 30, 40, 'F');
+    
+    doc.setFontSize(10);
+    doc.setTextColor(25, 118, 210);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PAYMENT INFORMATION', leftMargin + 5, yPosition + 8);
+    
+    yPosition += 12;
+    doc.setFontSize(8);
+    doc.setTextColor(52, 73, 94);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Payment is due within 30 days from the invoice date.', leftMargin + 5, yPosition);
+
+    if (templateData.bankDetails) {
+      yPosition += 8;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Bank Transfer Details:', leftMargin + 5, yPosition);
+      yPosition += 5;
+      doc.setFont('helvetica', 'normal');
+      if (templateData.bankDetails.name) {
+        doc.text(`Bank Name: ${templateData.bankDetails.name}`, leftMargin + 5, yPosition);
+        yPosition += 4;
+      }
+      if (templateData.bankDetails.accountNumber) {
+        doc.text(`Account: ${templateData.bankDetails.accountNumber}`, leftMargin + 5, yPosition);
+        yPosition += 4;
+      }
+      if (templateData.bankDetails.iban) {
+        doc.text(`IBAN: ${templateData.bankDetails.iban}`, leftMargin + 5, yPosition);
+        yPosition += 4;
+      }
+      if (templateData.bankDetails.swiftCode) {
+        doc.text(`SWIFT: ${templateData.bankDetails.swiftCode}`, leftMargin + 5, yPosition);
+      }
+    }
+
+    yPosition += 15;
+    doc.setFontSize(9);
+    doc.setTextColor(127, 140, 141);
+    doc.setFont('helvetica', 'italic');
+    doc.text(`Thank you for choosing ${templateData.companyName} for your educational needs.`, pageWidth / 2, yPosition, { align: 'center' });
 
     return Buffer.from(doc.output('arraybuffer'));
   }
