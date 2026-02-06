@@ -78,7 +78,8 @@ export class PerformancesRelationalRepository implements PerformanceRepository {
     const queryBuilder = this.performancesRepository
       .createQueryBuilder('performance')
       .leftJoinAndSelect('performance.student', 'student')
-      .leftJoinAndSelect('performance.assignment', 'assignment');
+      .leftJoinAndSelect('performance.assignment', 'assignment')
+      .leftJoinAndSelect('performance.class', 'class');
 
     if (filterOptions?.studentName) {
       queryBuilder.andWhere('student.name ILIKE :studentName', {
@@ -89,6 +90,12 @@ export class PerformancesRelationalRepository implements PerformanceRepository {
     if (filterOptions?.assignmentTitle) {
       queryBuilder.andWhere('assignment.title ILIKE :assignmentTitle', {
         assignmentTitle: `%${filterOptions.assignmentTitle}%`,
+      });
+    }
+
+    if (filterOptions?.classId !== undefined) {
+      queryBuilder.andWhere('class.id = :classId', {
+        classId: filterOptions.classId,
       });
     }
 
