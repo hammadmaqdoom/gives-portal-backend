@@ -38,7 +38,7 @@ import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
 
 @ApiBearerAuth()
-@Roles(RoleEnum.admin)
+@Roles(RoleEnum.admin, RoleEnum.superAdmin)
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @ApiTags('Parents')
 @Controller({
@@ -84,7 +84,11 @@ export class ParentsController {
   @Get()
   @HttpCode(HttpStatus.OK)
   async findAll(
-    @Query() query: QueryParentDto,
+    @Query('search') search?: string,
+    @Query('city') city?: string,
+    @Query('country') country?: string,
+    @Query('relationship') relationship?: string,
+    @Query() query?: QueryParentDto,
   ): Promise<InfinityPaginationResponseDto<Parent>> {
     const page = query?.page ?? 1;
     let limit = query?.limit ?? 10;
@@ -92,9 +96,18 @@ export class ParentsController {
       limit = 50;
     }
 
+    // Merge top-level query parameters with filters object (prioritize top-level params)
+    const filterOptions = {
+      ...query?.filters,
+      ...(search && { search }),
+      ...(city && { city }),
+      ...(country && { country }),
+      ...(relationship && { relationship: relationship as 'father' | 'mother' | 'guardian' }),
+    };
+
     return infinityPagination(
       await this.parentsService.findManyWithPagination({
-        filterOptions: query?.filters,
+        filterOptions,
         sortOptions: query?.sort,
         paginationOptions: {
           page,
