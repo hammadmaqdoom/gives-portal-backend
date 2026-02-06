@@ -42,6 +42,9 @@ export class InvoiceRepositoryImpl implements InvoiceRepository {
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           total: item.total,
+          classId: item.classId,
+          className: item.className,
+          teacherName: item.teacherName,
         });
         return itemEntity;
       });

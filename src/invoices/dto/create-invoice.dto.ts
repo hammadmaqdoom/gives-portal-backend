@@ -39,6 +39,22 @@ export class CreateInvoiceItemDto {
   @Min(0)
   @Transform(({ value }) => Number(value) || 0)
   total: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'Class ID' })
+  @IsOptional()
+  @IsNumber()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
+  classId?: number;
+
+  @ApiPropertyOptional({ example: 'Mathematics 101', description: 'Class name' })
+  @IsOptional()
+  @IsString()
+  className?: string;
+
+  @ApiPropertyOptional({ example: 'John Smith', description: 'Teacher name' })
+  @IsOptional()
+  @IsString()
+  teacherName?: string;
 }
 
 export class CreateInvoiceDto {
