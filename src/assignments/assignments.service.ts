@@ -2,6 +2,8 @@ import {
   HttpStatus,
   Injectable,
   UnprocessableEntityException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
 import { NullableType } from '../utils/types/nullable.type';
@@ -13,10 +15,15 @@ import { AssignmentRepository } from './infrastructure/persistence/assignment.re
 import { Assignment, AssignmentStatus } from './domain/assignment';
 import { IPaginationOptions } from '../utils/types/pagination-options';
 import { UpdateAssignmentDto } from './dto/update-assignment.dto';
+import { FilesService } from '../files/files.service';
 
 @Injectable()
 export class AssignmentsService {
-  constructor(private readonly assignmentsRepository: AssignmentRepository) {}
+  constructor(
+    private readonly assignmentsRepository: AssignmentRepository,
+    @Inject(forwardRef(() => FilesService))
+    private readonly filesService: FilesService,
+  ) {}
 
   async create(
     createAssignmentDto: CreateAssignmentDto,
@@ -31,12 +38,17 @@ export class AssignmentsService {
       status: AssignmentStatus.DRAFT, // Default to draft
       maxScore: createAssignmentDto.maxScore,
       markingCriteria: createAssignmentDto.markingCriteria,
+      // Attachments are expected to be objects coming from the files module.
+      // We strip any transient/view-only fields like `url` so the DB only stores
+      // stable internal refs (id/path/filename/mimeType), not presigned URLs.
       attachments:
         createAssignmentDto.attachments &&
         createAssignmentDto.attachments.length > 0
-          ? createAssignmentDto.attachments.filter(
-              (att) => att && att.trim() !== '',
-            )
+          ? createAssignmentDto.attachments.map((att: any) => {
+              if (!att || typeof att !== 'object') return att;
+              const { url, ...rest } = att;
+              return rest;
+            })
           : undefined,
       class: { id: createAssignmentDto.class } as any, // ensure class_id persists
       teacher: user?.id ? ({ id: user.id } as any) : undefined,

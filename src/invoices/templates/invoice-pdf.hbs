@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice {{invoiceNumber}}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Roboto', 'Helvetica', Arial, sans-serif;
+            font-size: 9pt;
+            line-height: 1.5;
+            color: #2C3E50;
+            background-color: #FFFFFF;
+            padding: 30px;
+        }
+        
+        /* Header Accent Bar */
+        .header-accent {
+            background-color: #1976D2;
+            height: 8px;
+            margin: -30px -30px 25px -30px;
+        }
+        
+        /* Header Section */
+        .header {
+            margin-bottom: 35px;
+        }
+        
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        
+        .company-section {
+            flex: 1;
+            padding-right: 30px;
+        }
+        
+        .logo {
+            width: 90px;
+            height: 90px;
+            margin-bottom: 15px;
+            object-fit: contain;
+        }
+        
+        .company-name {
+            font-size: 9pt;
+            font-weight: bold;
+            color: #34495E;
+            margin-bottom: 5px;
+        }
+        
+        .company-details {
+            font-size: 8pt;
+            color: #34495E;
+            line-height: 1.6;
+            margin-top: 20px;
+        }
+        
+        .company-detail-line {
+            margin-bottom: 2px;
+        }
+        
+        /* Invoice Info Box */
+        .invoice-info-box {
+            width: 220px;
+            background-color: #F8F9FA;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #1976D2;
+        }
+        
+        .invoice-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+            min-height: 28px;
+        }
+        
+        .invoice-title {
+            font-size: 22pt;
+            font-weight: bold;
+            color: #1976D2;
+            letter-spacing: 1px;
+            line-height: 28px;
+        }
+        
+        .invoice-meta-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            width: 100%;
+            flex-wrap: wrap;
+        }
+        
+        .invoice-meta-label {
+            font-size: 8pt;
+            color: #7F8C8D;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            flex-shrink: 0;
+        }
+        
+        .invoice-meta-value {
+            font-size: 9pt;
+            color: #2C3E50;
+            font-weight: bold;
+            max-width: 60%;
+            text-align: right;
+            flex-shrink: 1;
+        }
+        
+        .status-badge {
+            padding: 4px 10px;
+            background-color: #E8F5E9;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        
+        .status-text {
+            font-size: 8pt;
+            color: #2E7D32;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        /* Bill To Section */
+        .bill-to-section {
+            display: flex;
+            margin-bottom: 25px;
+            gap: 15px;
+        }
+        
+        .bill-to-card {
+            flex: 1;
+            background-color: #FAFAFA;
+            padding: 12px;
+            border-radius: 4px;
+        }
+        
+        .bill-to-title {
+            font-size: 9pt;
+            font-weight: bold;
+            color: #34495E;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #1976D2;
+        }
+        
+        .student-id-inline {
+            margin-bottom: 6px;
+        }
+        
+        .student-id-inline-label {
+            font-size: 7pt;
+            color: #7F8C8D;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .student-id-inline-value {
+            font-size: 9pt;
+            color: #2C3E50;
+            font-weight: bold;
+            margin-left: 4px;
+        }
+        
+        .bill-to-content {
+            font-size: 9pt;
+            line-height: 1.5;
+        }
+        
+        .bill-to-name {
+            font-size: 10pt;
+            font-weight: bold;
+            color: #2C3E50;
+            margin-bottom: 6px;
+        }
+        
+        .bill-to-detail {
+            font-size: 8pt;
+            color: #34495E;
+            margin-bottom: 3px;
+        }
+        
+        /* Table Section */
+        .table-section {
+            margin-bottom: 25px;
+        }
+        
+        .table {
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid #E0E0E0;
+            width: 100%;
+        }
+        
+        .table-header {
+            display: flex;
+            background-color: #1976D2;
+            padding: 10px 12px;
+        }
+        
+        .table-header-cell {
+            font-size: 8pt;
+            font-weight: bold;
+            color: #FFFFFF;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .table-row {
+            display: flex;
+            padding: 8px;
+            border-bottom: 1px solid #ECF0F1;
+            background-color: #FFFFFF;
+        }
+        
+        .table-row-alt {
+            background-color: #F8F9FA;
+        }
+        
+        .table-cell {
+            font-size: 9pt;
+            color: #2C3E50;
+        }
+        
+        .col-class-name {
+            width: 20%;
+            padding-right: 4px;
+        }
+        
+        .teacher-name {
+            font-size: 8pt;
+            color: #7F8C8D;
+            margin-top: 2px;
+        }
+        
+        .col-description {
+            width: 33%;
+            padding-right: 4px;
+        }
+        
+        .col-quantity {
+            width: 5%;
+            text-align: center;
+            padding-right: 0;
+        }
+        
+        .col-unit-price {
+            width: 20%;
+            text-align: right;
+            padding-right: 24px;
+        }
+        
+        .col-total {
+            width: 17%;
+            text-align: right;
+            font-weight: bold;
+            padding-right: 8px;
+        }
+        
+        /* Totals Section */
+        .totals-section {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+        
+        .totals-box {
+            width: 45%;
+            min-width: 220px;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 15px;
+            border-bottom: 1px solid #ECF0F1;
+        }
+        
+        .total-label {
+            font-size: 9pt;
+            color: #34495E;
+        }
+        
+        .total-value {
+            font-size: 9pt;
+            color: #2C3E50;
+            font-weight: bold;
+        }
+        
+        .grand-total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 15px;
+            background-color: #1976D2;
+            border-radius: 4px;
+            margin-top: 2px;
+        }
+        
+        .grand-total-label {
+            font-size: 11pt;
+            font-weight: bold;
+            color: #FFFFFF;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .grand-total-value {
+            font-size: 13pt;
+            font-weight: bold;
+            color: #FFFFFF;
+        }
+        
+        /* Footer Section */
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #E0E0E0;
+        }
+        
+        .payment-info-box {
+            background-color: #F8F9FA;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        
+        .payment-title {
+            font-size: 10pt;
+            font-weight: bold;
+            color: #1976D2;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .payment-content {
+            font-size: 8pt;
+            line-height: 1.6;
+            color: #34495E;
+        }
+        
+        .payment-detail {
+            margin-bottom: 4px;
+        }
+        
+        .bank-details-section {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #E0E0E0;
+        }
+        
+        .thank-you-section {
+            text-align: center;
+            padding: 15px 0;
+        }
+        
+        .thank-you-text {
+            font-size: 9pt;
+            color: #7F8C8D;
+            font-style: italic;
+        }
+        
+        .text-right {
+            text-align: right;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .text-bold {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <!-- Accent Bar at Top -->
+    <div class="header-accent"></div>
+    
+    <!-- Header - Two Column Layout -->
+    <div class="header">
+        <div class="header-row">
+            <!-- Left: Company Information -->
+            <div class="company-section">
+                {{#if logo}}
+                <img src="{{logo}}" alt="Company Logo" class="logo" />
+                {{/if}}
+                <div class="company-details">
+                    <div class="company-name">{{companyName}}</div>
+                    <div class="company-detail-line">{{address}}</div>
+                    <div class="company-detail-line">Phone: {{phone}}</div>
+                    <div class="company-detail-line">Email: {{email}}</div>
+                    {{#if website}}
+                    <div class="company-detail-line">Website: {{website}}</div>
+                    {{/if}}
+                    {{#if taxNumber}}
+                    <div class="company-detail-line">Tax ID: {{taxNumber}}</div>
+                    {{/if}}
+                </div>
+            </div>
+            
+            <!-- Right: Invoice Information Box -->
+            <div class="invoice-info-box">
+                <div class="invoice-title-row">
+                    <div class="invoice-title">INVOICE</div>
+                    <div class="status-badge">
+                        <span class="status-text">{{status}}</span>
+                    </div>
+                </div>
+                
+                <div class="invoice-meta-row">
+                    <span class="invoice-meta-label">Invoice #:</span>
+                    <span class="invoice-meta-value">{{invoiceNumber}}</span>
+                </div>
+                
+                <div class="invoice-meta-row">
+                    <span class="invoice-meta-label">Date:</span>
+                    <span class="invoice-meta-value">{{issueDate}}</span>
+                </div>
+                
+                <div class="invoice-meta-row">
+                    <span class="invoice-meta-label">Due Date:</span>
+                    <span class="invoice-meta-value">{{dueDate}}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bill To Section - Two Column Cards -->
+    <div class="bill-to-section">
+        <!-- Parent Information -->
+        {{#if parent}}
+        <div class="bill-to-card">
+            <div class="bill-to-title">Bill To</div>
+            <div class="bill-to-content">
+                <div class="bill-to-name">{{parent.name}}</div>
+                <div class="bill-to-detail">{{parent.email}}</div>
+                {{#if parent.address}}
+                <div class="bill-to-detail">{{parent.address}}</div>
+                {{/if}}
+                {{#if parent.city}}
+                <div class="bill-to-detail">{{parent.city}}{{#if parent.country}}, {{parent.country}}{{/if}}</div>
+                {{/if}}
+            </div>
+        </div>
+        {{/if}}
+        
+        <!-- Student Information with Student ID -->
+        {{#if student}}
+        <div class="bill-to-card">
+            <div class="bill-to-title">Student</div>
+            <div class="bill-to-content">
+                {{#if studentId}}
+                <div class="student-id-inline">
+                    <span class="student-id-inline-label">Student ID:</span>
+                    <span class="student-id-inline-value">{{studentId}}</span>
+                </div>
+                {{/if}}
+                <div class="bill-to-name">{{student.name}}</div>
+                <div class="bill-to-detail">{{student.email}}</div>
+            </div>
+        </div>
+        {{/if}}
+    </div>
+    
+    <!-- Invoice Items Table -->
+    <div class="table-section">
+        <div class="table">
+            <!-- Table Header: Class details + fee -->
+            <div class="table-header">
+                <div class="table-header-cell col-class-name">Class Name</div>
+                <div class="table-header-cell col-description">Description</div>
+                <div class="table-header-cell col-quantity text-center">Qty</div>
+                <div class="table-header-cell col-unit-price">Unit Price</div>
+                <div class="table-header-cell col-total">Total</div>
+            </div>
+            
+            <!-- Table Rows -->
+            {{#if items}}
+                {{#each items}}
+                <div class="table-row {{#if @index}}{{#if (mod @index 2)}}table-row-alt{{/if}}{{/if}}">
+                    <div class="table-cell col-class-name">
+                        <div>{{className}}</div>
+                        {{#if teacherName}}
+                        <div class="teacher-name">{{teacherName}}</div>
+                        {{/if}}
+                    </div>
+                    <div class="table-cell col-description">{{description}}</div>
+                    <div class="table-cell col-quantity text-center">{{quantity}}</div>
+                    <div class="table-cell col-unit-price text-right">{{formatCurrency unitPrice ../currency}}</div>
+                    <div class="table-cell col-total text-right">{{formatCurrency total ../currency}}</div>
+                </div>
+                {{/each}}
+            {{else}}
+                <div class="table-row">
+                    <div class="table-cell col-class-name">-</div>
+                    <div class="table-cell col-description">No items found</div>
+                    <div class="table-cell col-quantity text-center">-</div>
+                    <div class="table-cell col-unit-price text-right">-</div>
+                    <div class="table-cell col-total text-right">-</div>
+                </div>
+            {{/if}}
+        </div>
+    </div>
+    
+    <!-- Totals Section -->
+    <div class="totals-section">
+        <div class="totals-box">
+            <div class="total-row">
+                <span class="total-label">Subtotal</span>
+                <span class="total-value">{{formatCurrency subtotal currency}}</span>
+            </div>
+            {{#if tax}}
+            <div class="total-row">
+                <span class="total-label">Tax</span>
+                <span class="total-value">{{formatCurrency tax currency}}</span>
+            </div>
+            {{/if}}
+            <div class="grand-total-row">
+                <span class="grand-total-label">Total Amount</span>
+                <span class="grand-total-value">{{formatCurrency total currency}}</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer - Payment Information -->
+    <div class="footer">
+        <div class="payment-info-box">
+            <div class="payment-title">Payment Information</div>
+            <div class="payment-content">
+                <div class="payment-detail">
+                    Payment is due within 30 days from the invoice date.
+                </div>
+                
+                {{#if bankDetails}}
+                <div class="bank-details-section">
+                    <div class="payment-detail text-bold">
+                        Bank Transfer Details:
+                    </div>
+                    {{#if bankDetails.name}}
+                    <div class="payment-detail">Bank Name: {{bankDetails.name}}</div>
+                    {{/if}}
+                    {{#if bankDetails.accountNumber}}
+                    <div class="payment-detail">Account: {{bankDetails.accountNumber}}</div>
+                    {{/if}}
+                    {{#if bankDetails.iban}}
+                    <div class="payment-detail">IBAN: {{bankDetails.iban}}</div>
+                    {{/if}}
+                    {{#if bankDetails.swiftCode}}
+                    <div class="payment-detail">SWIFT: {{bankDetails.swiftCode}}</div>
+                    {{/if}}
+                </div>
+                {{/if}}
+            </div>
+        </div>
+        
+        <!-- Thank You Message -->
+        <div class="thank-you-section">
+            <div class="thank-you-text">
+                Thank you for choosing {{companyName}} for your educational needs.
+            </div>
+        </div>
+    </div>
+</body>
+</html>
