@@ -664,30 +664,56 @@ export class InvoicesService {
       doc.text(`Tax ID: ${templateData.taxNumber}`, leftMargin, yPosition);
     }
 
-    // Right: Invoice Info Box
+    // Right: Invoice Info Box (wider to prevent overlap)
     const infoBoxY = 10;
+    const infoBoxWidth = 100; // Increased from 90 to prevent overlap
     doc.setFillColor(248, 249, 250); // #F8F9FA
     doc.setDrawColor(25, 118, 210); // #1976D2
     doc.setLineWidth(0.5);
-    doc.rect(rightColumnStart - 5, infoBoxY, 90, 50, 'FD');
+    doc.rect(rightColumnStart - 5, infoBoxY, infoBoxWidth, 50, 'FD');
     
     // Left border accent
     doc.setFillColor(25, 118, 210);
     doc.rect(rightColumnStart - 5, infoBoxY, 2, 50, 'F');
 
     let infoY = infoBoxY + 8;
+    
+    // Invoice Title and Status on same line - center aligned vertically
     doc.setFontSize(22);
     doc.setTextColor(25, 118, 210);
     doc.setFont('helvetica', 'bold');
-    doc.text('INVOICE', rightColumnStart, infoY);
-    infoY += 10;
+    const titleHeight = 22 * 0.35; // Approximate height of 22pt text
+    const titleBaseline = infoY + titleHeight;
+    doc.text('INVOICE', rightColumnStart, titleBaseline);
+    
+    // Status Badge on the right, center-aligned vertically with title
+    // Box is drawn from (rightColumnStart - 5) with width infoBoxWidth
+    // Right edge of box: rightColumnStart - 5 + infoBoxWidth
+    // Leave 5px padding from right edge of box
+    const statusWidth = 30;
+    const boxRightEdge = rightColumnStart - 5 + infoBoxWidth;
+    const statusX = boxRightEdge - statusWidth - 5; // Right edge minus badge width minus padding
+    const statusHeight = 8;
+    const statusY = titleBaseline - (statusHeight / 2) - 1; // Center align with title baseline
+    doc.setFillColor(232, 245, 233); // #E8F5E9
+    doc.rect(statusX, statusY, statusWidth, statusHeight, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(46, 125, 50); // #2E7D32
+    doc.setFont('helvetica', 'bold');
+    doc.text(templateData.status, statusX + 2, statusY + statusHeight / 2 + 2);
+    
+    // Add more spacing below title before invoice details
+    infoY += 18;
 
     doc.setFontSize(8);
     doc.setTextColor(127, 140, 141);
     doc.setFont('helvetica', 'bold');
     doc.text('Invoice #:', rightColumnStart, infoY);
     doc.setTextColor(44, 62, 80); // #2C3E50
-    doc.text(templateData.invoiceNumber, rightColumnStart + 35, infoY);
+    // Limit invoice number width to prevent overlap with status badge
+    const invoiceNumMaxWidth = infoBoxWidth - 50; // Leave space for label and padding
+    const invoiceNumText = doc.splitTextToSize(templateData.invoiceNumber, invoiceNumMaxWidth);
+    doc.text(invoiceNumText, rightColumnStart + 35, infoY);
     infoY += 6;
 
     doc.setTextColor(127, 140, 141);
@@ -700,15 +726,6 @@ export class InvoicesService {
     doc.text('Due Date:', rightColumnStart, infoY);
     doc.setTextColor(44, 62, 80);
     doc.text(templateData.dueDate, rightColumnStart + 35, infoY);
-    infoY += 8;
-
-    // Status Badge
-    doc.setFillColor(232, 245, 233); // #E8F5E9
-    doc.rect(rightColumnStart, infoY, 30, 6, 'F');
-    doc.setFontSize(8);
-    doc.setTextColor(46, 125, 50); // #2E7D32
-    doc.setFont('helvetica', 'bold');
-    doc.text(templateData.status, rightColumnStart + 2, infoY + 4.5);
 
     yPosition = 70;
 
@@ -784,14 +801,15 @@ export class InvoicesService {
     // Invoice Items Table (Class Name | Description | Qty | Unit Price | Total)
     const tableWidth = pageWidth - 30;
     const colClassName = leftMargin + 2;
-    const colDesc = colClassName + tableWidth * 0.22 + 8;
-    const colQty = colDesc + tableWidth * 0.36 + 8;
-    const colUnitStart = colQty + tableWidth * 0.08 + 8;
-    const colUnitWidth = tableWidth * 0.18;
+    const colDesc = colClassName + tableWidth * 0.20 + 4;
+    const colQty = colDesc + tableWidth * 0.33 + 4;
+    const colUnitStart = colQty + tableWidth * 0.05 + 0; // Minimal spacing - Qty right-aligned, Unit Price starts immediately after
+    const colUnitWidth = tableWidth * 0.20; // Reduced width
     const colUnitRight = colUnitStart + colUnitWidth;
-    const colTotalStart = colUnitRight + 8;
-    const colTotalWidth = tableWidth * 0.16;
-    const colTotalRight = colTotalStart + colTotalWidth;
+    const colTotalStart = colUnitRight + 24; // Significantly increased spacing between Unit Price and Total
+    const colTotalWidth = tableWidth * 0.17;
+    // Ensure Total column doesn't exceed page width, with padding from right edge
+    const colTotalRight = Math.min(colTotalStart + colTotalWidth, pageWidth - 20);
 
     doc.setFontSize(8);
     doc.setTextColor(255, 255, 255);
@@ -801,7 +819,7 @@ export class InvoicesService {
 
     doc.text('Class Name', colClassName, yPosition + 5.5);
     doc.text('Description', colDesc, yPosition + 5.5);
-    doc.text('Qty', colQty, yPosition + 5.5);
+    doc.text('Qty', colQty + tableWidth * 0.025, yPosition + 5.5); // Center-align Qty header
     doc.text('Unit Price', colUnitRight, yPosition + 5.5, { align: 'right' });
     doc.text('Total', colTotalRight, yPosition + 5.5, { align: 'right' });
 
@@ -832,11 +850,13 @@ export class InvoicesService {
         // Description
         doc.setFontSize(9);
         doc.setTextColor(44, 62, 80);
-        const descLines = doc.splitTextToSize(item.description || '-', tableWidth * 0.36 - 4);
+        const descLines = doc.splitTextToSize(item.description || '-', tableWidth * 0.33 - 2);
         doc.text(descLines, colDesc, yPosition + 4);
         
         // Quantity, Unit Price, Total
-        doc.text(String(item.quantity), colQty, yPosition + 4);
+        // Center-align quantity within its column
+        const qtyCenter = colQty + (tableWidth * 0.05) / 2;
+        doc.text(String(item.quantity), qtyCenter, yPosition + 4, { align: 'center' });
         doc.text(`${templateData.currency} ${Number(item.unitPrice).toFixed(2)}`, colUnitRight, yPosition + 4, { align: 'right' });
         doc.setFont('helvetica', 'bold');
         doc.text(`${templateData.currency} ${Number(item.total).toFixed(2)}`, colTotalRight, yPosition + 4, { align: 'right' });
