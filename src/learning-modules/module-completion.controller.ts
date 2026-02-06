@@ -33,7 +33,7 @@ export class ModuleCompletionController {
   }
 
   @Get('student/:studentId')
-  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Get all module completions for a student' })
   @ApiResponse({ status: 200, description: 'Student module completions' })
   async getStudentCompletions(@Param('studentId') studentId: string) {
@@ -43,7 +43,7 @@ export class ModuleCompletionController {
   }
 
   @Get('module/:moduleId')
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Get all completions for a specific module' })
   @ApiResponse({ status: 200, description: 'Module completions' })
   async getModuleCompletions(@Param('moduleId') moduleId: string) {
@@ -53,7 +53,7 @@ export class ModuleCompletionController {
   }
 
   @Get('check/:moduleId/:studentId')
-  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Check if a module is completed by a student' })
   @ApiResponse({ status: 200, description: 'Completion status' })
   async checkCompletion(

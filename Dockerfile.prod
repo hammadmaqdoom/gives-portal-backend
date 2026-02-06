@@ -81,13 +81,16 @@ COPY --from=builder /app/dist ./dist
 # Copy mail templates (needed at runtime)
 COPY --from=builder /app/src/mail/mail-templates ./src/mail/mail-templates
 
+# Copy invoice templates (needed at runtime)
+COPY --from=builder /app/src/invoices/templates ./src/invoices/templates
+
 # Copy wait-for-it script (embedded in repository for reliability)
 COPY scripts/wait-for-it.sh /usr/local/bin/wait-for-it
 
 # Create necessary directories and set permissions (combined into single layer)
 RUN chmod +x /usr/local/bin/wait-for-it && \
     ln -s /usr/local/bin/wait-for-it ./wait-for-it.sh && \
-    mkdir -p src/mail/mail-templates uploads && \
+    mkdir -p src/mail/mail-templates src/invoices/templates uploads && \
     chown -R nestjs:nodejs src uploads
 
 # Switch to non-root user
