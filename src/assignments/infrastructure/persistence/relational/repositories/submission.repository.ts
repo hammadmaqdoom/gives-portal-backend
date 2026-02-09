@@ -40,6 +40,17 @@ export class SubmissionsRelationalRepository implements SubmissionRepository {
     return submission ? this.submissionMapper.toDomain(submission) : null;
   }
 
+  async findByIdWithRelations(
+    id: Submission['id'],
+    relations: string[] = ['student', 'assignment', 'assignment.class'],
+  ): Promise<NullableType<Submission>> {
+    const submission = await this.submissionsRepository.findOne({
+      where: { id },
+      relations,
+    });
+    return submission ? this.submissionMapper.toDomain(submission) : null;
+  }
+
   async findByAssignment(assignmentId: number): Promise<Submission[]> {
     const submissions = await this.submissionsRepository.find({
       where: { assignment: { id: assignmentId } },
@@ -84,6 +95,12 @@ export class SubmissionsRelationalRepository implements SubmissionRepository {
       .createQueryBuilder('submission')
       .leftJoinAndSelect('submission.student', 'student')
       .leftJoinAndSelect('submission.assignment', 'assignment');
+
+    if (filterOptions?.classId != null) {
+      queryBuilder.andWhere('assignment.classId = :classId', {
+        classId: filterOptions.classId,
+      });
+    }
 
     if (filterOptions?.assignmentId) {
       queryBuilder.andWhere('assignment.id = :assignmentId', {

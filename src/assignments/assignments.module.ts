@@ -1,14 +1,22 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { AssignmentsController } from './assignments.controller';
 import { AssignmentsService } from './assignments.service';
 import { SubmissionsController } from './submissions.controller';
 import { SubmissionsService } from './submissions.service';
 import { RelationalAssignmentPersistenceModule } from './infrastructure/persistence/relational/relational-persistence.module';
+import { AnnotationsModule } from '../annotations/annotations.module';
+import { FilesModule } from '../files/files.module';
+import { PerformanceModule } from '../performance/performance.module';
 
 const infrastructurePersistenceModule = RelationalAssignmentPersistenceModule;
 
 @Module({
-  imports: [infrastructurePersistenceModule],
+  imports: [
+    infrastructurePersistenceModule,
+    AnnotationsModule,
+    forwardRef(() => FilesModule),
+    forwardRef(() => PerformanceModule),
+  ],
   controllers: [AssignmentsController, SubmissionsController],
   providers: [AssignmentsService, SubmissionsService],
   exports: [

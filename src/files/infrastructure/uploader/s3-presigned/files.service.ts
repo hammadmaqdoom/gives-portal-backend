@@ -91,6 +91,8 @@ export class FilesS3PresignedService {
       azureContainerName?: string | null;
       azureBlobSasExpirySeconds?: number | null;
       azureBlobPublicBaseUrl?: string | null;
+      b2EndpointUrl?: string | null;
+      b2Region?: string | null;
     } | null = null;
 
     try {
@@ -163,10 +165,9 @@ export class FilesS3PresignedService {
         signedUrl = `https://${accountName}.blob.core.windows.net/${containerName}/${key}?${sasToken}`;
       }
     } else {
-      const region: string =
-        storageConfig?.awsS3Region ??
-        this.configService.get('file.awsS3Region', { infer: true }) ??
-        '';
+      // S3 or B2 (both use S3-compatible API)
+      const isB2Driver =
+        driver === FileDriver.B2 || driver === FileDriver.B2_PRESIGNED;
       const accessKeyId: string =
         storageConfig?.accessKeyId ??
         this.configService.getOrThrow('file.accessKeyId', {
@@ -183,22 +184,45 @@ export class FilesS3PresignedService {
           infer: true,
         });
 
+      // B2-specific configuration
+      const endpointUrl = isB2Driver
+        ? storageConfig?.b2EndpointUrl ||
+          this.configService.get('file.b2EndpointUrl', { infer: true })
+        : undefined;
+      const region = isB2Driver
+        ? storageConfig?.b2Region ||
+          this.configService.get('file.b2Region', { infer: true }) ||
+          'us-west-001'
+        : storageConfig?.awsS3Region ??
+          this.configService.get('file.awsS3Region', { infer: true }) ??
+          '';
+
       if (!region || !accessKeyId || !secretAccessKey || !bucket) {
         throw new UnprocessableEntityException({
           status: HttpStatus.UNPROCESSABLE_ENTITY,
           errors: {
-            file: 'S3 storage configuration is incomplete',
+            file: isB2Driver
+              ? 'B2 storage configuration is incomplete'
+              : 'S3 storage configuration is incomplete',
           },
         });
       }
 
-      const s3 = new S3Client({
+      const clientConfig: any = {
         region,
         credentials: {
           accessKeyId,
           secretAccessKey,
         },
-      });
+      };
+
+      // Add endpoint for B2
+      if (isB2Driver && endpointUrl) {
+        clientConfig.endpoint = endpointUrl;
+        clientConfig.forcePathStyle = false; // B2 supports virtual-host style
+      }
+
+      const s3 = new S3Client(clientConfig);
 
       const command = new PutObjectCommand({
         Bucket: bucket,
