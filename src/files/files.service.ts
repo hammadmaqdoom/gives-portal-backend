@@ -356,4 +356,15 @@ export class FilesService {
       where: { videoFileId: fileId },
     });
   }
+
+  /**
+   * Get class ID for a module by module ID (for module-context file access checks)
+   */
+  async getClassIdByModuleId(moduleId: number): Promise<number | null> {
+    const module = await this.learningModuleRepo.findOne({
+      where: { id: moduleId },
+      select: ['classId'],
+    });
+    return module?.classId ?? null;
+  }
 }
