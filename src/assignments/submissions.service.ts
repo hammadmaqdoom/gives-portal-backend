@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { UpdateSubmissionDto } from './dto/update-submission.dto';
@@ -9,10 +11,15 @@ import { SubmissionRepository } from './infrastructure/persistence/submission.re
 import { Submission, SubmissionStatus } from './domain/submission';
 import { NullableType } from '../utils/types/nullable.type';
 import { IPaginationOptions } from '../utils/types/pagination-options';
+import { PerformanceService } from '../performance/performance.service';
 
 @Injectable()
 export class SubmissionsService {
-  constructor(private readonly submissionsRepository: SubmissionRepository) {}
+  constructor(
+    private readonly submissionsRepository: SubmissionRepository,
+    @Inject(forwardRef(() => PerformanceService))
+    private readonly performanceService: PerformanceService,
+  ) {}
 
   async create(createSubmissionDto: CreateSubmissionDto): Promise<Submission> {
     // Check if submission already exists for this student and assignment
@@ -189,6 +196,30 @@ export class SubmissionsService {
       gradedAt: new Date(),
     };
 
-    return this.submissionsRepository.update(id, submissionData);
+    const updated = await this.submissionsRepository.update(id, submissionData);
+
+    // Sync Performance record so Performance page and Grade Management show data
+    const submissionWithRelations =
+      await this.submissionsRepository.findByIdWithRelations(id);
+    if (updated && submissionWithRelations?.student?.id != null && submissionWithRelations?.assignment?.id != null) {
+      const gradedAt = new Date();
+      try {
+        await this.performanceService.createOrUpdateFromSubmissionPayload({
+          studentId: submissionWithRelations.student.id,
+          assignmentId: submissionWithRelations.assignment.id,
+          classId: submissionWithRelations.assignment?.class?.id ?? undefined,
+          score,
+          grade,
+          comments: comments ?? null,
+          gradedAt,
+          submittedAt: submissionWithRelations.submittedAt ?? gradedAt,
+        });
+      } catch (err) {
+        // Log but do not fail the grade; submission is already updated
+        console.error('Failed to sync Performance from submission:', err);
+      }
+    }
+
+    return updated;
   }
 }

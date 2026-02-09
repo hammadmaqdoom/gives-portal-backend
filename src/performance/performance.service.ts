@@ -106,4 +106,51 @@ export class PerformanceService {
   async remove(id: Performance['id']): Promise<void> {
     await this.performanceRepository.remove(id);
   }
+
+  /**
+   * Create or update a Performance record from graded submission data.
+   * Used when a teacher grades a submission so Performance page and Grade Management show data.
+   */
+  async createOrUpdateFromSubmissionPayload(payload: {
+    studentId: number;
+    assignmentId: number;
+    classId?: number | null;
+    score: number;
+    grade: string;
+    comments?: string | null;
+    gradedAt: Date;
+    submittedAt?: Date | null;
+  }): Promise<Performance | null> {
+    const existing = await this.performanceRepository.findByStudentAndAssignment(
+      payload.studentId,
+      payload.assignmentId,
+    );
+    const gradedAt = payload.gradedAt ?? new Date();
+    const submittedAt = payload.submittedAt ?? gradedAt;
+
+    if (existing) {
+      return this.performanceRepository.update(existing.id, {
+        score: payload.score,
+        grade: payload.grade,
+        comments: payload.comments ?? undefined,
+        gradedAt,
+        student: { id: payload.studentId } as any,
+        assignment: { id: payload.assignmentId } as any,
+      });
+    }
+
+    const performanceData: Partial<Performance> & { class?: { id: number } } = {
+      score: payload.score,
+      grade: payload.grade,
+      comments: payload.comments ?? undefined,
+      submittedAt,
+      gradedAt,
+      student: { id: payload.studentId } as any,
+      assignment: { id: payload.assignmentId } as any,
+    };
+    if (payload.classId != null) {
+      performanceData.class = { id: payload.classId };
+    }
+    return this.performanceRepository.create(performanceData);
+  }
 }

@@ -7,6 +7,11 @@ export abstract class SubmissionRepository {
 
   abstract findById(id: Submission['id']): Promise<NullableType<Submission>>;
 
+  abstract findByIdWithRelations(
+    id: Submission['id'],
+    relations?: string[],
+  ): Promise<NullableType<Submission>>;
+
   abstract findByAssignment(assignmentId: number): Promise<Submission[]>;
 
   abstract findByStudent(studentId: number): Promise<Submission[]>;
