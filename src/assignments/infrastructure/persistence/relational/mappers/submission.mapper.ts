@@ -61,6 +61,7 @@ export class SubmissionMapper {
         createdAt: raw.assignment.createdAt,
         updatedAt: raw.assignment.updatedAt,
         deletedAt: raw.assignment.deletedAt,
+        class: raw.assignment.class ? { id: raw.assignment.class.id } : undefined,
       } as Assignment;
     } else {
       console.log('No assignment data found in submission');

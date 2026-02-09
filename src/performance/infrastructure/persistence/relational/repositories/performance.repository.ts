@@ -94,9 +94,10 @@ export class PerformancesRelationalRepository implements PerformanceRepository {
     }
 
     if (filterOptions?.classId !== undefined) {
-      queryBuilder.andWhere('class.id = :classId', {
-        classId: filterOptions.classId,
-      });
+      queryBuilder.andWhere(
+        '(class.id = :classId OR assignment.classId = :classId)',
+        { classId: filterOptions.classId },
+      );
     }
 
     if (filterOptions?.scoreMin !== undefined) {

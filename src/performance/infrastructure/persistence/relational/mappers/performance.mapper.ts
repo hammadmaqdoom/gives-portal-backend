@@ -69,6 +69,15 @@ export class PerformanceMapper {
     if (performance.gradedAt !== undefined) {
       performanceEntity.gradedAt = performance.gradedAt;
     }
+    if ((performance as any).student !== undefined) {
+      performanceEntity.student = (performance as any).student as any;
+    }
+    if ((performance as any).assignment !== undefined) {
+      performanceEntity.assignment = (performance as any).assignment as any;
+    }
+    if ((performance as any).class !== undefined) {
+      performanceEntity.class = (performance as any).class as any;
+    }
 
     return performanceEntity;
   }
