@@ -10,6 +10,9 @@ export class InvoiceItemMapper {
     domainEntity.quantity = raw.quantity;
     domainEntity.unitPrice = Number(raw.unitPrice);
     domainEntity.total = Number(raw.total);
+    domainEntity.classId = raw.classId ?? undefined;
+    domainEntity.className = raw.className ?? undefined;
+    domainEntity.teacherName = raw.teacherName ?? undefined;
     domainEntity.createdAt = raw.createdAt;
     domainEntity.updatedAt = raw.updatedAt;
     return domainEntity;
@@ -24,6 +27,9 @@ export class InvoiceItemMapper {
     persistenceEntity.quantity = domainEntity.quantity;
     persistenceEntity.unitPrice = domainEntity.unitPrice;
     persistenceEntity.total = domainEntity.total;
+    if (domainEntity.classId !== undefined) persistenceEntity.classId = domainEntity.classId;
+    if (domainEntity.className !== undefined) persistenceEntity.className = domainEntity.className;
+    if (domainEntity.teacherName !== undefined) persistenceEntity.teacherName = domainEntity.teacherName;
     persistenceEntity.createdAt = domainEntity.createdAt;
     persistenceEntity.updatedAt = domainEntity.updatedAt;
     return persistenceEntity;

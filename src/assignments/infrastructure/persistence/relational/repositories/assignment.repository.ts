@@ -31,6 +31,7 @@ export class AssignmentsRelationalRepository implements AssignmentRepository {
   async findById(id: Assignment['id']): Promise<NullableType<Assignment>> {
     const assignment = await this.assignmentsRepository.findOne({
       where: { id },
+      relations: ['class'],
     });
     return assignment ? this.assignmentMapper.toDomain(assignment) : null;
   }
@@ -66,6 +67,12 @@ export class AssignmentsRelationalRepository implements AssignmentRepository {
     if (filterOptions?.className) {
       queryBuilder.andWhere('class.name ILIKE :className', {
         className: `%${filterOptions.className}%`,
+      });
+    }
+
+    if (filterOptions?.classId) {
+      queryBuilder.andWhere('class.id = :classId', {
+        classId: filterOptions.classId,
       });
     }
 

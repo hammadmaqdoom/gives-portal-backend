@@ -19,6 +19,7 @@ import {
   ApiCreatedResponse,
   ApiOkResponse,
   ApiParam,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { Roles } from '../roles/roles.decorator';
@@ -37,7 +38,7 @@ import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
 
 @ApiBearerAuth()
-@Roles(RoleEnum.admin)
+@Roles(RoleEnum.admin, RoleEnum.superAdmin)
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @ApiTags('Users')
 @Controller({
@@ -69,24 +70,37 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   async findAll(
     @Query() query: QueryUserDto,
-  ): Promise<InfinityPaginationResponseDto<User>> {
+    @Query('search') search?: string,
+  ): Promise<InfinityPaginationResponseDto<User> & { meta?: { total: number; page: number; limit: number } }> {
     const page = query?.page ?? 1;
     let limit = query?.limit ?? 10;
     if (limit > 50) {
       limit = 50;
     }
 
-    return infinityPagination(
-      await this.usersService.findManyWithPagination({
-        filterOptions: query?.filters,
-        sortOptions: query?.sort,
-        paginationOptions: {
-          page,
-          limit,
-        },
-      }),
-      { page, limit },
-    );
+    // Merge top-level search parameter with filter DTO (prioritize top-level)
+    const filterOptions = {
+      ...query?.filters,
+      search: search || query?.filters?.search,
+    };
+
+    const result = await this.usersService.findManyWithPagination({
+      filterOptions,
+      sortOptions: query?.sort,
+      paginationOptions: {
+        page,
+        limit,
+      },
+    });
+
+    return {
+      ...infinityPagination(result.data, { page, limit }),
+      meta: {
+        total: result.total,
+        page,
+        limit,
+      },
+    };
   }
 
   @ApiOkResponse({
@@ -124,6 +138,13 @@ export class UsersController {
     @Body() updateProfileDto: UpdateUserDto,
   ): Promise<User | null> {
     return this.usersService.update(id, updateProfileDto);
+  }
+
+  @Delete('by-email')
+  @ApiQuery({ name: 'email', required: true, description: 'User email to delete' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeByEmail(@Query('email') email: string): Promise<void> {
+    return this.usersService.removeByEmail(email ?? null);
   }
 
   @Delete(':id')
