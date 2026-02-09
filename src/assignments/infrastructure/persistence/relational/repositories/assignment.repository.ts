@@ -31,6 +31,7 @@ export class AssignmentsRelationalRepository implements AssignmentRepository {
   async findById(id: Assignment['id']): Promise<NullableType<Assignment>> {
     const assignment = await this.assignmentsRepository.findOne({
       where: { id },
+      relations: ['class'],
     });
     return assignment ? this.assignmentMapper.toDomain(assignment) : null;
   }

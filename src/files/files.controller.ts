@@ -8,6 +8,7 @@ import {
   Param,
   UseGuards,
   BadRequestException,
+  NotFoundException,
   Get,
   Delete,
   ParseFilePipe,
@@ -18,6 +19,7 @@ import {
   Options,
   Head,
   Query,
+  HttpException,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import {
@@ -144,14 +146,11 @@ export class FilesController {
     // If file context is a learning module, get the class from the module
     if (file.contextType === 'module') {
       try {
-        const { InjectRepository } = require('@nestjs/typeorm');
-        const { Repository } = require('typeorm');
-        const { LearningModuleEntity } = require('../learning-modules/infrastructure/persistence/relational/entities/learning-module.entity');
         const moduleId = parseInt(file.contextId, 10);
-
-        // We need to query the module to get its classId
-        const moduleRepository = this.configService.get('typeorm');
-        // For now, we'll use the filesService to check this
+        if (!Number.isNaN(moduleId)) {
+          const classIdFromModule = await this.filesService.getClassIdByModuleId(moduleId);
+          if (classIdFromModule != null) return classIdFromModule;
+        }
         const modulesUsingFile = await this.filesService.checkFileUsageInModules(file.id);
         if (modulesUsingFile.length > 0 && modulesUsingFile[0].classId) {
           return modulesUsingFile[0].classId;
@@ -941,7 +940,7 @@ export class FilesController {
     try {
       const file = await this.filesService.getFileById(id);
       if (!file) {
-        throw new BadRequestException('File not found');
+        throw new NotFoundException('File not found');
       }
 
       // Check authorization for class, module, and assignment files
@@ -1080,16 +1079,7 @@ export class FilesController {
 
       if (!fs.existsSync(fullPath)) {
         console.log(`File not found at path: ${fullPath}`);
-        // Try to list the directory contents
-        const dirPath = path.dirname(fullPath);
-        console.log(`Directory path: ${dirPath}`);
-        if (fs.existsSync(dirPath)) {
-          const files = fs.readdirSync(dirPath);
-          console.log(`Directory contents: ${files}`);
-        } else {
-          console.log(`Directory does not exist: ${dirPath}`);
-        }
-        throw new BadRequestException('File not found on disk');
+        throw new NotFoundException('File not found on disk');
       }
 
       // Get file stats for size
@@ -1174,6 +1164,7 @@ export class FilesController {
       const fileStream = fs.createReadStream(fullPath);
       fileStream.pipe(res);
     } catch (error) {
+      if (error instanceof HttpException) throw error;
       console.error('Error serving file:', error);
       res.status(500).json({ error: 'Failed to serve file' });
     }
