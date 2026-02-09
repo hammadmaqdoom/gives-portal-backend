@@ -25,6 +25,47 @@ import * as path from 'path';
 import Handlebars from 'handlebars';
 import { ConfigService } from '@nestjs/config';
 
+/** Parse hex color to RGB tuple for jsPDF. */
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace(/^#/, '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return [r, g, b];
+}
+
+/**
+ * Get image dimensions from a data URL (PNG or JPEG) to preserve aspect ratio.
+ * Returns { width, height } in pixels or null if parsing fails.
+ */
+function getImageDimensionsFromDataUrl(dataUrl: string): { width: number; height: number } | null {
+  try {
+    const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+    const buf = Buffer.from(base64, 'base64');
+    if (buf.length < 24) return null;
+    // PNG: bytes 16-19 = width (big-endian), 20-23 = height
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e) {
+      const width = buf.readUInt32BE(16);
+      const height = buf.readUInt32BE(20);
+      if (width > 0 && height > 0 && width < 2000 && height < 2000) return { width, height };
+    }
+    // JPEG: find SOF0 (0xFF 0xC0), then 2 bytes skip, 1 byte precision, 2 bytes height, 2 bytes width
+    let i = 0;
+    while (i < buf.length - 9) {
+      if (buf[i] === 0xff && buf[i + 1] === 0xc0) {
+        const height = buf.readUInt16BE(i + 5);
+        const width = buf.readUInt16BE(i + 7);
+        if (width > 0 && height > 0 && width < 2000 && height < 2000) return { width, height };
+        return null;
+      }
+      i += 1;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 @Injectable()
 export class InvoicesService {
   constructor(
@@ -483,10 +524,16 @@ export class InvoicesService {
       parent = parents && parents.length > 0 ? parents[0] : null;
     }
 
-    // Get company settings
+    // Get company settings and theme primary color from super admin dashboard
     const settings = await this.settingsService.getSettingsOrCreate();
     const businessInfo = await this.settingsService.getBusinessInfo();
     const bankDetails = await this.settingsService.getBankDetails();
+    const theme = await this.settingsService.getThemeConfig();
+    const primaryColorHex = this.settingsService.getPrimaryColorHex(
+      theme.themeColorPreset,
+      theme.themeCustomColor,
+    );
+    const primaryRgb = hexToRgb(primaryColorHex);
 
     // Read and compile HTML template
     // Try multiple paths to support both development and production environments
@@ -589,6 +636,7 @@ export class InvoicesService {
       website: businessInfo.contactWebsite || '',
       taxNumber: businessInfo.taxRegistrationNumber || '',
       logo: settings.logoNavbar || '',
+      primaryColorHex,
       bankDetails: bankDetails.bankName
         ? {
             name: bankDetails.bankName || '',
@@ -619,8 +667,8 @@ export class InvoicesService {
     const pageHeight = doc.internal.pageSize.getHeight();
     let yPosition = 0;
 
-    // Header Accent Bar (Blue bar at top)
-    doc.setFillColor(25, 118, 210); // #1976D2
+    // Header Accent Bar (theme primary color)
+    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
     doc.rect(0, 0, pageWidth, 3, 'F');
     yPosition = 10;
 
@@ -629,17 +677,31 @@ export class InvoicesService {
     const leftMargin = 15;
     const rightColumnStart = pageWidth - 100;
 
-    // Company Logo (bigger size)
+    // Company Logo: preserve aspect ratio (no squishing)
+    const logoMaxHeight = 50;
+    const logoMaxWidth = 60;
+    let logoHeightUsed = 0;
     if (settings.logoNavbar && settings.logoNavbar.startsWith('data:image/')) {
       try {
-        doc.addImage(settings.logoNavbar, 'PNG', leftMargin, yPosition, 50, 50);
+        const dims = getImageDimensionsFromDataUrl(settings.logoNavbar);
+        const format = settings.logoNavbar.includes('image/jpeg') || settings.logoNavbar.includes('image/jpg') ? 'JPEG' : 'PNG';
+        if (dims && dims.width > 0 && dims.height > 0) {
+          const scale = Math.min(logoMaxWidth / dims.width, logoMaxHeight / dims.height, 1);
+          const drawW = dims.width * scale;
+          const drawH = dims.height * scale;
+          doc.addImage(settings.logoNavbar, format, leftMargin, yPosition, drawW, drawH);
+          logoHeightUsed = drawH;
+        } else {
+          doc.addImage(settings.logoNavbar, format, leftMargin, yPosition, logoMaxWidth, logoMaxHeight);
+          logoHeightUsed = logoMaxHeight;
+        }
       } catch (error) {
         console.warn('Failed to load company logo:', error);
       }
     }
 
     // Position company details below logo
-    yPosition += (settings.logoNavbar ? 60 : 10);
+    yPosition += (logoHeightUsed > 0 ? logoHeightUsed + 10 : 10);
     
     // Company name as small bold text above address
     doc.setFontSize(9);
@@ -668,19 +730,19 @@ export class InvoicesService {
     const infoBoxY = 10;
     const infoBoxWidth = 100; // Increased from 90 to prevent overlap
     doc.setFillColor(248, 249, 250); // #F8F9FA
-    doc.setDrawColor(25, 118, 210); // #1976D2
+    doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
     doc.setLineWidth(0.5);
     doc.rect(rightColumnStart - 5, infoBoxY, infoBoxWidth, 50, 'FD');
     
     // Left border accent
-    doc.setFillColor(25, 118, 210);
+    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
     doc.rect(rightColumnStart - 5, infoBoxY, 2, 50, 'F');
 
     let infoY = infoBoxY + 8;
     
     // Invoice Title and Status on same line - center aligned vertically
     doc.setFontSize(22);
-    doc.setTextColor(25, 118, 210);
+    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
     doc.setFont('helvetica', 'bold');
     const titleHeight = 22 * 0.35; // Approximate height of 22pt text
     const titleBaseline = infoY + titleHeight;
@@ -741,7 +803,7 @@ export class InvoicesService {
       doc.setFont('helvetica', 'bold');
       doc.text('BILL TO', leftMargin + 5, yPosition + 8);
       doc.setLineWidth(0.5);
-      doc.setDrawColor(25, 118, 210);
+      doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
       doc.line(leftMargin + 5, yPosition + 10, leftMargin + cardWidth - 5, yPosition + 10);
       
       let cardY = yPosition + 15;
@@ -768,7 +830,7 @@ export class InvoicesService {
       doc.setFont('helvetica', 'bold');
       doc.text('STUDENT', leftMargin + cardWidth + cardGap + 5, yPosition + 8);
       doc.setLineWidth(0.5);
-      doc.setDrawColor(25, 118, 210);
+      doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
       doc.line(leftMargin + cardWidth + cardGap + 5, yPosition + 10, leftMargin + cardWidth * 2 + cardGap - 5, yPosition + 10);
       
       let cardY = yPosition + 15;
@@ -814,7 +876,7 @@ export class InvoicesService {
     doc.setFontSize(8);
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.setFillColor(25, 118, 210); // #1976D2
+    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
     doc.rect(leftMargin, yPosition, tableWidth, 8, 'F');
 
     doc.text('Class Name', colClassName, yPosition + 5.5);
@@ -891,7 +953,7 @@ export class InvoicesService {
     }
 
     // Grand Total
-    doc.setFillColor(25, 118, 210);
+    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
     doc.rect(totalsX - 5, yPosition - 3, pageWidth - totalsX + 5, 10, 'F');
     doc.setFontSize(11);
     doc.setTextColor(255, 255, 255);
@@ -906,7 +968,7 @@ export class InvoicesService {
     doc.rect(leftMargin, yPosition, pageWidth - 30, 40, 'F');
     
     doc.setFontSize(10);
-    doc.setTextColor(25, 118, 210);
+    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
     doc.setFont('helvetica', 'bold');
     doc.text('PAYMENT INFORMATION', leftMargin + 5, yPosition + 8);
     

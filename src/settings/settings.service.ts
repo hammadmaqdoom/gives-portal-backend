@@ -109,8 +109,14 @@ export class SettingsService {
     logoFavicon?: string | null;
     defaultTimezone: string;
     defaultCurrency?: string | null;
+    primaryColor?: string;
   }> {
     const settings = await this.getSettingsOrCreate();
+    const theme = await this.getThemeConfig();
+    const primaryColor = this.getPrimaryColorHex(
+      theme.themeColorPreset,
+      theme.themeCustomColor,
+    );
 
     return {
       appName: settings.appName,
@@ -120,6 +126,7 @@ export class SettingsService {
       logoFavicon: settings.logoFavicon,
       defaultTimezone: settings.defaultTimezone,
       defaultCurrency: (settings as any).defaultCurrency || 'PKR',
+      primaryColor,
     };
   }
 
@@ -254,6 +261,27 @@ export class SettingsService {
       themeColorPreset: (settings as any).themeColorPreset || null,
       themeCustomColor: (settings as any).themeCustomColor || null,
     };
+  }
+
+  /**
+   * Resolves the primary brand hex color from super admin theme settings.
+   * Matches frontend preset values (theme/options/presets.ts).
+   */
+  getPrimaryColorHex(themeColorPreset?: string | null, themeCustomColor?: string | null): string {
+    const preset = themeColorPreset || 'brand';
+    if (preset === 'custom' && themeCustomColor && /^#[0-9A-Fa-f]{6}$/.test(themeCustomColor)) {
+      return themeCustomColor;
+    }
+    const presetToHex: Record<string, string> = {
+      default: '#00C7AB',
+      brand: '#00C7AB',
+      cyan: '#078DEE',
+      purple: '#7635dc',
+      blue: '#2065D1',
+      orange: '#fda92d',
+      red: '#FF3030',
+    };
+    return presetToHex[preset] ?? '#00C7AB';
   }
 
   async getContentProtection(): Promise<{
