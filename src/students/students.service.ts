@@ -226,6 +226,94 @@ export class StudentsService {
     return student;
   }
 
+  /**
+   * Auto-create a student profile for a user if one doesn't exist
+   * Note: This method will NOT create profiles for superAdmin users
+   */
+  async ensureStudentProfileForUser(userId: number): Promise<Student> {
+    console.log(`🔧 ensureStudentProfileForUser called with userId: ${userId}`);
+    
+    // Try to find existing student profile
+    let student = await this.findByUserId(userId);
+    console.log(`🔧 ensureStudentProfileForUser - findByUserId result:`, student ? 'found' : 'not found');
+    
+    if (student) {
+      console.log(`🔧 ensureStudentProfileForUser - Returning existing student: ${student.id}`);
+      return student;
+    }
+
+    // Get the full user object
+    console.log(`🔧 ensureStudentProfileForUser - Fetching user with ID: ${userId}`);
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      console.error(`🔧 ensureStudentProfileForUser - User not found with ID: ${userId}`);
+      throw new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: {
+          user: 'userNotExists',
+        },
+      });
+    }
+
+    // Don't create student profiles for super admins
+    if (user.role?.id === RoleEnum.superAdmin) {
+      console.log(`🔧 ensureStudentProfileForUser - User is superAdmin, skipping auto-creation`);
+      throw new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: {
+          user: 'superAdmin users do not have student profiles',
+        },
+      });
+    }
+
+    console.log(`🔧 ensureStudentProfileForUser - User found: ${user.email || 'no email'}, firstName: ${user.firstName || 'none'}, lastName: ${user.lastName || 'none'}`);
+
+    // Try to find by email as well
+    if (user.email) {
+      console.log(`🔧 ensureStudentProfileForUser - Trying to find student by email: ${user.email}`);
+      student = await this.findByEmail(user.email);
+      if (student) {
+        console.log(`🔧 ensureStudentProfileForUser - Found student by email, linking to user`);
+        // Link the student to the user if not already linked
+        if (!student.userId && user.id) {
+          await this.update(student.id, {
+            user: { id: Number(user.id) },
+          });
+          // Re-fetch to get the updated student
+          const updatedStudent = await this.findById(student.id);
+          if (updatedStudent) {
+            student = updatedStudent;
+          }
+        }
+        console.log(`🔧 ensureStudentProfileForUser - Returning linked student: ${student.id}`);
+        return student;
+      }
+    }
+
+    // Create a new student profile from user data
+    const studentName = 
+      (user.firstName && user.lastName) 
+        ? `${user.firstName} ${user.lastName}`.trim()
+        : user.firstName || user.lastName || user.email?.split('@')[0] || 'Student';
+
+    console.log(`🔧 ensureStudentProfileForUser - Creating new student profile with name: ${studentName}`);
+
+    const createStudentDto: CreateStudentDto = {
+      name: studentName,
+      email: user.email || undefined,
+      contact: user.phone || undefined,
+      address: user.address || undefined,
+      city: user.city || undefined,
+      country: user.country || undefined,
+      user: { id: Number(user.id) },
+    };
+
+    console.log(`🔧 ensureStudentProfileForUser - Calling create with DTO:`, JSON.stringify(createStudentDto, null, 2));
+    const result = await this.create(createStudentDto);
+    console.log(`🔧 ensureStudentProfileForUser - Student created successfully with ID: ${result.student.id}`);
+    return result.student;
+  }
+
   async findByStudentId(
     studentId: Student['studentId'],
   ): Promise<NullableType<Student>> {
@@ -410,6 +498,8 @@ export class StudentsService {
         ? new Date(createEnrollmentDto.enrollmentDate)
         : new Date(),
       status: createEnrollmentDto.status || 'active',
+      customFeePKR: createEnrollmentDto.customFeePKR ?? null,
+      customFeeUSD: createEnrollmentDto.customFeeUSD ?? null,
     });
 
     // Generate monthly invoice for the enrollment

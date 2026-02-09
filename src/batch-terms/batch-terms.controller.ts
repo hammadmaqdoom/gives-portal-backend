@@ -40,7 +40,7 @@ export class BatchTermsController {
   @Post()
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Create a new batch term' })
   @ApiCreatedResponse({
     type: BatchTerm,
@@ -81,7 +81,7 @@ export class BatchTermsController {
   @Patch(':id')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Update a batch term' })
   @ApiParam({
     name: 'id',
@@ -100,7 +100,7 @@ export class BatchTermsController {
   @Delete(':id')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a batch term' })
   @ApiParam({

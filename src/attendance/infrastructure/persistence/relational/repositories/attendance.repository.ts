@@ -18,7 +18,7 @@ export class AttendancesRelationalRepository implements AttendanceRepository {
     @InjectRepository(AttendanceEntity)
     private readonly attendancesRepository: Repository<AttendanceEntity>,
     private readonly attendanceMapper: AttendanceMapper,
-  ) {}
+  ) { }
 
   async create(data: Partial<Attendance>): Promise<Attendance> {
     const attendanceEntity = this.attendanceMapper.toPersistence(data);
@@ -48,6 +48,24 @@ export class AttendancesRelationalRepository implements AttendanceRepository {
     return attendance ? this.attendanceMapper.toDomain(attendance) : null;
   }
 
+  async findByStudentAndClass(
+    studentId: number,
+    classId: number,
+  ): Promise<Attendance[]> {
+    const attendances = await this.attendancesRepository.find({
+      where: {
+        student: { id: studentId },
+        class: { id: classId },
+      },
+      order: {
+        date: 'DESC',
+      },
+    });
+    return attendances.map((attendance) =>
+      this.attendanceMapper.toDomain(attendance),
+    );
+  }
+
   async findByClassAndDate(classId: number, date: Date): Promise<Attendance[]> {
     const attendances = await this.attendancesRepository.find({
       where: {
@@ -58,6 +76,21 @@ export class AttendancesRelationalRepository implements AttendanceRepository {
     return attendances.map((attendance) =>
       this.attendanceMapper.toDomain(attendance),
     );
+  }
+
+  async findByStudentDateAndClass(
+    studentId: number,
+    date: Date,
+    classId: number,
+  ): Promise<NullableType<Attendance>> {
+    const attendance = await this.attendancesRepository.findOne({
+      where: {
+        student: { id: studentId },
+        class: { id: classId },
+        date: date,
+      },
+    });
+    return attendance ? this.attendanceMapper.toDomain(attendance) : null;
   }
 
   async findManyWithPagination({

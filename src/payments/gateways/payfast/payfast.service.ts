@@ -39,23 +39,34 @@ export class PayFastService {
   /**
    * Get the base API URL based on environment
    * Reads from credentials additionalConfig, falls back to defaults
+   * Note: PayFast Pakistan uses the same base URL for both sandbox and production
+   * The environment is determined by the credentials used
    */
   private getBaseUrl(credentials: PaymentGatewayCredentials): string {
     const config = credentials.additionalConfig || {};
     
+    // Check for custom URLs first (allows override if needed)
     if (credentials.environment === 'production') {
-      return (
-        config.productionUrl ||
-        config.production_url ||
-        'https://api.gopayfast.com/api'
-      );
+      const url = config.productionUrl || config.production_url || 'https://api.gopayfast.com/api';
+      this.logger.log(`Using PayFast production URL: ${url}`);
+      return url;
     }
     
-    return (
-      config.sandboxUrl ||
-      config.sandbox_url ||
-      'https://sandbox.gopayfast.com/api'
-    );
+    // For sandbox, use the same base URL as production
+    // PayFast Pakistan uses the same API endpoint, environment is determined by credentials
+    let url = config.sandboxUrl || config.sandbox_url || 'https://api.gopayfast.com/api';
+    
+    // Auto-correct the old incorrect sandbox URL if detected
+    if (url.includes('sandbox.gopayfast.com')) {
+      this.logger.warn(
+        'Detected incorrect PayFast sandbox URL. PayFast Pakistan uses the same URL for both environments. ' +
+        'Auto-correcting to: https://api.gopayfast.com/api'
+      );
+      url = 'https://api.gopayfast.com/api';
+    }
+    
+    this.logger.log(`Using PayFast sandbox URL: ${url}`);
+    return url;
   }
 
   /**
@@ -74,9 +85,11 @@ export class PayFastService {
 
       this.logger.log('Fetching new PayFast access token');
     const baseUrl = this.getBaseUrl(credentials);
+    const tokenUrl = `${baseUrl}/token`;
+    this.logger.log(`PayFast token endpoint: ${tokenUrl}`);
 
     try {
-      const response = await fetch(`${baseUrl}/token`, {
+      const response = await fetch(tokenUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -106,6 +119,17 @@ export class PayFastService {
       return data.access_token;
     } catch (error) {
       this.logger.error('Error getting PayFast access token:', error);
+      
+      // Provide more helpful error messages for common issues
+      if (error.code === 'ENOTFOUND' || error.message?.includes('getaddrinfo')) {
+        const baseUrl = this.getBaseUrl(credentials);
+        throw new Error(
+          `PayFast authentication failed: Unable to connect to ${baseUrl}. ` +
+          `Please verify the API URL is correct. PayFast Pakistan uses 'https://api.gopayfast.com/api' for both sandbox and production. ` +
+          `Original error: ${error.message}`
+        );
+      }
+      
       throw new Error(`PayFast authentication failed: ${error.message}`);
     }
   }
