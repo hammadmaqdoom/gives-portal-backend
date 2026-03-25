@@ -24,19 +24,22 @@ import { RoleEnum } from '../roles/roles.enum';
 import { PaymentGateway } from './domain/payment-gateway';
 import { PaymentGatewayCredentials } from './domain/payment-gateway-credentials';
 import { PaymentsService } from './payments.service';
+import { RequireSettingsAccess } from '../feature-modules/decorators/require-settings-access.decorator';
+import { SettingsAccessGuard } from '../feature-modules/guards/settings-access.guard';
 
 @ApiTags('Payment Gateways')
 @Controller({
   path: 'payment-gateways',
   version: '1',
 })
-@UseGuards(AuthGuard('jwt'), RolesGuard)
+@UseGuards(AuthGuard('jwt'), RolesGuard, SettingsAccessGuard)
 @ApiBearerAuth()
 export class PaymentGatewaysController {
   constructor(private paymentsService: PaymentsService) {}
 
   @Get()
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.superAdmin, RoleEnum.admin)
+  @RequireSettingsAccess('payment_gateways')
   @ApiOperation({ summary: 'Get all payment gateways' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -48,7 +51,7 @@ export class PaymentGatewaysController {
   }
 
   @Get('active')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.superAdmin, RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
   @ApiOperation({ summary: 'Get active payment gateways for checkout' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -60,7 +63,8 @@ export class PaymentGatewaysController {
   }
 
   @Get(':id')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.superAdmin, RoleEnum.admin)
+  @RequireSettingsAccess('payment_gateways')
   @ApiOperation({ summary: 'Get payment gateway by ID' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -72,7 +76,8 @@ export class PaymentGatewaysController {
   }
 
   @Patch(':id/toggle')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.superAdmin, RoleEnum.admin)
+  @RequireSettingsAccess('payment_gateways')
   @ApiOperation({ summary: 'Toggle payment gateway active status' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -84,7 +89,8 @@ export class PaymentGatewaysController {
   }
 
   @Patch(':id/set-default')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.superAdmin, RoleEnum.admin)
+  @RequireSettingsAccess('payment_gateways')
   @ApiOperation({ summary: 'Set payment gateway as default' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -96,7 +102,8 @@ export class PaymentGatewaysController {
   }
 
   @Get(':id/credentials')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.superAdmin, RoleEnum.admin)
+  @RequireSettingsAccess('payment_gateways')
   @ApiOperation({ summary: 'Get payment gateway credentials' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -110,7 +117,8 @@ export class PaymentGatewaysController {
   }
 
   @Post(':id/credentials')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.superAdmin, RoleEnum.admin)
+  @RequireSettingsAccess('payment_gateways')
   @ApiOperation({ summary: 'Create or update payment gateway credentials' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -125,7 +133,8 @@ export class PaymentGatewaysController {
   }
 
   @Post(':id/test-connection')
-  @Roles(RoleEnum.admin)
+  @Roles(RoleEnum.superAdmin, RoleEnum.admin)
+  @RequireSettingsAccess('payment_gateways')
   @ApiOperation({ summary: 'Test payment gateway connection' })
   @ApiResponse({
     status: HttpStatus.OK,

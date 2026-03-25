@@ -39,10 +39,10 @@ import { infinityPagination } from '../utils/infinity-pagination';
   version: '1',
 })
 export class AttendanceController {
-  constructor(private readonly attendanceService: AttendanceService) {}
+  constructor(private readonly attendanceService: AttendanceService) { }
 
   @Post()
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.CREATED)
   create(
     @Body() createAttendanceDto: CreateAttendanceDto,
@@ -51,7 +51,7 @@ export class AttendanceController {
   }
 
   @Get()
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user, RoleEnum.superAdmin)
   @ApiOkResponse({
     type: InfinityPaginationResponseDto,
   })
@@ -77,7 +77,7 @@ export class AttendanceController {
   }
 
   @Get('student/:studentId/date/:date')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user, RoleEnum.superAdmin)
   @ApiParam({
     name: 'studentId',
     type: String,
@@ -102,8 +102,31 @@ export class AttendanceController {
     );
   }
 
+  @Get('student/:studentId/class/:classId')
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user, RoleEnum.superAdmin)
+  @ApiParam({
+    name: 'studentId',
+    type: String,
+  })
+  @ApiParam({
+    name: 'classId',
+    type: String,
+  })
+  @ApiOkResponse({
+    type: [Attendance],
+  })
+  @SerializeOptions({
+    groups: ['admin'],
+  })
+  findByStudentAndClass(
+    @Param('studentId') studentId: string,
+    @Param('classId') classId: string,
+  ): Promise<Attendance[]> {
+    return this.attendanceService.findByStudentAndClass(+studentId, +classId);
+  }
+
   @Get('class/:classId/date/:date')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user, RoleEnum.superAdmin)
   @ApiParam({
     name: 'classId',
     type: String,
@@ -126,7 +149,7 @@ export class AttendanceController {
   }
 
   @Get('by-date')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user, RoleEnum.superAdmin)
   @ApiOkResponse({
     type: [Attendance],
   })
@@ -146,7 +169,7 @@ export class AttendanceController {
   }
 
   @Get(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.user, RoleEnum.superAdmin)
   @ApiParam({
     name: 'id',
     type: String,
@@ -162,7 +185,7 @@ export class AttendanceController {
   }
 
   @Patch(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   @ApiParam({
     name: 'id',
     type: String,
@@ -181,7 +204,7 @@ export class AttendanceController {
   }
 
   @Post('bulk-update')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   @HttpCode(HttpStatus.OK)
   bulkUpdate(
     @Body()
@@ -193,7 +216,7 @@ export class AttendanceController {
   }
 
   @Delete(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
   @ApiParam({
     name: 'id',
     type: String,

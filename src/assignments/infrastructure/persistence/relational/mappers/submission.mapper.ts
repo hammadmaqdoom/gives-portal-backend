@@ -16,9 +16,10 @@ export class SubmissionMapper {
     submission.grade = raw.grade;
     submission.comments = raw.comments;
     submission.fileUrl = raw.fileUrl;
-    // Convert comma-separated string back to array for domain model
+    // Convert comma-separated string back to array for domain model.
+    // These values are expected to be internal file refs (ids/paths), not raw S3/Blaze URLs.
     submission.attachments = raw.attachments
-      ? raw.attachments.split(',').filter((att) => att.trim() !== '')
+      ? raw.attachments.split(',').map((att) => att.trim()).filter((att) => att !== '')
       : null;
     submission.submittedAt = raw.submittedAt;
     submission.gradedAt = raw.gradedAt;
@@ -60,6 +61,7 @@ export class SubmissionMapper {
         createdAt: raw.assignment.createdAt,
         updatedAt: raw.assignment.updatedAt,
         deletedAt: raw.assignment.deletedAt,
+        class: raw.assignment.class ? { id: raw.assignment.class.id } : undefined,
       } as Assignment;
     } else {
       console.log('No assignment data found in submission');
@@ -90,10 +92,13 @@ export class SubmissionMapper {
       submissionEntity.comments = submission.comments;
     }
     if (submission.fileUrl !== undefined) {
+      // Only persist internal references (ids/paths). If callers mistakenly pass full URLs,
+      // they should be filtered out at the service/DTO layer.
       submissionEntity.fileUrl = submission.fileUrl;
     }
     if (submission.attachments !== undefined) {
-      // Convert array to comma-separated string for database storage
+      // Convert array to comma-separated string for database storage.
+      // Values should be internal refs (ids/paths), not provider-specific URLs.
       submissionEntity.attachments = Array.isArray(submission.attachments)
         ? submission.attachments.join(',')
         : submission.attachments;

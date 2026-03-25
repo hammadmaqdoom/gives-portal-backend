@@ -83,13 +83,13 @@ export class AnnouncementsService {
     authorName: string,
     postDate: string,
   ): Promise<void> {
-    const users = await this.usersService.findManyWithPagination({
+    const usersResult = await this.usersService.findManyWithPagination({
       filterOptions: {},
       sortOptions: null,
       paginationOptions: { page: 1, limit: 1000 },
     });
 
-    for (const user of users) {
+    for (const user of usersResult.data) {
       if (user.email) {
         try {
           await this.notificationService.sendAnnouncementNotification({
@@ -176,13 +176,15 @@ export class AnnouncementsService {
     authorName: string,
     postDate: string,
   ): Promise<void> {
-    const users = await this.usersService.findManyWithPagination({
+    const usersResult = await this.usersService.findManyWithPagination({
       filterOptions: {},
       sortOptions: null,
       paginationOptions: { page: 1, limit: 1000 },
     });
 
-    const teachers = users.filter((user) => user.role?.name === 'teacher');
+    const teachers = usersResult.data.filter(
+      (user) => user.role?.name === 'teacher',
+    );
 
     for (const teacher of teachers) {
       if (teacher.email) {

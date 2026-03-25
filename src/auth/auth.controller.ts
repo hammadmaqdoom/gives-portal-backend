@@ -42,8 +42,14 @@ export class AuthController {
     type: LoginResponseDto,
   })
   @HttpCode(HttpStatus.OK)
-  public login(@Body() loginDto: AuthEmailLoginDto): Promise<LoginResponseDto> {
-    return this.service.validateLogin(loginDto);
+  public login(
+    @Body() loginDto: AuthEmailLoginDto,
+    @Request() request,
+  ): Promise<LoginResponseDto> {
+    return this.service.validateLogin(loginDto, {
+      ip: request.ip || request.headers['x-forwarded-for'],
+      userAgent: request.headers['user-agent'],
+    });
   }
 
   @SerializeOptions({
@@ -56,8 +62,12 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   public jLogin(
     @Body() loginDto: AuthEmailLoginDto,
+    @Request() request,
   ): Promise<LoginResponseDto> {
-    return this.service.validateLogin(loginDto);
+    return this.service.validateLogin(loginDto, {
+      ip: request.ip || request.headers['x-forwarded-for'],
+      userAgent: request.headers['user-agent'],
+    });
   }
 
   @Post('email/register')
@@ -160,9 +170,15 @@ export class AuthController {
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.NO_CONTENT)
   public async logout(@Request() request): Promise<void> {
-    await this.service.logout({
-      sessionId: request.user.sessionId,
-    });
+    await this.service.logout(
+      { sessionId: request.user.sessionId },
+      {
+        userId: request.user.id,
+        email: request.user.email,
+        ip: request.ip || request.headers['x-forwarded-for'],
+        userAgent: request.headers['user-agent'],
+      },
+    );
   }
 
   @ApiBearerAuth()

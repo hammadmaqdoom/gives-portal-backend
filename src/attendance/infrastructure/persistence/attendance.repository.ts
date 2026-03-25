@@ -16,10 +16,21 @@ export abstract class AttendanceRepository {
     date: Date,
   ): Promise<NullableType<Attendance>>;
 
+  abstract findByStudentAndClass(
+    studentId: number,
+    classId: number,
+  ): Promise<Attendance[]>;
+
   abstract findByClassAndDate(
     classId: number,
     date: Date,
   ): Promise<Attendance[]>;
+
+  abstract findByStudentDateAndClass(
+    studentId: number,
+    date: Date,
+    classId: number,
+  ): Promise<NullableType<Attendance>>;
 
   abstract findManyWithPagination({
     filterOptions,

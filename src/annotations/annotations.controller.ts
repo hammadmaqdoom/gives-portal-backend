@@ -34,7 +34,7 @@ export class AnnotationsController {
   constructor(private readonly annotationsService: AnnotationsService) {}
 
   @Post()
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Create annotation document' })
   @ApiResponse({
     status: 201,
@@ -45,7 +45,7 @@ export class AnnotationsController {
   }
 
   @Get(':id')
-  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiOperation({ summary: 'Get annotation document by ID' })
   @ApiResponse({
     status: 200,
@@ -56,7 +56,7 @@ export class AnnotationsController {
   }
 
   @Get('submission/:submissionId')
-  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiOperation({ summary: 'Get annotation document by submission ID' })
   @ApiResponse({
     status: 200,
@@ -67,7 +67,7 @@ export class AnnotationsController {
   }
 
   @Get('file/:fileId')
-  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.user)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin, RoleEnum.user)
   @ApiOperation({ summary: 'Get annotation document by file ID' })
   @ApiResponse({
     status: 200,
@@ -78,7 +78,7 @@ export class AnnotationsController {
   }
 
   @Patch(':id')
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Update annotation document' })
   @ApiResponse({
     status: 200,
@@ -92,7 +92,7 @@ export class AnnotationsController {
   }
 
   @Post('save')
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Save or update annotation document' })
   @ApiResponse({
     status: 200,
@@ -109,7 +109,7 @@ export class AnnotationsController {
   }
 
   @Delete(':id')
-  @Roles(RoleEnum.teacher, RoleEnum.admin)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   @ApiOperation({ summary: 'Delete annotation document' })
   @ApiResponse({
     status: 200,
