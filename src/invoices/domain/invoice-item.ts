@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class InvoiceItem {
   @ApiProperty()
@@ -18,6 +18,15 @@ export class InvoiceItem {
 
   @ApiProperty()
   total: number;
+
+  @ApiPropertyOptional()
+  classId?: number;
+
+  @ApiPropertyOptional()
+  className?: string;
+
+  @ApiPropertyOptional()
+  teacherName?: string;
 
   @ApiProperty()
   createdAt: Date;

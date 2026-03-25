@@ -11,6 +11,8 @@ import { AssignmentEntity } from '../assignments/infrastructure/persistence/rela
 import { SubmissionEntity } from '../assignments/infrastructure/persistence/relational/entities/submission.entity';
 import { ParentEntity } from '../parents/infrastructure/persistence/relational/entities/parent.entity';
 import { StudentClassEnrollmentEntity } from '../students/infrastructure/persistence/relational/entities/student-class-enrollment.entity';
+import { UserEntity } from '../users/infrastructure/persistence/relational/entities/user.entity';
+import { FileEntity } from '../files/infrastructure/persistence/relational/entities/file.entity';
 import { AttendanceStatus } from '../attendance/domain/attendance';
 import { PaymentStatus } from '../fees/domain/fee';
 import { AssignmentStatus } from '../assignments/domain/assignment';
@@ -25,11 +27,20 @@ import {
   StudentAnalyticsDto,
 } from './dto/student-dashboard.dto';
 import { ParentStatsDto, ParentAnalyticsDto } from './dto/parent-dashboard.dto';
+import { SuperAdminStatsDto } from './dto/super-admin-dashboard.dto';
 import { CurrencyService } from '../currency/currency.service';
 import { SettingsService } from '../settings/settings.service';
+import { ConfigService } from '@nestjs/config';
+import { RoleEnum } from '../roles/roles.enum';
+import { FileDriver } from '../files/config/file-config.type';
+import { RedisService } from '../cache/redis.service';
+import { TeachersService } from '../teachers/teachers.service';
+import { Logger } from '@nestjs/common';
 
 @Injectable()
 export class DashboardService {
+  private readonly logger = new Logger(DashboardService.name);
+
   constructor(
     @InjectRepository(StudentEntity)
     private studentRepository: Repository<StudentEntity>,
@@ -51,8 +62,15 @@ export class DashboardService {
     private parentRepository: Repository<ParentEntity>,
     @InjectRepository(StudentClassEnrollmentEntity)
     private enrollmentRepository: Repository<StudentClassEnrollmentEntity>,
+    @InjectRepository(UserEntity)
+    private userRepository: Repository<UserEntity>,
+    @InjectRepository(FileEntity)
+    private fileRepository: Repository<FileEntity>,
     private readonly currencyService: CurrencyService,
     private readonly settingsService: SettingsService,
+    private readonly configService: ConfigService,
+    private readonly redisService: RedisService,
+    private readonly teachersService: TeachersService,
   ) {}
 
   async getAdminStats(): Promise<AdminStatsDto> {
@@ -426,7 +444,9 @@ export class DashboardService {
         'average',
       )
       .setParameter('present', AttendanceStatus.PRESENT)
-      .where('class.teacher.id = :teacherId', { teacherId })
+      .where('class.teacherId = :teacherId', { teacherId })
+      .andWhere('attendance.deletedAt IS NULL')
+      .andWhere('class.deletedAt IS NULL')
       .getRawOne();
     return parseFloat(result?.average || '0');
   }
@@ -435,12 +455,18 @@ export class DashboardService {
     teacherId: number,
   ): Promise<number> {
     try {
-      return await this.assignmentRepository.count({
-        where: {
-          teacher: { id: teacherId },
-          status: AssignmentStatus.PUBLISHED,
-        },
-      });
+      // Check both direct teacher assignment and assignments via class
+      const result = await this.assignmentRepository
+        .createQueryBuilder('assignment')
+        .leftJoin('assignment.class', 'class')
+        .where('assignment.status = :status', { status: AssignmentStatus.PUBLISHED })
+        .andWhere('assignment.deletedAt IS NULL')
+        .andWhere(
+          '(assignment.teacherId = :teacherId OR class.teacherId = :teacherId)',
+          { teacherId },
+        )
+        .getCount();
+      return result;
     } catch (error) {
       // Fallback when assignment table/columns are missing
       return 0;
@@ -451,9 +477,18 @@ export class DashboardService {
     teacherId: number,
   ): Promise<number> {
     try {
-      return await this.assignmentRepository.count({
-        where: { teacher: { id: teacherId }, status: AssignmentStatus.CLOSED },
-      });
+      // Check both direct teacher assignment and assignments via class
+      const result = await this.assignmentRepository
+        .createQueryBuilder('assignment')
+        .leftJoin('assignment.class', 'class')
+        .where('assignment.status = :status', { status: AssignmentStatus.CLOSED })
+        .andWhere('assignment.deletedAt IS NULL')
+        .andWhere(
+          '(assignment.teacherId = :teacherId OR class.teacherId = :teacherId)',
+          { teacherId },
+        )
+        .getCount();
+      return result;
     } catch (error) {
       // Fallback when assignment table/columns are missing
       return 0;
@@ -464,69 +499,189 @@ export class DashboardService {
     const result = await this.performanceRepository
       .createQueryBuilder('performance')
       .leftJoin('performance.assignment', 'assignment')
+      .leftJoin('assignment.class', 'class')
       .select('AVG(performance.score)', 'average')
-      .where('assignment.teacher.id = :teacherId', { teacherId })
+      .where(
+        '(assignment.teacherId = :teacherId OR class.teacherId = :teacherId)',
+        { teacherId },
+      )
+      .andWhere('performance.deletedAt IS NULL')
+      .andWhere('assignment.deletedAt IS NULL')
       .getRawOne();
     return parseFloat(result?.average || '0');
   }
 
   private async getClassAttendanceForTeacher(teacherId: number) {
-    const result = await this.attendanceRepository
-      .createQueryBuilder('attendance')
-      .leftJoin('attendance.class', 'class')
-      .select('class.name', 'className')
-      .addSelect(
-        'AVG(CASE WHEN attendance.status = :present THEN 100 ELSE 0 END)',
-        'attendance',
-      )
-      .setParameter('present', AttendanceStatus.PRESENT)
-      .where('class.teacher.id = :teacherId', { teacherId })
-      .groupBy('class.name')
-      .getRawMany();
+    try {
+      const result = await this.attendanceRepository
+        .createQueryBuilder('attendance')
+        .leftJoin('attendance.class', 'class')
+        .leftJoin('class.teacher', 'teacher')
+        .select('class.name', 'className')
+        .addSelect(
+          'AVG(CASE WHEN attendance.status = :present THEN 100 ELSE 0 END)',
+          'attendance',
+        )
+        .setParameter('present', AttendanceStatus.PRESENT)
+        .where('(class.teacherId = :teacherId OR teacher.id = :teacherId)', { teacherId })
+        .andWhere('attendance.deletedAt IS NULL')
+        .andWhere('class.deletedAt IS NULL')
+        .andWhere('(teacher.deletedAt IS NULL OR teacher.deletedAt IS NULL)')
+        .groupBy('class.name')
+        .getRawMany();
 
-    return result.map((item) => ({
-      class: item.className,
-      attendance: parseFloat(item.attendance),
-    }));
+      const mapped = result
+        .filter((item) => item.className != null)
+        .map((item) => ({
+          class: item.className,
+          attendance: parseFloat(item.attendance || '0'),
+        }));
+
+      this.logger.debug(`getClassAttendanceForTeacher(${teacherId}): Found ${mapped.length} classes with attendance data`);
+      return mapped;
+    } catch (error) {
+      this.logger.error(`Error getting class attendance for teacher ${teacherId}:`, error);
+      return [];
+    }
   }
 
   private async getStudentPerformanceForTeacher(teacherId: number) {
-    const result = await this.performanceRepository
-      .createQueryBuilder('performance')
-      .leftJoin('performance.student', 'student')
-      .leftJoin('performance.assignment', 'assignment')
-      .select('student.name', 'studentName')
-      .addSelect('AVG(performance.score)', 'grade')
-      .where('assignment.teacher.id = :teacherId', { teacherId })
-      .groupBy('student.name')
-      .getRawMany();
+    try {
+      // Try using Performance entity first
+      const result = await this.performanceRepository
+        .createQueryBuilder('performance')
+        .leftJoin('performance.student', 'student')
+        .leftJoin('performance.assignment', 'assignment')
+        .leftJoin('assignment.class', 'class')
+        .leftJoin('assignment.teacher', 'assignmentTeacher')
+        .leftJoin('class.teacher', 'classTeacher')
+        .select('student.name', 'studentName')
+        .addSelect('AVG(performance.score)', 'grade')
+        .where(
+          '(assignment.teacherId = :teacherId OR class.teacherId = :teacherId OR assignmentTeacher.id = :teacherId OR classTeacher.id = :teacherId)',
+          { teacherId },
+        )
+        .andWhere('performance.deletedAt IS NULL')
+        .andWhere('assignment.deletedAt IS NULL')
+        .andWhere('performance.score IS NOT NULL')
+        .groupBy('student.name')
+        .getRawMany();
 
-    return result.map((item) => ({
-      student: item.studentName,
-      grade: parseFloat(item.grade),
-    }));
+      // If no results from Performance entity, try using Submission entity (where teachers actually grade)
+      if (result.length === 0) {
+        const submissionResult = await this.submissionRepository
+          .createQueryBuilder('submission')
+          .leftJoin('submission.student', 'student')
+          .leftJoin('submission.assignment', 'assignment')
+          .leftJoin('assignment.class', 'class')
+          .leftJoin('assignment.teacher', 'assignmentTeacher')
+          .leftJoin('class.teacher', 'classTeacher')
+          .select('student.name', 'studentName')
+          .addSelect('AVG(submission.score)', 'grade')
+          .where(
+            '(assignment.teacherId = :teacherId OR class.teacherId = :teacherId OR assignmentTeacher.id = :teacherId OR classTeacher.id = :teacherId)',
+            { teacherId },
+          )
+          .andWhere('submission.deletedAt IS NULL')
+          .andWhere('assignment.deletedAt IS NULL')
+          .andWhere('submission.score IS NOT NULL')
+          .groupBy('student.name')
+          .getRawMany();
+
+        const mapped = submissionResult
+          .filter((item) => item.studentName != null)
+          .map((item) => ({
+            student: item.studentName,
+            grade: parseFloat(item.grade || '0'),
+          }));
+
+        this.logger.debug(`getStudentPerformanceForTeacher(${teacherId}): Found ${mapped.length} students via submissions`);
+        return mapped;
+      }
+
+      const mapped = result
+        .filter((item) => item.studentName != null)
+        .map((item) => ({
+          student: item.studentName,
+          grade: parseFloat(item.grade || '0'),
+        }));
+
+      this.logger.debug(`getStudentPerformanceForTeacher(${teacherId}): Found ${mapped.length} students via performance`);
+      return mapped;
+    } catch (error) {
+      this.logger.error(`Error getting student performance for teacher ${teacherId}:`, error);
+      return [];
+    }
   }
 
   private async getAssignmentStatusForTeacher(teacherId: number) {
     try {
-      const result = await this.assignmentRepository
+      // Assignment entity has no totalStudents; total = enrolled students in assignment's class
+      const assignmentsWithSubmissions = await this.assignmentRepository
         .createQueryBuilder('assignment')
-        // Some deployments may not have submissions; guard join in try/catch
-        .leftJoin('assignment.submissions', 'submission')
-        .select('assignment.title', 'assignmentTitle')
-        .addSelect('COUNT(submission.id)', 'submitted')
-        .addSelect('assignment.totalStudents', 'total')
-        .where('assignment.teacher.id = :teacherId', { teacherId })
+        .leftJoin('assignment.submissions', 'submission', 'submission.deletedAt IS NULL')
+        .leftJoin('assignment.class', 'class')
+        .leftJoin('assignment.teacher', 'assignmentTeacher')
+        .leftJoin('class.teacher', 'classTeacher')
+        .select('assignment.id', 'id')
+        .addSelect('assignment.title', 'assignmentTitle')
+        .addSelect('assignment.classId', 'classId')
+        .addSelect('COUNT(DISTINCT submission.id)', 'submitted')
+        .where(
+          '(assignment.teacherId = :teacherId OR class.teacherId = :teacherId OR assignmentTeacher.id = :teacherId OR classTeacher.id = :teacherId)',
+          { teacherId },
+        )
+        .andWhere('assignment.deletedAt IS NULL')
+        .andWhere('(class.deletedAt IS NULL OR class.deletedAt IS NULL)')
         .groupBy('assignment.id')
+        .addGroupBy('assignment.title')
+        .addGroupBy('assignment.classId')
         .getRawMany();
 
-      return result.map((item) => ({
-        assignment: item.assignmentTitle,
-        submitted: parseInt(item.submitted),
-        total: parseInt(item.total),
+      const classIds = [
+        ...new Set(
+          (assignmentsWithSubmissions as { classId: number }[])
+            .map((a) => a.classId)
+            .filter((id) => id != null),
+        ),
+      ];
+
+      if (classIds.length === 0) {
+        const result = assignmentsWithSubmissions.map((item: any) => ({
+          assignment: item.assignmentTitle || 'Untitled Assignment',
+          submitted: parseInt(item.submitted, 10) || 0,
+          total: 0,
+        }));
+        this.logger.debug(`getAssignmentStatusForTeacher(${teacherId}): Found ${result.length} assignments but no class enrollments`);
+        return result;
+      }
+
+      const enrollmentCounts = await this.enrollmentRepository
+        .createQueryBuilder('enrollment')
+        .select('enrollment.classId', 'classId')
+        .addSelect('COUNT(DISTINCT enrollment.id)', 'total')
+        .where('enrollment.classId IN (:...classIds)', { classIds })
+        .andWhere('(enrollment.status = :status OR enrollment.status IS NULL)', { status: 'active' })
+        .andWhere('enrollment.deletedAt IS NULL')
+        .groupBy('enrollment.classId')
+        .getRawMany();
+
+      const totalByClassId = new Map<number, number>();
+      for (const row of enrollmentCounts as { classId: number; total: string }[]) {
+        totalByClassId.set(row.classId, parseInt(row.total, 10) || 0);
+      }
+
+      const result = assignmentsWithSubmissions.map((item: any) => ({
+        assignment: item.assignmentTitle || 'Untitled Assignment',
+        submitted: parseInt(item.submitted, 10) || 0,
+        total: totalByClassId.get(item.classId) ?? 0,
       }));
+
+      this.logger.debug(`getAssignmentStatusForTeacher(${teacherId}): Found ${result.length} assignments with status data`);
+      return result;
     } catch (error) {
-      // Fallback when submissions table or assignment columns are missing
+      this.logger.error(`Error getting assignment status for teacher ${teacherId}:`, error);
+      // Fallback when submissions table or relations are missing
       return [];
     }
   }
@@ -549,9 +704,89 @@ export class DashboardService {
   async findTeacherByUserEmail(
     userEmail: string,
   ): Promise<TeacherEntity | null> {
-    return await this.teacherRepository.findOne({
-      where: { email: userEmail },
-    });
+    // Use case-insensitive email lookup
+    return await this.teacherRepository
+      .createQueryBuilder('teacher')
+      .where('LOWER(teacher.email) = LOWER(:email)', { email: userEmail })
+      .andWhere('teacher.deletedAt IS NULL')
+      .getOne();
+  }
+
+  async findTeacherByUserId(
+    userId: number,
+  ): Promise<TeacherEntity | null> {
+    try {
+      // First try using the teachers service method (which uses email matching)
+      const teacher = await this.teachersService.findByUserId(userId);
+      if (teacher) {
+        // Convert domain Teacher to entity if needed, or return entity directly
+        const teacherEntity = await this.teacherRepository.findOne({
+          where: { id: teacher.id },
+        });
+        if (teacherEntity) {
+          this.logger.debug(`Found teacher ${teacherEntity.id} for user ${userId} via email matching`);
+          return teacherEntity;
+        }
+      }
+
+      // Fallback: Try to find teacher by checking classes they teach
+      // This handles cases where email might not match but teacher is assigned to classes
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        this.logger.warn(`User not found. User ID: ${userId}`);
+        return null;
+      }
+
+      // Try to find teacher by checking if any classes are assigned to a teacher with matching email
+      if (user.email) {
+        const teacherByEmail = await this.teacherRepository
+          .createQueryBuilder('teacher')
+          .where('LOWER(teacher.email) = LOWER(:email)', { email: user.email })
+          .andWhere('teacher.deletedAt IS NULL')
+          .getOne();
+        
+        if (teacherByEmail) {
+          this.logger.debug(`Found teacher ${teacherByEmail.id} for user ${userId} via email fallback`);
+          return teacherByEmail;
+        }
+      }
+
+      // Last resort: Find teacher by checking classes - if user has teacher role and classes exist
+      // This is less reliable but might help in edge cases
+      const classesWithTeacher = await this.classRepository
+        .createQueryBuilder('class')
+        .leftJoin('class.teacher', 'teacher')
+        .where('teacher.deletedAt IS NULL')
+        .andWhere('class.deletedAt IS NULL')
+        .select('teacher.id', 'teacherId')
+        .addSelect('teacher.email', 'teacherEmail')
+        .distinct(true)
+        .getRawMany();
+
+      // Try to match by checking if any teacher email matches user email
+      if (user.email) {
+        for (const row of classesWithTeacher) {
+          if (row.teacherEmail && row.teacherEmail.toLowerCase() === user.email.toLowerCase()) {
+            const foundTeacher = await this.teacherRepository.findOne({
+              where: { id: row.teacherId },
+            });
+            if (foundTeacher) {
+              this.logger.debug(`Found teacher ${foundTeacher.id} for user ${userId} via class lookup`);
+              return foundTeacher;
+            }
+          }
+        }
+      }
+
+      this.logger.warn(`Could not find teacher for user ${userId}. User email: ${user.email || 'N/A'}`);
+      return null;
+    } catch (error) {
+      this.logger.error(`Error finding teacher for user ${userId}:`, error);
+      return null;
+    }
   }
 
   private async getEnrolledClassCount(studentId: number): Promise<number> {
@@ -563,25 +798,51 @@ export class DashboardService {
   private async getAttendanceRateForStudent(
     studentId: number,
   ): Promise<number> {
-    const result = await this.attendanceRepository
-      .createQueryBuilder('attendance')
-      .select(
-        'AVG(CASE WHEN attendance.status = :present THEN 100 ELSE 0 END)',
-        'rate',
-      )
-      .setParameter('present', AttendanceStatus.PRESENT)
-      .where('attendance.student.id = :studentId', { studentId })
-      .getRawOne();
-    return parseFloat(result?.rate || '0');
+    try {
+      const result = await this.attendanceRepository
+        .createQueryBuilder('attendance')
+        .select(
+          'AVG(CASE WHEN attendance.status = :present THEN 100 ELSE 0 END)',
+          'rate',
+        )
+        .setParameter('present', AttendanceStatus.PRESENT)
+        .where('attendance.studentId = :studentId', { studentId })
+        .andWhere('attendance.deletedAt IS NULL')
+        .getRawOne();
+      
+      // Handle null result (no attendance records) or null rate value
+      const rate = result?.rate ?? null;
+      if (rate === null || rate === undefined) {
+        return 0;
+      }
+      const parsed = parseFloat(String(rate));
+      return isNaN(parsed) ? 0 : parsed;
+    } catch (error) {
+      console.error(`Error calculating attendance rate for student ${studentId}:`, error);
+      return 0;
+    }
   }
 
   private async getAverageGradeForStudent(studentId: number): Promise<number> {
-    const result = await this.performanceRepository
-      .createQueryBuilder('performance')
-      .select('AVG(performance.score)', 'average')
-      .where('performance.student.id = :studentId', { studentId })
-      .getRawOne();
-    return parseFloat(result?.average || '0');
+    try {
+      const result = await this.performanceRepository
+        .createQueryBuilder('performance')
+        .select('AVG(performance.score)', 'average')
+        .where('performance.studentId = :studentId', { studentId })
+        .andWhere('performance.deletedAt IS NULL')
+        .getRawOne();
+      
+      // Handle null result (no performance records) or null average value
+      const average = result?.average ?? null;
+      if (average === null || average === undefined) {
+        return 0;
+      }
+      const parsed = parseFloat(String(average));
+      return isNaN(parsed) ? 0 : parsed;
+    } catch (error) {
+      console.error(`Error calculating average grade for student ${studentId}:`, error);
+      return 0;
+    }
   }
 
   private async getPendingAssignmentsForStudent(
@@ -625,21 +886,25 @@ export class DashboardService {
   }
 
   private async getGradeProgressForStudent(studentId: number) {
-    const result = await this.performanceRepository
-      .createQueryBuilder('performance')
-      .leftJoin('performance.assignment', 'assignment')
+    // Use Submission table (where teachers actually grade) so dashboard stays in sync
+    const result = await this.submissionRepository
+      .createQueryBuilder('submission')
+      .leftJoin('submission.assignment', 'assignment')
       .leftJoin('assignment.class', 'klass')
       .leftJoin('klass.subject', 'subject')
       .select('subject.name', 'subjectName')
-      .addSelect('AVG(performance.score)', 'grade')
-      .where('performance.student.id = :studentId', { studentId })
+      .addSelect('AVG(submission.score)', 'grade')
+      .where('submission.student.id = :studentId', { studentId })
+      .andWhere('submission.score IS NOT NULL')
       .groupBy('subject.name')
       .getRawMany();
 
-    return result.map((item) => ({
-      subject: item.subjectName,
-      grade: parseFloat(item.grade),
-    }));
+    return result
+      .filter((item) => item.subjectName != null)
+      .map((item) => ({
+        subject: item.subjectName,
+        grade: item.grade != null ? parseFloat(item.grade) : 0,
+      }));
   }
 
   private async getAttendanceCalendarForStudent(studentId: number) {
@@ -671,11 +936,19 @@ export class DashboardService {
       .where('submission.student.id = :studentId', { studentId })
       .getRawMany();
 
-    return result.map((item) => ({
-      assignment: item.assignmentTitle,
-      status: item.status,
-      grade: item.grade ? parseFloat(item.grade) : undefined,
-    }));
+    return result.map((item) => {
+      // Map backend status to dashboard display: graded/submitted -> completed
+      const rawStatus = item.status as string;
+      const displayStatus =
+        rawStatus === 'graded' || rawStatus === 'submitted'
+          ? 'completed'
+          : rawStatus ?? 'pending';
+      return {
+        assignment: item.assignmentTitle,
+        status: displayStatus,
+        grade: item.grade != null ? parseFloat(item.grade) : undefined,
+      };
+    });
   }
 
   // Helper methods for parent analytics
@@ -794,5 +1067,187 @@ export class DashboardService {
       amount: parseFloat(item.amount),
       status: item.status,
     }));
+  }
+
+  // Super Admin Dashboard Methods
+  async getSuperAdminStats(): Promise<SuperAdminStatsDto> {
+    const [
+      userBreakdown,
+      storageStats,
+      systemHealth,
+      totalClasses,
+      totalParents,
+      totalRevenue,
+      pendingFees,
+    ] = await Promise.all([
+      this.getUserRoleBreakdown(),
+      this.getStorageStats(),
+      this.getSystemHealth(),
+      this.classRepository.count(),
+      this.parentRepository.count(),
+      this.getTotalRevenue(),
+      this.getPendingFees(),
+    ]);
+
+    return {
+      userBreakdown,
+      storageStats,
+      systemHealth,
+      totalClasses,
+      totalParents,
+      totalRevenue,
+      pendingFees,
+    };
+  }
+
+  private async getUserRoleBreakdown() {
+    const [
+      totalUsers,
+      students,
+      teachers,
+      admins,
+      superAdmins,
+    ] = await Promise.all([
+      this.userRepository.count(),
+      this.userRepository.count({
+        where: { role: { id: RoleEnum.user } },
+      }),
+      this.userRepository.count({
+        where: { role: { id: RoleEnum.teacher } },
+      }),
+      this.userRepository.count({
+        where: { role: { id: RoleEnum.admin } },
+      }),
+      this.userRepository.count({
+        where: { role: { id: RoleEnum.superAdmin } },
+      }),
+    ]);
+
+    return {
+      totalUsers,
+      students,
+      teachers,
+      admins,
+      superAdmins,
+    };
+  }
+
+  private async getStorageStats() {
+    try {
+      const result = await this.fileRepository
+        .createQueryBuilder('file')
+        .select('SUM(file.size)', 'totalSize')
+        .addSelect('COUNT(file.id)', 'totalFiles')
+        .where('file.deletedAt IS NULL')
+        .getRawOne();
+
+      const totalStorageBytes = parseInt(result?.totalSize || '0', 10);
+      const totalFiles = parseInt(result?.totalFiles || '0', 10);
+
+      // Format storage size
+      const formatBytes = (bytes: number): string => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+      };
+
+      // Get storage provider from config
+      const fileDriver = this.configService.get<FileDriver>('file.driver', { infer: true }) || FileDriver.LOCAL;
+      let storageProvider = 'LOCAL';
+      
+      if (fileDriver === FileDriver.S3 || fileDriver === FileDriver.S3_PRESIGNED) {
+        storageProvider = 'S3';
+      } else if (fileDriver === FileDriver.B2 || fileDriver === FileDriver.B2_PRESIGNED) {
+        storageProvider = 'B2';
+      } else if (fileDriver === FileDriver.AZURE_BLOB_SAS) {
+        storageProvider = 'Azure Blob';
+      }
+
+      return {
+        totalStorageBytes,
+        totalStorageFormatted: formatBytes(totalStorageBytes),
+        totalFiles,
+        storageProvider,
+      };
+    } catch (error) {
+      // Return defaults if there's an error
+      return {
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 Bytes',
+        totalFiles: 0,
+        storageProvider: 'Unknown',
+      };
+    }
+  }
+
+  private async getSystemHealth() {
+    try {
+      // Check database connection by running a simple query
+      await this.userRepository.count();
+      const databaseConnected = true;
+
+      // Check storage by checking if we can query files
+      await this.fileRepository.count();
+      const storageConnected = true;
+
+      // Check Redis connection by attempting a simple operation
+      // First check if Redis is enabled in config
+      const redisEnabled = this.configService.get('redis.enabled', { infer: true }) ?? false;
+      let redisConnected = false;
+      
+      if (redisEnabled) {
+        try {
+          const testKey = 'health-check-' + Date.now();
+          await this.redisService.set(testKey, 'test', 1);
+          const value = await this.redisService.get(testKey);
+          await this.redisService.delete(testKey);
+          redisConnected = value === 'test';
+        } catch (error) {
+          redisConnected = false;
+        }
+      } else {
+        // Redis is disabled, so we don't check connection
+        // We'll mark it as connected=false but won't affect overall health
+        redisConnected = false;
+      }
+
+      // Determine overall health status
+      let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
+      let message = 'All systems operational';
+
+      const disconnectedServices: string[] = [];
+      if (!databaseConnected) disconnectedServices.push('Database');
+      if (!storageConnected) disconnectedServices.push('Storage');
+      if (!redisConnected) disconnectedServices.push('Redis');
+
+      if (disconnectedServices.length > 0) {
+        if (disconnectedServices.length === 1 && disconnectedServices[0] === 'Redis') {
+          // Redis is optional, so if only Redis is down, mark as degraded
+          status = 'degraded';
+          message = 'Redis is unavailable, but core systems are operational';
+        } else {
+          status = 'unhealthy';
+          message = `${disconnectedServices.join(', ')} ${disconnectedServices.length === 1 ? 'is' : 'are'} experiencing issues`;
+        }
+      }
+
+      return {
+        status,
+        databaseConnected,
+        storageConnected,
+        redisConnected,
+        message,
+      };
+    } catch (error) {
+      return {
+        status: 'unhealthy' as const,
+        databaseConnected: false,
+        storageConnected: false,
+        redisConnected: false,
+        message: 'System health check failed',
+      };
+    }
   }
 }

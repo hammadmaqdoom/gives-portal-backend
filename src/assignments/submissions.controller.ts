@@ -33,6 +33,8 @@ import { Submission } from './domain/submission';
 import { SubmissionsService } from './submissions.service';
 import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
+import { AnnotationsService } from '../annotations/annotations.service';
+import { NotFoundException } from '@nestjs/common';
 
 @ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -42,7 +44,10 @@ import { infinityPagination } from '../utils/infinity-pagination';
   version: '1',
 })
 export class SubmissionsController {
-  constructor(private readonly submissionsService: SubmissionsService) {}
+  constructor(
+    private readonly submissionsService: SubmissionsService,
+    private readonly annotationsService: AnnotationsService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -62,17 +67,23 @@ export class SubmissionsController {
   @ApiOkResponse({
     type: InfinityPaginationResponseDto,
   })
-  @SerializeOptions({
-    groups: ['admin'],
-  })
   async findAll(
     @Query() query: any,
   ): Promise<InfinityPaginationResponseDto<Submission>> {
     const page = query?.page ?? 1;
     const limit = query?.limit ?? 10;
 
+    let filterOptions = query?.filters ?? null;
+    if (typeof filterOptions === 'string') {
+      try {
+        filterOptions = JSON.parse(filterOptions);
+      } catch {
+        filterOptions = null;
+      }
+    }
+
     const data = await this.submissionsService.findManyWithPagination({
-      filterOptions: query?.filters ?? null,
+      filterOptions,
       sortOptions: query?.sort ?? null,
       paginationOptions: {
         page,
@@ -91,9 +102,6 @@ export class SubmissionsController {
   @ApiOkResponse({
     type: [Submission],
   })
-  @SerializeOptions({
-    groups: ['admin'],
-  })
   findByAssignment(
     @Param('assignmentId') assignmentId: string,
   ): Promise<Submission[]> {
@@ -107,9 +115,6 @@ export class SubmissionsController {
   })
   @ApiOkResponse({
     type: [Submission],
-  })
-  @SerializeOptions({
-    groups: ['admin'],
   })
   findByStudent(@Param('studentId') studentId: string): Promise<Submission[]> {
     return this.submissionsService.findByStudent(+studentId);
@@ -126,9 +131,6 @@ export class SubmissionsController {
   })
   @ApiOkResponse({
     type: Submission,
-  })
-  @SerializeOptions({
-    groups: ['admin'],
   })
   findByStudentAndAssignment(
     @Param('studentId') studentId: string,
@@ -147,9 +149,6 @@ export class SubmissionsController {
   })
   @ApiOkResponse({
     type: Submission,
-  })
-  @SerializeOptions({
-    groups: ['admin'],
   })
   findOne(@Param('id') id: string): Promise<NullableType<Submission>> {
     return this.submissionsService.findById(+id);
@@ -215,17 +214,27 @@ export class SubmissionsController {
   @ApiOkResponse({
     description: 'Get annotations for a submission',
   })
-  @SerializeOptions({
-    groups: ['admin'],
-  })
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
-  getAnnotations(@Param('id') id: string) {
-    // For now, return empty annotations
-    // In a real implementation, you'd fetch from a database
-    return {
-      submissionId: id,
-      annotations: [],
-    };
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin, RoleEnum.user)
+  async getAnnotations(@Param('id') id: string) {
+    // Verify submission exists
+    const submission = await this.submissionsService.findById(+id);
+    if (!submission) {
+      throw new NotFoundException('Submission not found');
+    }
+
+    // Fetch annotations for this submission
+    const annotationDocument =
+      await this.annotationsService.findBySubmissionId(id);
+
+    if (!annotationDocument) {
+      return {
+        submissionId: id,
+        annotations: [],
+        layers: [],
+      };
+    }
+
+    return annotationDocument;
   }
 
   @Post(':id/annotations')
@@ -239,18 +248,36 @@ export class SubmissionsController {
   @SerializeOptions({
     groups: ['admin'],
   })
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
-  saveAnnotations(
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin)
+  async saveAnnotations(
     @Param('id') id: string,
-    @Body() annotationData: { fileId: string; annotations: any[] },
+    @Body() annotationData: { fileId: string; layers: any[] },
   ) {
-    // For now, just return success
-    // In a real implementation, you'd save to a database
-    console.log(`Saving annotations for submission ${id}:`, annotationData);
+    // Verify submission exists
+    const submission = await this.submissionsService.findById(+id);
+    if (!submission) {
+      throw new NotFoundException('Submission not found');
+    }
+
+    // Save or update annotations
+    const savedDocument = await this.annotationsService.saveOrUpdate(
+      id,
+      annotationData.fileId,
+      annotationData.layers,
+    );
+
+    // Count total annotations across all layers
+    const totalAnnotations = annotationData.layers?.reduce(
+      (count, layer) => count + (layer.annotations?.length || 0),
+      0,
+    ) || 0;
+
     return {
       message: 'Annotations saved successfully',
       submissionId: id,
-      savedAnnotations: annotationData.annotations.length,
+      fileId: annotationData.fileId,
+      savedAnnotations: totalAnnotations,
+      document: savedDocument,
     };
   }
 }

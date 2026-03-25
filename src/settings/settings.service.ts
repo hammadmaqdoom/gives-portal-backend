@@ -60,9 +60,15 @@ export class SettingsService {
       throw new NotFoundException('Settings not found');
     }
 
+    // Convert detectors array to JSON string if provided
+    const updateData = { ...updateSettingsDto };
+    if (updateData.disableDevToolDetectors && Array.isArray(updateData.disableDevToolDetectors)) {
+      (updateData as any).disableDevToolDetectors = JSON.stringify(updateData.disableDevToolDetectors);
+    }
+
     const updatedSettings = await this.settingsRepository.update(
       existingSettings.id,
-      updateSettingsDto,
+      updateData,
     );
 
     // Attempt to refresh mailer transporter immediately (best-effort)
@@ -103,8 +109,14 @@ export class SettingsService {
     logoFavicon?: string | null;
     defaultTimezone: string;
     defaultCurrency?: string | null;
+    primaryColor?: string;
   }> {
     const settings = await this.getSettingsOrCreate();
+    const theme = await this.getThemeConfig();
+    const primaryColor = this.getPrimaryColorHex(
+      theme.themeColorPreset,
+      theme.themeCustomColor,
+    );
 
     return {
       appName: settings.appName,
@@ -114,6 +126,7 @@ export class SettingsService {
       logoFavicon: settings.logoFavicon,
       defaultTimezone: settings.defaultTimezone,
       defaultCurrency: (settings as any).defaultCurrency || 'PKR',
+      primaryColor,
     };
   }
 
@@ -128,6 +141,8 @@ export class SettingsService {
     azureContainerName?: string | null;
     azureBlobSasExpirySeconds?: number | null;
     azureBlobPublicBaseUrl?: string | null;
+    b2EndpointUrl?: string | null;
+    b2Region?: string | null;
   }> {
     const s = await this.getSettingsOrCreate();
     return {
@@ -141,6 +156,8 @@ export class SettingsService {
       azureContainerName: (s as any).azureContainerName,
       azureBlobSasExpirySeconds: (s as any).azureBlobSasExpirySeconds ?? null,
       azureBlobPublicBaseUrl: (s as any).azureBlobPublicBaseUrl,
+      b2EndpointUrl: (s as any).b2EndpointUrl,
+      b2Region: (s as any).b2Region,
     };
   }
 
@@ -243,6 +260,95 @@ export class SettingsService {
     return {
       themeColorPreset: (settings as any).themeColorPreset || null,
       themeCustomColor: (settings as any).themeCustomColor || null,
+    };
+  }
+
+  /**
+   * Resolves the primary brand hex color from super admin theme settings.
+   * Matches frontend preset values (theme/options/presets.ts).
+   */
+  getPrimaryColorHex(themeColorPreset?: string | null, themeCustomColor?: string | null): string {
+    const preset = themeColorPreset || 'brand';
+    if (preset === 'custom' && themeCustomColor && /^#[0-9A-Fa-f]{6}$/.test(themeCustomColor)) {
+      return themeCustomColor;
+    }
+    const presetToHex: Record<string, string> = {
+      default: '#00C7AB',
+      brand: '#00C7AB',
+      cyan: '#078DEE',
+      purple: '#7635dc',
+      blue: '#2065D1',
+      orange: '#fda92d',
+      red: '#FF3030',
+    };
+    return presetToHex[preset] ?? '#00C7AB';
+  }
+
+  async getContentProtection(): Promise<{
+    contentProtectionEnabled: boolean;
+    blockDevTools: boolean;
+    blockKeyboardShortcuts: boolean;
+    blockRightClick: boolean;
+    blockTextSelection: boolean;
+    protectionAction: string;
+    watermarkEnabled: boolean;
+    watermarkShowInstitution: boolean;
+    watermarkShowInstructor: boolean;
+    watermarkShowStudentEmail: boolean;
+    watermarkShowStudentId: boolean;
+    watermarkOpacity: number;
+    watermarkPosition: string;
+    disableDevToolMd5?: string | null;
+    disableDevToolTkName?: string | null;
+    disableDevToolUrl?: string | null;
+    disableDevToolDetectors?: number[] | null;
+    disableDevToolInterval?: number | null;
+    disableDevToolClearLog?: boolean;
+    blockCopy?: boolean;
+    blockCut?: boolean;
+    blockPaste?: boolean;
+  }> {
+    const settings = await this.getSettingsOrCreate();
+
+    // Parse detectors if stored as JSON string
+    let detectors: number[] | null = null;
+    if ((settings as any).disableDevToolDetectors) {
+      try {
+        detectors = typeof (settings as any).disableDevToolDetectors === 'string'
+          ? JSON.parse((settings as any).disableDevToolDetectors)
+          : (settings as any).disableDevToolDetectors;
+      } catch {
+        detectors = null;
+      }
+    }
+
+    return {
+      contentProtectionEnabled:
+        (settings as any).contentProtectionEnabled ?? false,
+      blockDevTools: (settings as any).blockDevTools ?? false,
+      blockKeyboardShortcuts: (settings as any).blockKeyboardShortcuts ?? true,
+      blockRightClick: (settings as any).blockRightClick ?? true,
+      blockTextSelection: (settings as any).blockTextSelection ?? true,
+      protectionAction: (settings as any).protectionAction ?? 'warn',
+      watermarkEnabled: (settings as any).watermarkEnabled ?? false,
+      watermarkShowInstitution:
+        (settings as any).watermarkShowInstitution ?? true,
+      watermarkShowInstructor:
+        (settings as any).watermarkShowInstructor ?? true,
+      watermarkShowStudentEmail:
+        (settings as any).watermarkShowStudentEmail ?? true,
+      watermarkShowStudentId: (settings as any).watermarkShowStudentId ?? false,
+      watermarkOpacity: (settings as any).watermarkOpacity ?? 0.4,
+      watermarkPosition: (settings as any).watermarkPosition ?? 'random',
+      disableDevToolMd5: (settings as any).disableDevToolMd5 ?? null,
+      disableDevToolTkName: (settings as any).disableDevToolTkName ?? 'ddtk',
+      disableDevToolUrl: (settings as any).disableDevToolUrl ?? null,
+      disableDevToolDetectors: detectors,
+      disableDevToolInterval: (settings as any).disableDevToolInterval ?? 200,
+      disableDevToolClearLog: (settings as any).disableDevToolClearLog ?? false,
+      blockCopy: (settings as any).blockCopy ?? false,
+      blockCut: (settings as any).blockCut ?? false,
+      blockPaste: (settings as any).blockPaste ?? false,
     };
   }
 }
