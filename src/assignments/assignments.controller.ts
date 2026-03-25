@@ -73,9 +73,6 @@ export class AssignmentsController {
   @ApiOkResponse({
     type: InfinityPaginationResponseDto,
   })
-  @SerializeOptions({
-    groups: ['admin'],
-  })
   async findAll(
     @Query() query: QueryAssignmentDto,
   ): Promise<InfinityPaginationResponseDto<Assignment>> {
@@ -103,9 +100,6 @@ export class AssignmentsController {
   @ApiOkResponse({
     type: [Assignment],
   })
-  @SerializeOptions({
-    groups: ['admin'],
-  })
   findByClass(@Param('classId') classId: string): Promise<Assignment[]> {
     return this.assignmentsService.findByClass(+classId);
   }
@@ -118,9 +112,6 @@ export class AssignmentsController {
   })
   @ApiOkResponse({
     type: Assignment,
-  })
-  @SerializeOptions({
-    groups: ['admin'],
   })
   async findOne(@Param('id') id: string): Promise<any> {
     const assignment = await this.assignmentsService.findById(+id);

@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
+import { AuditLogsModule } from './audit-logs/audit-logs.module';
+import { AuditInterceptor } from './audit-logs/audit.interceptor';
 import { UsersModule } from './users/users.module';
 import { FilesModule } from './files/files.module';
 import { StudentsModule } from './students/students.module';
@@ -107,6 +110,13 @@ import sentryConfig from './config/sentry.config';
     CheckoutModule,
     AccessControlModule,
     FeatureModulesModule,
+    AuditLogsModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditInterceptor,
+    },
   ],
 })
 export class AppModule {}

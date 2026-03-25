@@ -67,9 +67,6 @@ export class SubmissionsController {
   @ApiOkResponse({
     type: InfinityPaginationResponseDto,
   })
-  @SerializeOptions({
-    groups: ['admin'],
-  })
   async findAll(
     @Query() query: any,
   ): Promise<InfinityPaginationResponseDto<Submission>> {
@@ -105,9 +102,6 @@ export class SubmissionsController {
   @ApiOkResponse({
     type: [Submission],
   })
-  @SerializeOptions({
-    groups: ['admin'],
-  })
   findByAssignment(
     @Param('assignmentId') assignmentId: string,
   ): Promise<Submission[]> {
@@ -121,9 +115,6 @@ export class SubmissionsController {
   })
   @ApiOkResponse({
     type: [Submission],
-  })
-  @SerializeOptions({
-    groups: ['admin'],
   })
   findByStudent(@Param('studentId') studentId: string): Promise<Submission[]> {
     return this.submissionsService.findByStudent(+studentId);
@@ -140,9 +131,6 @@ export class SubmissionsController {
   })
   @ApiOkResponse({
     type: Submission,
-  })
-  @SerializeOptions({
-    groups: ['admin'],
   })
   findByStudentAndAssignment(
     @Param('studentId') studentId: string,
@@ -161,9 +149,6 @@ export class SubmissionsController {
   })
   @ApiOkResponse({
     type: Submission,
-  })
-  @SerializeOptions({
-    groups: ['admin'],
   })
   findOne(@Param('id') id: string): Promise<NullableType<Submission>> {
     return this.submissionsService.findById(+id);
@@ -228,9 +213,6 @@ export class SubmissionsController {
   })
   @ApiOkResponse({
     description: 'Get annotations for a submission',
-  })
-  @SerializeOptions({
-    groups: ['admin'],
   })
   @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.superAdmin, RoleEnum.user)
   async getAnnotations(@Param('id') id: string) {
