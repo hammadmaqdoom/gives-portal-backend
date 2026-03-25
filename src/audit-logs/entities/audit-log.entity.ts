@@ -54,6 +54,12 @@ export class AuditLogEntity extends EntityRelationalHelper {
   @Column({ type: 'varchar', length: 45, nullable: true })
   ipAddress: string | null;
 
+  @Column({ type: 'varchar', length: 2, nullable: true })
+  countryCode: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  city: string | null;
+
   @Column({ type: 'varchar', length: 500, nullable: true })
   userAgent: string | null;
 
