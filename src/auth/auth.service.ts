@@ -29,6 +29,8 @@ import { Session } from '../session/domain/session';
 import { SessionService } from '../session/session.service';
 import { StatusEnum } from '../statuses/statuses.enum';
 import { User } from '../users/domain/user';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AuditEventType } from '../audit-logs/entities/audit-log.entity';
 
 @Injectable()
 export class AuthService {
@@ -39,17 +41,31 @@ export class AuthService {
     private mailService: MailService,
     private notificationService: NotificationService,
     private configService: ConfigService<AllConfigType>,
+    private auditLogsService: AuditLogsService,
   ) {}
 
-  async validateLogin(loginDto: AuthEmailLoginDto): Promise<LoginResponseDto> {
+  async validateLogin(
+    loginDto: AuthEmailLoginDto,
+    requestMeta?: { ip?: string; userAgent?: string },
+  ): Promise<LoginResponseDto> {
     const user = await this.usersService.findByEmail(loginDto.email);
 
-    // For security, never reveal whether the email or password is incorrect
-    const invalidCredentials = () =>
-      new UnprocessableEntityException({
+    const invalidCredentials = () => {
+      this.auditLogsService.create({
+        eventType: AuditEventType.LOGIN_FAILURE,
+        userId: user?.id ?? null,
+        userEmail: loginDto.email,
+        userRole: user?.role?.name ?? null,
+        resource: 'Auth',
+        details: { reason: user ? 'invalid_password' : 'user_not_found' },
+        ipAddress: requestMeta?.ip ?? null,
+        userAgent: requestMeta?.userAgent ?? null,
+      });
+      return new UnprocessableEntityException({
         status: HttpStatus.UNPROCESSABLE_ENTITY,
         error: 'invalidCredentials',
       });
+    };
 
     if (!user) {
       throw invalidCredentials();
@@ -92,6 +108,16 @@ export class AuthService {
       role: user.role,
       sessionId: session.id,
       hash,
+    });
+
+    this.auditLogsService.create({
+      eventType: AuditEventType.LOGIN_SUCCESS,
+      userId: user.id,
+      userEmail: user.email ?? loginDto.email,
+      userRole: user.role?.name ?? null,
+      resource: 'Auth',
+      ipAddress: requestMeta?.ip ?? null,
+      userAgent: requestMeta?.userAgent ?? null,
     });
 
     return {
@@ -408,6 +434,14 @@ export class AuthService {
     });
 
     await this.usersService.update(user.id, user);
+
+    this.auditLogsService.create({
+      eventType: AuditEventType.PASSWORD_RESET,
+      userId: user.id,
+      userEmail: user.email ?? null,
+      resource: 'Auth',
+      details: { method: 'forgot_password_flow' },
+    });
   }
 
   async me(userJwtPayload: JwtPayloadType): Promise<NullableType<User>> {
@@ -464,6 +498,14 @@ export class AuthService {
         await this.sessionService.deleteByUserIdWithExclude({
           userId: currentUser.id,
           excludeSessionId: userJwtPayload.sessionId,
+        });
+
+        this.auditLogsService.create({
+          eventType: AuditEventType.PASSWORD_CHANGE,
+          userId: currentUser.id,
+          userEmail: currentUser.email ?? null,
+          userRole: currentUser.role?.name ?? null,
+          resource: 'Auth',
         });
       }
     }
@@ -559,7 +601,20 @@ export class AuthService {
     await this.usersService.remove(user.id);
   }
 
-  async logout(data: Pick<JwtRefreshPayloadType, 'sessionId'>) {
+  async logout(
+    data: Pick<JwtRefreshPayloadType, 'sessionId'>,
+    requestMeta?: { userId?: number; email?: string; ip?: string; userAgent?: string },
+  ) {
+    if (requestMeta) {
+      this.auditLogsService.create({
+        eventType: AuditEventType.LOGOUT,
+        userId: requestMeta.userId ?? null,
+        userEmail: requestMeta.email ?? null,
+        resource: 'Auth',
+        ipAddress: requestMeta.ip ?? null,
+        userAgent: requestMeta.userAgent ?? null,
+      });
+    }
     return this.sessionService.deleteById(data.sessionId);
   }
 

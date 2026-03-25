@@ -218,8 +218,33 @@ export class FilesService {
   }
 
   /**
+   * Get module IDs belonging to a class
+   */
+  private async getModuleIdsByClass(classId: number): Promise<number[]> {
+    const modules = await this.learningModuleRepo.find({
+      where: { classId },
+      select: ['id'],
+    });
+    return modules.map((m) => m.id);
+  }
+
+  /**
+   * Get files for all modules in a class (queries by actual module IDs)
+   */
+  private async getModuleFilesByClass(classId: number): Promise<File[]> {
+    const moduleIds = await this.getModuleIdsByClass(classId);
+    if (moduleIds.length === 0) return [];
+
+    const moduleContexts = moduleIds.map((id) => ({
+      contextType: 'module',
+      contextId: id.toString(),
+    }));
+    return this.fileRepository.findByMultipleContexts(moduleContexts);
+  }
+
+  /**
    * Get files by class ID filtered by user role
-   * - For students: Only returns files from assignments and their own submissions
+   * - For students: Returns class files, module files, assignment files, and their own submission files
    * - For admins/teachers/superadmins: Returns all files for the class
    */
   async getFilesByClassFilteredByRole(
@@ -266,8 +291,8 @@ export class FilesService {
           ? await this.fileRepository.findByMultipleContexts(submissionContexts)
           : [];
 
-      // Get module files
-      const moduleFiles = await this.getFilesByContext('module', classId.toString());
+      // Get module files using actual module IDs (not classId)
+      const moduleFiles = await this.getModuleFilesByClass(classId);
 
       // Combine all files and remove duplicates
       const allFiles = [
@@ -282,8 +307,14 @@ export class FilesService {
       return uniqueFiles;
     }
 
-    // For students, only return assignment files and their own submission files
+    // For students, return class files, module files, assignment files, and own submission files
     if (normalizedRole === 'user' && studentId) {
+      // Get class-level files (e.g. uploaded videos, PDFs for the class)
+      const classFiles = await this.getFilesByContext('class', classId.toString());
+
+      // Get module files for this class
+      const moduleFiles = await this.getModuleFilesByClass(classId);
+
       // Get assignments for the class
       const assignments = await this.assignmentsService.findByClass(classId);
       const assignmentContexts = assignments.map((assignment) => ({
@@ -315,8 +346,13 @@ export class FilesService {
           ? await this.fileRepository.findByMultipleContexts(submissionContexts)
           : [];
 
-      // Combine assignment and submission files
-      const allFiles = [...assignmentFiles, ...submissionFiles];
+      // Combine all files and remove duplicates
+      const allFiles = [
+        ...classFiles,
+        ...moduleFiles,
+        ...assignmentFiles,
+        ...submissionFiles,
+      ];
       const uniqueFiles = Array.from(
         new Map(allFiles.map((file) => [file.id, file])).values(),
       );
