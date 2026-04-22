@@ -59,6 +59,37 @@ export class FilesService {
     return fileRecord;
   }
 
+  async uploadFileFromPathWithContext(
+    sourcePath: string,
+    fileMeta: { originalName: string; mimeType: string; size: number },
+    context: FileUploadContext,
+  ): Promise<File> {
+    const uploadedFileInfo =
+      await this.fileStorageService.uploadFileFromPathWithContext(
+        sourcePath,
+        fileMeta,
+        context,
+      );
+
+    const fileUrl = this.fileStorageService.getFileUrl(uploadedFileInfo.path);
+
+    const fileRecord = await this.fileRepository.create({
+      id: uploadedFileInfo.id,
+      filename: uploadedFileInfo.filename,
+      originalName: uploadedFileInfo.originalName,
+      path: uploadedFileInfo.path,
+      url: fileUrl,
+      size: uploadedFileInfo.size,
+      mimeType: uploadedFileInfo.mimeType,
+      uploadedBy: uploadedFileInfo.uploadedBy.toString(),
+      uploadedAt: uploadedFileInfo.uploadedAt,
+      contextType: uploadedFileInfo.contextType,
+      contextId: uploadedFileInfo.contextId.toString(),
+    });
+
+    return fileRecord;
+  }
+
   /**
    * Upload multiple files with context
    */
