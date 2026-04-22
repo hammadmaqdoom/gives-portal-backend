@@ -154,7 +154,7 @@ jobs:
 
             # Authentication
             AUTH_JWT_SECRET=secret
-            AUTH_JWT_TOKEN_EXPIRES_IN=15m
+            AUTH_JWT_TOKEN_EXPIRES_IN=6h
             AUTH_REFRESH_SECRET=secret_for_refresh
             AUTH_REFRESH_TOKEN_EXPIRES_IN=3650d
             AUTH_FORGOT_SECRET=secret_for_forgot
