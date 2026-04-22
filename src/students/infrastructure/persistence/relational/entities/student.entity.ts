@@ -56,6 +56,17 @@ export class StudentEntity extends EntityRelationalHelper {
   @Column({ type: 'int', nullable: true })
   userId?: number | null;
 
+  // Biometric (facial-recognition) consent. Face-embedding enrollment is
+  // gated on this being true — backend rejects enrollment attempts otherwise.
+  @Column({ type: 'boolean', default: false })
+  biometricConsent: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  biometricConsentAt?: Date | null;
+
+  @Column({ type: 'int', nullable: true })
+  biometricConsentBy?: number | null;
+
   @OneToOne(() => FileEntity, {
     // eager: true, // Removed to fix query builder issues
   })

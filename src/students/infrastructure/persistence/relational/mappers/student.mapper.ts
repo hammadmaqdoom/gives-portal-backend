@@ -19,6 +19,9 @@ export class StudentMapper {
     student.email = raw.email;
     student.contact = raw.contact;
     student.userId = raw.userId;
+    student.biometricConsent = raw.biometricConsent ?? false;
+    student.biometricConsentAt = raw.biometricConsentAt ?? null;
+    student.biometricConsentBy = raw.biometricConsentBy ?? null;
     student.createdAt = raw.createdAt;
     student.updatedAt = raw.updatedAt;
     student.deletedAt = raw.deletedAt;
@@ -115,6 +118,15 @@ export class StudentMapper {
     }
     if (student.userId !== undefined) {
       studentEntity.userId = student.userId;
+    }
+    if (student.biometricConsent !== undefined) {
+      studentEntity.biometricConsent = student.biometricConsent;
+    }
+    if (student.biometricConsentAt !== undefined) {
+      studentEntity.biometricConsentAt = student.biometricConsentAt;
+    }
+    if (student.biometricConsentBy !== undefined) {
+      studentEntity.biometricConsentBy = student.biometricConsentBy;
     }
 
     return studentEntity;

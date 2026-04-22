@@ -20,8 +20,11 @@ export class StudentFaceEmbedding {
   @ApiProperty({ example: 0.98, required: false })
   qualityScore?: number | null;
 
-  @ApiProperty({ example: 321, required: false })
-  sourceFileId?: number | null;
+  @ApiProperty({
+    example: 'b3a4c1d2-0000-4000-8000-000000000001',
+    required: false,
+  })
+  sourceFileId?: string | null;
 
   @ApiProperty({ example: '2026-04-22T10:00:00.000Z' })
   createdAt: Date;

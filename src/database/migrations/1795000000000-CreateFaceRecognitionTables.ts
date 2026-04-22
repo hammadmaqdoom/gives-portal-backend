@@ -16,7 +16,7 @@ export class CreateFaceRecognitionTables1795000000000
         "embedding" real[] NOT NULL,
         "modelName" varchar(128) NOT NULL,
         "qualityScore" real,
-        "sourceFileId" integer,
+        "sourceFileId" uuid,
         "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
         "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
         "deletedAt" TIMESTAMP,
@@ -45,7 +45,7 @@ export class CreateFaceRecognitionTables1795000000000
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_student_face_embedding_file') THEN
           ALTER TABLE "student_face_embedding"
           ADD CONSTRAINT "FK_student_face_embedding_file"
-          FOREIGN KEY ("sourceFileId") REFERENCES "file"("id") ON DELETE SET NULL ON UPDATE NO ACTION;
+          FOREIGN KEY ("sourceFileId") REFERENCES "files"("id") ON DELETE SET NULL ON UPDATE NO ACTION;
         END IF;
       END $$;
     `);
