@@ -46,6 +46,10 @@ import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
 import { BulkSubjectsResultDto } from './dto/bulk-subjects-response.dto';
 import { BulkCreateSubjectsDto } from './dto/bulk-create-subjects.dto';
+import {
+  BulkDeleteDto,
+  BulkDeleteResultDto,
+} from '../utils/dto/bulk-delete.dto';
 
 @ApiTags('Subjects')
 @Controller({
@@ -182,5 +186,24 @@ export class SubjectsController {
       bulkCreateDto.subjects,
       bulkCreateDto.duplicateHandling || 'skip',
     );
+  }
+
+  @Post('bulk-delete')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Bulk delete subjects by id',
+    description:
+      'Deletes multiple subjects in one request. Returns per-id success/failure so partial failures can be surfaced to the caller.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Bulk deletion processed',
+    type: BulkDeleteResultDto,
+  })
+  bulkDelete(@Body() body: BulkDeleteDto): Promise<BulkDeleteResultDto> {
+    return this.subjectsService.bulkRemove(body.ids);
   }
 }

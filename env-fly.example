@@ -49,7 +49,7 @@ MAIL_DEFAULT_NAME=API
 
 # Authentication Configuration
 AUTH_JWT_SECRET=your-super-secret-jwt-key-change-this
-AUTH_JWT_TOKEN_EXPIRES_IN=15m
+AUTH_JWT_TOKEN_EXPIRES_IN=6h
 AUTH_REFRESH_SECRET=your-super-secret-refresh-key-change-this
 AUTH_REFRESH_TOKEN_EXPIRES_IN=3650d
 AUTH_FORGOT_SECRET=your-super-secret-forgot-key-change-this

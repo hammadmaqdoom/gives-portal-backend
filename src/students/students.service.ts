@@ -34,6 +34,7 @@ import { MailService } from '../mail/mail.service';
 import { randomStringGenerator } from '../utils/random-string-generator';
 import { RoleEnum } from '../roles/roles.enum';
 import { StatusEnum } from '../statuses/statuses.enum';
+import { performBulkDelete } from '../utils/dto/bulk-delete.dto';
 
 @Injectable()
 export class StudentsService {
@@ -462,6 +463,13 @@ export class StudentsService {
     await this.studentsRepository.remove(id);
   }
 
+  async bulkRemove(ids: Array<Student['id']>) {
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('No student ids provided');
+    }
+    return performBulkDelete(ids, (id) => this.remove(id));
+  }
+
   async enrollInClass(
     studentId: number,
     createEnrollmentDto: CreateEnrollmentDto,
@@ -548,6 +556,107 @@ export class StudentsService {
     );
 
     return updatedEnrollment;
+  }
+
+  async bulkRemoveEnrollments(
+    enrollmentIds: number[],
+  ): Promise<{
+    removed: number;
+    skipped: number;
+    studentsAffected: number;
+    classesAffected: number;
+    results: Array<{
+      enrollmentId: number;
+      studentId?: number;
+      classId?: number;
+      success: boolean;
+      reason?: string;
+    }>;
+  }> {
+    // Dedupe to avoid processing the same enrollment twice when the client
+    // accidentally sends duplicates.
+    const uniqueIds = Array.from(
+      new Set((enrollmentIds || []).filter((id) => Number.isFinite(id))),
+    );
+
+    const results: Array<{
+      enrollmentId: number;
+      studentId?: number;
+      classId?: number;
+      success: boolean;
+      reason?: string;
+    }> = [];
+    const studentSet = new Set<number>();
+    const classSet = new Set<number>();
+    let removed = 0;
+    let skipped = 0;
+
+    for (const id of uniqueIds) {
+      try {
+        const enrollment = await this.enrollmentRepository.findById(id);
+        if (!enrollment) {
+          skipped++;
+          results.push({
+            enrollmentId: id,
+            success: false,
+            reason: 'notFound',
+          });
+          continue;
+        }
+
+        // Skip already-dropped enrollments so the counter stays accurate and
+        // we don't send a duplicate notification.
+        if (enrollment.status === 'dropped') {
+          skipped++;
+          results.push({
+            enrollmentId: id,
+            studentId: enrollment.studentId,
+            classId: enrollment.classId,
+            success: false,
+            reason: 'alreadyDropped',
+          });
+          continue;
+        }
+
+        await this.enrollmentRepository.remove(enrollment.id);
+        removed++;
+        studentSet.add(enrollment.studentId);
+        classSet.add(enrollment.classId);
+        results.push({
+          enrollmentId: id,
+          studentId: enrollment.studentId,
+          classId: enrollment.classId,
+          success: true,
+        });
+
+        // Best-effort notification; don't fail the batch if it throws.
+        try {
+          await this.sendUnenrollmentNotification(
+            enrollment.studentId,
+            enrollment.classId,
+            'Student unenrolled from class (bulk)',
+          );
+        } catch (error) {
+          console.error('Bulk unenroll notification error:', error);
+        }
+      } catch (error: any) {
+        console.error(`Bulk unenroll failed for enrollment ${id}:`, error);
+        skipped++;
+        results.push({
+          enrollmentId: id,
+          success: false,
+          reason: error?.message || 'error',
+        });
+      }
+    }
+
+    return {
+      removed,
+      skipped,
+      studentsAffected: studentSet.size,
+      classesAffected: classSet.size,
+      results,
+    };
   }
 
   async removeEnrollment(studentId: number, classId: number): Promise<void> {
@@ -649,18 +758,28 @@ export class StudentsService {
   async getAllEnrollments(options?: {
     page?: number;
     limit?: number;
+    search?: string;
+    status?: string;
+    classId?: number;
   }): Promise<{ data: any[]; total: number; page: number; limit: number }> {
     const page = options?.page || 1;
     const limit = options?.limit || 10;
     const skip = (page - 1) * limit;
+
+    const filters = {
+      search: options?.search,
+      status: options?.status,
+      classId: options?.classId,
+    };
 
     const [enrollments, total] = await Promise.all([
       this.enrollmentRepository.findAll({
         skip,
         take: limit,
         order: { enrollmentDate: 'DESC' },
+        ...filters,
       }),
-      this.enrollmentRepository.count(),
+      this.enrollmentRepository.countAll(filters),
     ]);
     
     // Enrich classes with image URLs
@@ -844,38 +963,95 @@ export class StudentsService {
       // Determine currency based on student's country using utility function
       const currency = this.currencyService.getCurrencyForCountry(student.country ?? undefined);
 
-      // Get the appropriate fee based on currency
-      const classFee =
-        currency === 'PKR' ? classDetails.feePKR : classDetails.feeUSD;
+      // Look up enrollment to respect any custom fee overrides. Decimal columns
+      // come back from TypeORM as strings, so we must coerce to Number to avoid
+      // accidental string concatenation (e.g. "4000" + 4000 = "40004000").
+      const enrollment = await this.enrollmentRepository.findByStudentAndClass(
+        studentId,
+        classId,
+      );
+
+      const defaultFeePKR = Number(classDetails.feePKR) || 0;
+      const defaultFeeUSD = Number(classDetails.feeUSD) || 0;
+      const customFeePKR =
+        enrollment?.customFeePKR !== null && enrollment?.customFeePKR !== undefined
+          ? Number(enrollment.customFeePKR)
+          : null;
+      const customFeeUSD =
+        enrollment?.customFeeUSD !== null && enrollment?.customFeeUSD !== undefined
+          ? Number(enrollment.customFeeUSD)
+          : null;
+
+      const classFee = Number(
+        currency === 'PKR'
+          ? customFeePKR ?? defaultFeePKR
+          : customFeeUSD ?? defaultFeeUSD,
+      ) || 0;
+
+      // Skip generation entirely when the class has no fee configured -
+      // prevents zero-amount and junk invoices.
+      if (classFee <= 0) {
+        console.warn(
+          `Skipping monthly invoice for student ${studentId}, class ${classId}: fee is 0 for currency ${currency}`,
+        );
+        return;
+      }
 
       // Get current month and year for invoice
       const now = new Date();
       const currentMonth = now.getMonth() + 1; // 1-12
       const currentYear = now.getFullYear();
 
-      // Check if invoice already exists for this month
+      // Check if invoice already exists for this month (and same currency)
       const existingInvoices =
         await this.invoicesService.findByStudent(studentId);
       const monthlyInvoice = existingInvoices.find((invoice) => {
         const invoiceDate = new Date(invoice.generatedDate);
         return (
           invoiceDate.getMonth() + 1 === currentMonth &&
-          invoiceDate.getFullYear() === currentYear
+          invoiceDate.getFullYear() === currentYear &&
+          invoice.currency === currency
         );
       });
 
       if (monthlyInvoice) {
+        // If this class is already billed on the existing invoice, don't add it again.
+        const alreadyHasClass = (monthlyInvoice.items || []).some(
+          (item) => item.classId === classId,
+        );
+        if (alreadyHasClass) {
+          console.log(
+            `Monthly invoice ${monthlyInvoice.invoiceNumber} already contains class ${classId}; skipping duplicate append`,
+          );
+          return;
+        }
+
         console.log(
           `Monthly invoice already exists for student ${studentId}, month ${currentMonth}/${currentYear}`,
         );
-        // Add class fee to existing invoice
-        const updatedAmount = monthlyInvoice.amount + classFee;
+
+        // Explicitly coerce both operands to Number before adding. Without this,
+        // `monthlyInvoice.amount + classFee` could perform string concatenation
+        // (the historical bug that produced totals like "40004000").
+        const existingAmount = Number(monthlyInvoice.amount) || 0;
+        const updatedAmount = existingAmount + classFee;
+
+        await this.invoicesService.addItem(monthlyInvoice.id, {
+          description: `Monthly tuition fee for ${classDetails.name}`,
+          quantity: 1,
+          unitPrice: classFee,
+          total: classFee,
+          classId: classDetails.id,
+          className: classDetails.name,
+          teacherName: (classDetails as any).teacher?.name ?? undefined,
+        });
+
         await this.invoicesService.update(monthlyInvoice.id, {
           amount: updatedAmount,
           description: `${monthlyInvoice.description} + ${classDetails.name} fee`,
         });
         console.log(
-          `Updated existing invoice ${monthlyInvoice.invoiceNumber} with additional fee ${classFee} ${currency}`,
+          `Updated existing invoice ${monthlyInvoice.invoiceNumber}: ${existingAmount} + ${classFee} = ${updatedAmount} ${currency}`,
         );
         return;
       }
@@ -886,25 +1062,35 @@ export class StudentsService {
       // Calculate due date (end of current month)
       const dueDate = new Date(currentYear, currentMonth, 0); // Last day of current month
 
-      // Create invoice
+      // Create invoice. `amount` is explicitly a Number here to avoid any
+      // decimal-as-string leakage ending up in the DB.
       const invoiceData = {
         invoiceNumber,
         studentId,
-        parentId: undefined, // Will be set if parent exists
-        amount: 0, // Will be set based on class fee
+        parentId: undefined,
+        amount: classFee,
         currency,
         status: 'draft' as any,
         dueDate: dueDate.toISOString().split('T')[0],
         description: `Monthly tuition fee for ${classDetails.name} - ${currentMonth}/${currentYear}`,
         notes: `Auto-generated invoice for class enrollment in ${classDetails.name}`,
+        classId: classDetails.id,
+        items: [
+          {
+            description: `Monthly tuition fee for ${classDetails.name}`,
+            quantity: 1,
+            unitPrice: classFee,
+            total: classFee,
+            classId: classDetails.id,
+            className: classDetails.name,
+            teacherName: (classDetails as any).teacher?.name ?? undefined,
+          },
+        ],
       };
-
-      // Set the actual class fee
-      invoiceData.amount = classFee;
 
       const invoice = await this.invoicesService.create(invoiceData);
       console.log(
-        `Generated invoice ${invoiceNumber} for student ${studentId}`,
+        `Generated invoice ${invoiceNumber} for student ${studentId} (${classFee} ${currency})`,
       );
     } catch (error) {
       console.error(
