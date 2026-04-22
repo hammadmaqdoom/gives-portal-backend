@@ -59,9 +59,21 @@ export class ChunkedUploadService implements OnModuleDestroy {
   private readonly MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024; // 5 GB
   private readonly SESSION_TTL_MS = 24 * 60 * 60 * 1000;
   private readonly gcInterval: NodeJS.Timeout;
+  private chunkRootReady = false;
 
   constructor(private readonly filesService: FilesService) {
-    fs.mkdirSync(this.CHUNK_ROOT, { recursive: true });
+    // Do NOT throw from the constructor: a transient filesystem error here
+    // (e.g. the host-mounted uploads dir is owned by a different UID than the
+    // container user) would take down the entire Nest app on boot. Attempt
+    // the mkdir best-effort and let `ensureChunkRoot()` retry on first use.
+    try {
+      fs.mkdirSync(this.CHUNK_ROOT, { recursive: true });
+      this.chunkRootReady = true;
+    } catch (err) {
+      this.logger.error(
+        `Failed to create chunk root ${this.CHUNK_ROOT} at startup; chunked uploads will be disabled until the directory is writable. ${(err as Error).message}`,
+      );
+    }
     this.gcInterval = setInterval(
       () => this.cleanupStale(),
       60 * 60 * 1000,
@@ -69,6 +81,12 @@ export class ChunkedUploadService implements OnModuleDestroy {
     // Prevent the interval from keeping the event loop alive on graceful
     // shutdown / test runs.
     this.gcInterval.unref?.();
+  }
+
+  private ensureChunkRoot(): void {
+    if (this.chunkRootReady) return;
+    fs.mkdirSync(this.CHUNK_ROOT, { recursive: true });
+    this.chunkRootReady = true;
   }
 
   onModuleDestroy(): void {
@@ -97,6 +115,8 @@ export class ChunkedUploadService implements OnModuleDestroy {
     if (!/\.(mp4|webm|mov|avi|mkv|flv|wmv|m4v)$/i.test(params.fileName)) {
       throw new BadRequestException('Unsupported video format');
     }
+
+    this.ensureChunkRoot();
 
     const uploadId = uuidv4();
     const chunkSize = this.CHUNK_SIZE;
