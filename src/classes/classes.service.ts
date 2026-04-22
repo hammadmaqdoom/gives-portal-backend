@@ -26,6 +26,7 @@ import { FileStorageService } from '../files/file-storage.service';
 import { FileDriver } from '../files/config/file-config.type';
 import { ConfigService } from '@nestjs/config';
 import { AccessControlService } from '../access-control/access-control.service';
+import { performBulkDelete } from '../utils/dto/bulk-delete.dto';
 
 @Injectable()
 export class ClassesService {
@@ -295,6 +296,13 @@ export class ClassesService {
 
   async remove(id: Class['id']): Promise<void> {
     await this.classesRepository.remove(id);
+  }
+
+  async bulkRemove(ids: Array<Class['id']>) {
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('No class ids provided');
+    }
+    return performBulkDelete(ids, (id) => this.classesRepository.remove(id));
   }
 
   // Duplicate class with sections and modules (no schedules, no enrollments)

@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, MinLength } from 'class-validator';
+import { IsDate, IsEmail, IsNotEmpty, IsOptional, MinLength } from 'class-validator';
 import { FileDto } from '../../files/dto/file.dto';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { lowerCaseTransformer } from '../../utils/transformers/lower-case.transformer';
 
 export class AuthUpdateDto {
@@ -59,7 +59,9 @@ export class AuthUpdateDto {
   @IsOptional()
   country?: string;
 
-  @ApiPropertyOptional({ example: '1990-01-01' })
+  @ApiPropertyOptional({ example: '1990-01-01', type: Date })
   @IsOptional()
-  dateOfBirth?: string;
+  @Type(() => Date)
+  @IsDate()
+  dateOfBirth?: Date | null;
 }
