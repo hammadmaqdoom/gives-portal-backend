@@ -8,7 +8,7 @@ import {
   IsNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { AttendanceStatus } from '../domain/attendance';
+import { AttendanceMatchedBy, AttendanceStatus } from '../domain/attendance';
 
 export class CreateAttendanceDto {
   @ApiProperty({ example: '2024-01-15' })
@@ -39,4 +39,13 @@ export class CreateAttendanceDto {
   @IsNotEmpty()
   @IsNumber()
   class: number;
+
+  @ApiProperty({
+    example: AttendanceMatchedBy.MANUAL,
+    required: false,
+    description: 'How the attendance row was captured.',
+  })
+  @IsOptional()
+  @IsEnum(AttendanceMatchedBy)
+  matchedBy?: AttendanceMatchedBy;
 }
