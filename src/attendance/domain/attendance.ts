@@ -9,6 +9,13 @@ export enum AttendanceStatus {
   EXCUSED = 'excused',
 }
 
+export enum AttendanceMatchedBy {
+  MANUAL = 'manual',
+  FACE = 'face',
+  QR = 'qr',
+  IMPORT = 'import',
+}
+
 export class Attendance {
   @ApiProperty({ example: 1 })
   id: number;
@@ -21,6 +28,13 @@ export class Attendance {
 
   @ApiProperty({ example: 'Student was present and participated well' })
   notes?: string | null;
+
+  @ApiProperty({
+    example: AttendanceMatchedBy.FACE,
+    required: false,
+    description: 'How this attendance row was captured (face, qr, manual...)',
+  })
+  matchedBy?: AttendanceMatchedBy | string | null;
 
   @ApiProperty({ example: '2024-01-01T00:00:00.000Z' })
   createdAt: Date;
