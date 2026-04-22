@@ -117,12 +117,8 @@ export class InvoiceRepositoryImpl implements InvoiceRepository {
   }
 
   async findByStudent(studentId: number): Promise<Invoice[]> {
-    console.log(
-      `🔍 InvoiceRepository.findByStudent called with studentId: ${studentId}`,
-    );
-
     const entities = await this.invoiceRepository.find({
-      where: { 
+      where: {
         student: { id: studentId },
         deletedAt: IsNull(), // Exclude soft-deleted invoices
       },
@@ -130,15 +126,22 @@ export class InvoiceRepositoryImpl implements InvoiceRepository {
       order: { createdAt: 'DESC' },
     });
 
-    console.log(`🔍 InvoiceRepository.findByStudent raw entities:`, entities);
-    console.log(
-      `🔍 InvoiceRepository.findByStudent found ${entities.length} invoices`,
-    );
+    return entities.map((entity) => InvoiceMapper.toDomain(entity));
+  }
 
-    const result = entities.map((entity) => InvoiceMapper.toDomain(entity));
-    console.log(`🔍 InvoiceRepository.findByStudent mapped result:`, result);
+  async findByStudentIds(studentIds: number[]): Promise<Invoice[]> {
+    if (!studentIds || studentIds.length === 0) return [];
+    const entities = await this.invoiceRepository
+      .createQueryBuilder('invoice')
+      .leftJoinAndSelect('invoice.student', 'student')
+      .leftJoinAndSelect('invoice.parent', 'parent')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .where('invoice.studentId IN (:...studentIds)', { studentIds })
+      .andWhere('invoice.deletedAt IS NULL')
+      .orderBy('invoice.createdAt', 'DESC')
+      .getMany();
 
-    return result;
+    return entities.map((entity) => InvoiceMapper.toDomain(entity));
   }
 
   async findByParent(parentId: number): Promise<Invoice[]> {

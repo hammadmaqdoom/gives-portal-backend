@@ -402,7 +402,10 @@ export class ClassesService {
   }
 
   // New method for getting class enrollments
-  async getEnrollments(classId: number): Promise<any[]> {
+  async getEnrollments(
+    classId: number,
+    options?: { includeAccessStatus?: boolean },
+  ): Promise<any[]> {
     // Check if class exists
     const classEntity = await this.classesRepository.findById(classId);
     if (!classEntity) {
@@ -416,31 +419,22 @@ export class ClassesService {
 
     // Get enrollments with student details
     const enrollments = await this.enrollmentRepository.findByClassId(classId);
-    
-    // Enrich enrollments with access control information
-    const enrichedEnrollments = await Promise.all(
-      enrollments.map(async (enrollment) => {
-        // Get access status for each enrollment
-        const accessStatus = await this.accessControlService.checkCourseAccess(
-          enrollment.studentId,
-          classId,
-        );
-        
-        return {
-          ...enrollment,
-          accessStatus: {
-            hasAccess: accessStatus.hasAccess,
-            isPaid: accessStatus.isPaid,
-            requiresPayment: accessStatus.requiresPayment,
-            enrollmentStatus: accessStatus.enrollmentStatus,
-            invoiceStatus: accessStatus.invoiceStatus,
-            invoiceId: accessStatus.invoiceId,
-            message: accessStatus.message,
-          },
-        };
-      }),
-    );
-    
+
+    // Skip the expensive per-student access-status enrichment when the caller
+    // (e.g. admin "Manage Enrollments" modal) doesn't need it. This avoids an
+    // N+1 that previously did 3 DB round-trips per enrollment.
+    if (options?.includeAccessStatus === false) {
+      return enrollments;
+    }
+
+    // Enrich enrollments with access control information (batched — single
+    // round-trip style rather than re-fetching the class/invoices per student).
+    const enrichedEnrollments =
+      await this.accessControlService.enrichEnrollmentsWithAccessStatus(
+        classEntity,
+        enrollments,
+      );
+
     return enrichedEnrollments;
   }
 

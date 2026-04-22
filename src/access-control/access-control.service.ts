@@ -109,6 +109,118 @@ export class AccessControlService {
   }
 
   /**
+   * Batched version of checkCourseAccess for a whole class.
+   *
+   * Previously the admin enrollment modal/roster re-ran checkCourseAccess per
+   * student, which re-fetched the class and ALL of that student's invoices
+   * per enrollment — an O(N) * O(invoices) round-trip to the DB. This version
+   * fetches the class once and all relevant invoices in a single IN(...) query.
+   */
+  async enrichEnrollmentsWithAccessStatus(
+    classEntity: { id: number; name: string },
+    enrollments: any[],
+  ): Promise<any[]> {
+    if (!enrollments || enrollments.length === 0) return [];
+
+    const studentIds = Array.from(
+      new Set(enrollments.map((e) => e.studentId).filter(Boolean)),
+    );
+
+    // Single batched fetch of every relevant invoice
+    const allInvoices = studentIds.length
+      ? await this.invoicesService.findByStudentIds(studentIds)
+      : [];
+
+    const invoicesByStudent = new Map<number, typeof allInvoices>();
+    for (const inv of allInvoices) {
+      const sid = (inv as any).student?.id;
+      if (!sid) continue;
+      if (!invoicesByStudent.has(sid)) invoicesByStudent.set(sid, []);
+      invoicesByStudent.get(sid)!.push(inv);
+    }
+
+    const matchesClass = (desc?: string | null): boolean => {
+      if (!desc) return false;
+      return (
+        desc.includes(classEntity.name) ||
+        desc.includes(`Course enrollment: ${classEntity.name}`)
+      );
+    };
+
+    return enrollments.map((enrollment) => {
+      const invoices = invoicesByStudent.get(enrollment.studentId) || [];
+      const paidInvoice = invoices.find(
+        (inv: any) =>
+          inv.status === InvoiceStatus.PAID && matchesClass(inv.description),
+      );
+      const unpaidInvoice = invoices.find(
+        (inv: any) =>
+          (inv.status === InvoiceStatus.DRAFT ||
+            inv.status === InvoiceStatus.SENT) &&
+          matchesClass(inv.description),
+      );
+      const isPaid = !!paidInvoice;
+      const invoiceStatus = paidInvoice?.status || unpaidInvoice?.status;
+      const invoiceId = paidInvoice?.id || unpaidInvoice?.id;
+
+      let accessStatus: PaymentStatus;
+
+      if (enrollment.adminGrantedAccess) {
+        accessStatus = {
+          hasAccess: true,
+          isPaid,
+          enrollmentStatus: enrollment.status,
+          invoiceStatus,
+          invoiceId,
+          requiresPayment: false,
+          message: 'Access granted by administrator',
+        };
+      } else if (enrollment.status === 'active') {
+        accessStatus = {
+          hasAccess: true,
+          isPaid,
+          enrollmentStatus: enrollment.status,
+          invoiceStatus,
+          invoiceId,
+          requiresPayment: false,
+          message: isPaid ? 'Access granted' : 'Access granted (manual enrollment)',
+        };
+      } else if ((enrollment.status as any) === 'pending_payment') {
+        accessStatus = {
+          hasAccess: false,
+          isPaid: false,
+          enrollmentStatus: enrollment.status,
+          invoiceStatus,
+          invoiceId,
+          requiresPayment: true,
+          message: 'Payment required to access this course',
+        };
+      } else {
+        accessStatus = {
+          hasAccess: false,
+          isPaid: false,
+          enrollmentStatus: enrollment.status,
+          requiresPayment: enrollment.status === 'inactive',
+          message: `Enrollment status: ${enrollment.status}`,
+        };
+      }
+
+      return {
+        ...enrollment,
+        accessStatus: {
+          hasAccess: accessStatus.hasAccess,
+          isPaid: accessStatus.isPaid,
+          requiresPayment: accessStatus.requiresPayment,
+          enrollmentStatus: accessStatus.enrollmentStatus,
+          invoiceStatus: accessStatus.invoiceStatus,
+          invoiceId: accessStatus.invoiceId,
+          message: accessStatus.message,
+        },
+      };
+    });
+  }
+
+  /**
    * Get payment status for a course
    */
   async getPaymentStatus(

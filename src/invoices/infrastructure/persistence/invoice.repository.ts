@@ -20,6 +20,7 @@ export interface InvoiceRepository {
   update(id: Invoice['id'], payload: Partial<Invoice>): Promise<Invoice | null>;
   remove(id: Invoice['id']): Promise<void>;
   findByStudent(studentId: number): Promise<Invoice[]>;
+  findByStudentIds(studentIds: number[]): Promise<Invoice[]>;
   findByParent(parentId: number): Promise<Invoice[]>;
   findByStatus(status: string): Promise<Invoice[]>;
   findOverdue(): Promise<Invoice[]>;

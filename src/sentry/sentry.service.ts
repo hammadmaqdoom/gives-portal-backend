@@ -1,25 +1,42 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Sentry from '@sentry/node';
-import { nodeProfilingIntegration } from '@sentry/profiling-node';
+import type { Integration } from '@sentry/types';
 import { AllConfigType } from '../config/config.type';
 
 @Injectable()
 export class SentryService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(SentryService.name);
+
   constructor(private configService: ConfigService<AllConfigType>) {}
 
   onModuleInit() {
     const sentryConfig = this.configService.get('sentry', { infer: true });
 
     if (sentryConfig?.enabled && sentryConfig?.dsn) {
+      // Profiling relies on a native prebuilt binary that may not exist for
+      // the current Node ABI (e.g. Node 25). Load it defensively so a missing
+      // binary disables profiling instead of crashing the process.
+      const integrations: Integration[] = [];
+      let profilingEnabled = false;
+      try {
+        const { nodeProfilingIntegration } = require('@sentry/profiling-node');
+        integrations.push(nodeProfilingIntegration());
+        profilingEnabled = true;
+      } catch (err) {
+        this.logger.warn(
+          `@sentry/profiling-node unavailable, continuing without profiling: ${(err as Error).message}`,
+        );
+      }
+
       Sentry.init({
         dsn: sentryConfig.dsn,
         environment: sentryConfig.environment,
-        integrations: [nodeProfilingIntegration()],
-        // Performance Monitoring
+        integrations,
         tracesSampleRate: sentryConfig.tracesSampleRate,
-        // Set sampling rate for profiling - this is relative to tracesSampleRate
-        profilesSampleRate: sentryConfig.profilesSampleRate,
+        profilesSampleRate: profilingEnabled
+          ? sentryConfig.profilesSampleRate
+          : 0,
       });
 
       console.log(

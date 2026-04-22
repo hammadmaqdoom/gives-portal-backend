@@ -219,8 +219,21 @@ export class ClassesController {
   @ApiOkResponse({
     description: 'Class enrollments retrieved successfully',
   })
-  getEnrollments(@Param('id') classId: string): Promise<any[]> {
-    return this.classesService.getEnrollments(+classId);
+  getEnrollments(
+    @Param('id') classId: string,
+    @Query('includeAccessStatus') includeAccessStatus?: string,
+  ): Promise<any[]> {
+    // Default = true (preserve existing behavior for the class roster view).
+    // Clients that only need the student/enrollment list (e.g. the admin
+    // "Manage Enrollments" modal) can pass ?includeAccessStatus=false to skip
+    // the expensive per-student access-status enrichment.
+    const include =
+      includeAccessStatus === 'false' || includeAccessStatus === '0'
+        ? false
+        : true;
+    return this.classesService.getEnrollments(+classId, {
+      includeAccessStatus: include,
+    });
   }
 
   // Bulk enroll endpoint
