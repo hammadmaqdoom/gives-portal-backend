@@ -23,6 +23,7 @@ import { PublicTeacherDto } from './dto/public-teacher.dto';
 import { FileStorageService } from '../files/file-storage.service';
 import { ConfigService } from '@nestjs/config';
 import { FileDriver } from '../files/config/file-config.type';
+import { performBulkDelete } from '../utils/dto/bulk-delete.dto';
 
 @Injectable()
 export class TeachersService {
@@ -287,6 +288,13 @@ export class TeachersService {
 
   async remove(id: Teacher['id']): Promise<void> {
     return this.teachersRepository.remove(id);
+  }
+
+  async bulkRemove(ids: Array<Teacher['id']>) {
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('No teacher ids provided');
+    }
+    return performBulkDelete(ids, (id) => this.teachersRepository.remove(id));
   }
 
   async resetPassword(id: Teacher['id']): Promise<{ tempPassword: string }> {

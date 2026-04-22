@@ -5,6 +5,7 @@ import { RelationalFilePersistenceModule } from './infrastructure/persistence/re
 import { FilesService } from './files.service';
 import { FilesController } from './files.controller';
 import { FileStorageService } from './file-storage.service';
+import { ChunkedUploadService } from './chunked-upload.service';
 import { FileEntity } from './infrastructure/persistence/relational/entities/file.entity';
 import { FileMapper } from './infrastructure/persistence/relational/mappers/file.mapper';
 import { FileRepository } from './infrastructure/persistence/relational/repositories/file.repository';
@@ -38,7 +39,7 @@ import { PassportModule } from '@nestjs/passport';
     PassportModule,
   ],
   controllers: [FilesController],
-  providers: [FilesService, FileStorageService, FileMapper, FileRepository, JwtQueryParamGuard, FrontendOriginGuard, JwtQueryParamStrategy],
+  providers: [FilesService, FileStorageService, ChunkedUploadService, FileMapper, FileRepository, JwtQueryParamGuard, FrontendOriginGuard, JwtQueryParamStrategy],
   exports: [
     FilesService,
     FileStorageService,
