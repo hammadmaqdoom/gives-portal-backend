@@ -58,7 +58,10 @@ export class StudentEntity extends EntityRelationalHelper {
 
   // Biometric (facial-recognition) consent. Face-embedding enrollment is
   // gated on this being true — backend rejects enrollment attempts otherwise.
-  @Column({ type: 'boolean', default: false })
+  // Defaults to true (opt-out model): we assume consent was collected offline
+  // during enrollment and admins can explicitly revoke via the consent UI,
+  // which writes an audit row and wipes any enrolled face samples.
+  @Column({ type: 'boolean', default: true })
   biometricConsent: boolean;
 
   @Column({ type: 'timestamp', nullable: true })

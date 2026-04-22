@@ -19,7 +19,9 @@ export class StudentMapper {
     student.email = raw.email;
     student.contact = raw.contact;
     student.userId = raw.userId;
-    student.biometricConsent = raw.biometricConsent ?? false;
+    // Column is NOT NULL with default true; the `?? true` guards against
+    // legacy rows where the field was never populated.
+    student.biometricConsent = raw.biometricConsent ?? true;
     student.biometricConsentAt = raw.biometricConsentAt ?? null;
     student.biometricConsentBy = raw.biometricConsentBy ?? null;
     student.createdAt = raw.createdAt;
