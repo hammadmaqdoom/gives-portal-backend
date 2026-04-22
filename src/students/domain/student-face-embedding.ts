@@ -1,0 +1,34 @@
+import { ApiProperty } from '@nestjs/swagger';
+
+export class StudentFaceEmbedding {
+  @ApiProperty({ example: 1 })
+  id: number;
+
+  @ApiProperty({ example: 42 })
+  studentId: number;
+
+  @ApiProperty({
+    description:
+      'Face descriptor vector (128 floats) computed by face-api.js in the browser.',
+    type: [Number],
+  })
+  embedding: number[];
+
+  @ApiProperty({ example: 'face-api.js@1.7.14/ssd_mobilenetv1' })
+  modelName: string;
+
+  @ApiProperty({ example: 0.98, required: false })
+  qualityScore?: number | null;
+
+  @ApiProperty({ example: 321, required: false })
+  sourceFileId?: number | null;
+
+  @ApiProperty({ example: '2026-04-22T10:00:00.000Z' })
+  createdAt: Date;
+
+  @ApiProperty({ example: '2026-04-22T10:00:00.000Z' })
+  updatedAt: Date;
+
+  @ApiProperty({ example: null, required: false })
+  deletedAt?: Date | null;
+}
