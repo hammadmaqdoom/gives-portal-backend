@@ -4,7 +4,9 @@ import {
   UnprocessableEntityException,
   Inject,
   forwardRef,
+  BadRequestException,
 } from '@nestjs/common';
+import { performBulkDelete } from '../utils/dto/bulk-delete.dto';
 import { CreateParentDto } from './dto/create-parent.dto';
 import { NullableType } from '../utils/types/nullable.type';
 import { FilterParentDto, SortParentDto } from './dto/query-parent.dto';
@@ -221,6 +223,13 @@ export class ParentsService {
 
   async remove(id: Parent['id']): Promise<void> {
     await this.parentsRepository.remove(id);
+  }
+
+  async bulkRemove(ids: Array<Parent['id']>) {
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('No parent ids provided');
+    }
+    return performBulkDelete(ids, (id) => this.parentsRepository.remove(id));
   }
 
   // New methods for managing parent-student relationships

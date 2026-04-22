@@ -21,7 +21,7 @@ import { AuditEventType } from './entities/audit-log.entity';
 })
 @ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles(RoleEnum.superAdmin)
+@Roles(RoleEnum.superAdmin, RoleEnum.admin)
 export class AuditLogsController {
   constructor(private readonly auditLogsService: AuditLogsService) {}
 
@@ -34,7 +34,16 @@ export class AuditLogsController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'eventType', required: false, enum: AuditEventType })
+  @ApiQuery({
+    name: 'eventTypes',
+    required: false,
+    type: String,
+    description:
+      'Comma-separated list of event types. Overrides eventType when provided.',
+  })
   @ApiQuery({ name: 'userId', required: false, type: Number })
+  @ApiQuery({ name: 'resource', required: false, type: String })
+  @ApiQuery({ name: 'resourceId', required: false, type: String })
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'startDate', required: false, type: String })
   @ApiQuery({ name: 'endDate', required: false, type: String })
