@@ -179,10 +179,33 @@ export class AuditLogsService {
       where.userEmail = ILike(`%${query.search}%`);
     }
 
-    if (query.startDate && query.endDate) {
-      where.createdAt = Between(new Date(query.startDate), new Date(query.endDate));
-    } else if (query.startDate) {
-      where.createdAt = Between(new Date(query.startDate), new Date());
+    // Dates from the UI arrive as `yyyy-mm-dd`, which `new Date(...)` parses as
+    // UTC midnight. That would (a) miss events earlier on the chosen start day
+    // in negative-offset timezones and (b) miss events later on the end day
+    // everywhere. Snap to start-of-day / end-of-day so the inclusive range
+    // behaves the way admins expect from a date picker.
+    const toStartOfDay = (value: string | undefined): Date | null => {
+      if (!value) return null;
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return null;
+      d.setHours(0, 0, 0, 0);
+      return d;
+    };
+    const toEndOfDay = (value: string | undefined): Date | null => {
+      if (!value) return null;
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return null;
+      d.setHours(23, 59, 59, 999);
+      return d;
+    };
+    const start = toStartOfDay(query.startDate);
+    const end = toEndOfDay(query.endDate);
+    if (start && end) {
+      where.createdAt = Between(start, end);
+    } else if (start) {
+      where.createdAt = Between(start, new Date());
+    } else if (end) {
+      where.createdAt = Between(new Date(0), end);
     }
 
     const [data, total] = await this.auditLogRepository.findAndCount({
