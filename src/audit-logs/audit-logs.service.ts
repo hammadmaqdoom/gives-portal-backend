@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, ILike } from 'typeorm';
+import { Repository, Between, ILike, In } from 'typeorm';
 import { AuditLogEntity, AuditEventType } from './entities/audit-log.entity';
 
 export interface CreateAuditLogDto {
@@ -27,7 +27,12 @@ export interface AuditLogQueryDto {
   page?: number;
   limit?: number;
   eventType?: AuditEventType;
+  // Comma-separated list or array; if provided overrides eventType.
+  // Useful for filtering the audit-log view to biometric-only events.
+  eventTypes?: AuditEventType[] | string;
   userId?: number;
+  resource?: string;
+  resourceId?: string;
   search?: string;
   startDate?: string;
   endDate?: string;
@@ -67,6 +72,19 @@ export class AuditLogsService {
     } catch (error) {
       this.logger.error(`Failed to write audit log: ${error.message}`, error.stack);
     }
+  }
+
+  private normalizeEventTypes(
+    value: AuditEventType[] | string | undefined,
+  ): AuditEventType[] {
+    if (!value) return [];
+    const raw = Array.isArray(value)
+      ? value
+      : value.split(',').map((v) => v.trim());
+    return raw
+      .filter((v): v is AuditEventType =>
+        Object.values(AuditEventType).includes(v as AuditEventType),
+      );
   }
 
   private cleanIpAddress(ip: string | null): string | null {
@@ -138,12 +156,23 @@ export class AuditLogsService {
 
     const where: any = {};
 
-    if (query.eventType) {
+    const typeList = this.normalizeEventTypes(query.eventTypes);
+    if (typeList.length > 0) {
+      where.eventType = In(typeList);
+    } else if (query.eventType) {
       where.eventType = query.eventType;
     }
 
     if (query.userId) {
       where.userId = query.userId;
+    }
+
+    if (query.resource) {
+      where.resource = query.resource;
+    }
+
+    if (query.resourceId) {
+      where.resourceId = query.resourceId;
     }
 
     if (query.search) {

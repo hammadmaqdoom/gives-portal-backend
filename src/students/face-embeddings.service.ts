@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { StudentFaceEmbeddingRepository } from './infrastructure/persistence/relational/repositories/student-face-embedding.repository';
 import { StudentClassEnrollmentRepository } from './infrastructure/persistence/relational/repositories/student-class-enrollment.repository';
@@ -13,9 +14,19 @@ import {
   ClassFaceEmbeddingsResponseDto,
   ClassFaceEmbeddingsStudentDto,
 } from './dto/face-embedding-response.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AuditEventType } from '../audit-logs/entities/audit-log.entity';
 
 // Hard cap per student to bound storage and matching cost.
 const MAX_EMBEDDINGS_PER_STUDENT = 10;
+
+export interface ActorContext {
+  userId?: number | null;
+  userEmail?: string | null;
+  userRole?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+}
 
 @Injectable()
 export class FaceEmbeddingsService {
@@ -24,15 +35,29 @@ export class FaceEmbeddingsService {
     private readonly enrollmentRepository: StudentClassEnrollmentRepository,
     private readonly studentRepository: StudentRepository,
     private readonly filesService: FilesService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async create(
     studentId: number,
     dto: CreateFaceEmbeddingDto,
+    actor: ActorContext = {},
   ): Promise<StudentFaceEmbedding> {
     const student = await this.studentRepository.findById(studentId);
     if (!student) {
       throw new NotFoundException(`Student ${studentId} not found`);
+    }
+
+    // Hard gate on biometric consent. This is non-negotiable for GDPR/BIPA
+    // compliance — no consent, no enrollment.
+    if (!student.biometricConsent) {
+      throw new ForbiddenException({
+        status: 403,
+        errors: {
+          biometricConsent:
+            'Student has not granted biometric consent. Record consent before enrolling face samples.',
+        },
+      });
     }
 
     const existingCount =
@@ -43,13 +68,34 @@ export class FaceEmbeddingsService {
       );
     }
 
-    return this.faceEmbeddingRepository.create({
+    const created = await this.faceEmbeddingRepository.create({
       studentId,
       embedding: dto.embedding,
       modelName: dto.modelName,
       qualityScore: dto.qualityScore,
       sourceFileId: dto.sourceFileId,
     });
+
+    await this.auditLogsService.create({
+      eventType: AuditEventType.FACE_ENROLL,
+      userId: actor.userId ?? null,
+      userEmail: actor.userEmail ?? null,
+      userRole: actor.userRole ?? null,
+      resource: 'student_face_embedding',
+      resourceId: String(created.id),
+      ipAddress: actor.ipAddress ?? null,
+      userAgent: actor.userAgent ?? null,
+      details: {
+        studentId,
+        studentCode: student.studentId,
+        embeddingId: created.id,
+        modelName: created.modelName,
+        qualityScore: created.qualityScore ?? null,
+        sampleCount: existingCount + 1,
+      },
+    });
+
+    return created;
   }
 
   async findByStudentId(
@@ -62,7 +108,11 @@ export class FaceEmbeddingsService {
     return embeddings.map((e) => ({ ...e, embedding: [] }));
   }
 
-  async remove(studentId: number, embeddingId: number): Promise<void> {
+  async remove(
+    studentId: number,
+    embeddingId: number,
+    actor: ActorContext = {},
+  ): Promise<void> {
     const existing = await this.faceEmbeddingRepository.findById(embeddingId);
     if (!existing || existing.studentId !== studentId) {
       throw new NotFoundException(
@@ -70,10 +120,46 @@ export class FaceEmbeddingsService {
       );
     }
     await this.faceEmbeddingRepository.softRemove(embeddingId);
+
+    await this.auditLogsService.create({
+      eventType: AuditEventType.FACE_UNENROLL,
+      userId: actor.userId ?? null,
+      userEmail: actor.userEmail ?? null,
+      userRole: actor.userRole ?? null,
+      resource: 'student_face_embedding',
+      resourceId: String(embeddingId),
+      ipAddress: actor.ipAddress ?? null,
+      userAgent: actor.userAgent ?? null,
+      details: {
+        studentId,
+        embeddingId,
+        modelName: existing.modelName,
+      },
+    });
   }
 
-  async removeAllForStudent(studentId: number): Promise<void> {
+  async removeAllForStudent(
+    studentId: number,
+    actor: ActorContext = {},
+  ): Promise<void> {
+    const existingCount =
+      await this.faceEmbeddingRepository.countByStudentId(studentId);
     await this.faceEmbeddingRepository.softRemoveByStudentId(studentId);
+
+    await this.auditLogsService.create({
+      eventType: AuditEventType.FACE_UNENROLL_ALL,
+      userId: actor.userId ?? null,
+      userEmail: actor.userEmail ?? null,
+      userRole: actor.userRole ?? null,
+      resource: 'student',
+      resourceId: String(studentId),
+      ipAddress: actor.ipAddress ?? null,
+      userAgent: actor.userAgent ?? null,
+      details: {
+        studentId,
+        removedCount: existingCount,
+      },
+    });
   }
 
   async getClassEmbeddings(
@@ -122,10 +208,77 @@ export class FaceEmbeddingsService {
           photoUrl,
           embeddings: list.map((l) => l.embedding),
           modelName: list[0]?.modelName ?? '',
+          biometricConsent: full?.biometricConsent ?? false,
+          biometricConsentAt: full?.biometricConsentAt ?? null,
         };
       }),
     );
 
     return { classId, students: studentEntries };
+  }
+
+  /**
+   * Grant or revoke biometric consent for a student. Revocation also wipes
+   * any enrolled face samples because continuing to hold them would violate
+   * the revocation semantics under GDPR / BIPA.
+   */
+  async updateBiometricConsent(
+    studentId: number,
+    consent: boolean,
+    actor: ActorContext = {},
+    note?: string,
+  ): Promise<{
+    studentId: number;
+    biometricConsent: boolean;
+    biometricConsentAt: Date | null;
+    biometricConsentBy: number | null;
+  }> {
+    const student = await this.studentRepository.findById(studentId);
+    if (!student) {
+      throw new NotFoundException(`Student ${studentId} not found`);
+    }
+
+    const now = new Date();
+    const updated = await this.studentRepository.update(studentId, {
+      biometricConsent: consent,
+      biometricConsentAt: now,
+      biometricConsentBy: actor.userId ?? null,
+    });
+
+    let wipedSamples = 0;
+    if (!consent) {
+      wipedSamples =
+        await this.faceEmbeddingRepository.countByStudentId(studentId);
+      if (wipedSamples > 0) {
+        await this.faceEmbeddingRepository.softRemoveByStudentId(studentId);
+      }
+    }
+
+    await this.auditLogsService.create({
+      eventType: consent
+        ? AuditEventType.BIOMETRIC_CONSENT_GRANTED
+        : AuditEventType.BIOMETRIC_CONSENT_REVOKED,
+      userId: actor.userId ?? null,
+      userEmail: actor.userEmail ?? null,
+      userRole: actor.userRole ?? null,
+      resource: 'student',
+      resourceId: String(studentId),
+      ipAddress: actor.ipAddress ?? null,
+      userAgent: actor.userAgent ?? null,
+      details: {
+        studentId,
+        studentCode: student.studentId,
+        previousConsent: student.biometricConsent ?? false,
+        note: note ?? null,
+        wipedSamples: consent ? undefined : wipedSamples,
+      },
+    });
+
+    return {
+      studentId,
+      biometricConsent: updated?.biometricConsent ?? consent,
+      biometricConsentAt: updated?.biometricConsentAt ?? now,
+      biometricConsentBy: updated?.biometricConsentBy ?? actor.userId ?? null,
+    };
   }
 }

@@ -34,8 +34,8 @@ export class StudentFaceEmbeddingEntity extends EntityRelationalHelper {
   @Column({ type: 'real', nullable: true })
   qualityScore?: number | null;
 
-  @Column({ type: 'int', nullable: true })
-  sourceFileId?: number | null;
+  @Column({ type: 'uuid', nullable: true })
+  sourceFileId?: string | null;
 
   @ManyToOne(() => StudentEntity, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'studentId' })

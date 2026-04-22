@@ -3,10 +3,10 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
-  IsInt,
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   Min,
 } from 'class-validator';
@@ -41,9 +41,10 @@ export class CreateFaceEmbeddingDto {
   qualityScore?: number;
 
   @ApiPropertyOptional({
-    description: 'Optional file id the embedding was derived from.',
+    description: 'Optional file id (uuid) the embedding was derived from.',
+    example: 'b3a4c1d2-0000-4000-8000-000000000001',
   })
   @IsOptional()
-  @IsInt()
-  sourceFileId?: number;
+  @IsUUID()
+  sourceFileId?: string;
 }

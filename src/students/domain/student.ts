@@ -23,6 +23,12 @@ export class Student {
 
   userId?: number | null;
 
+  biometricConsent?: boolean;
+
+  biometricConsentAt?: Date | null;
+
+  biometricConsentBy?: number | null;
+
   photo?: FileType | null;
 
   user?: User | null;

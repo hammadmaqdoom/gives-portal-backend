@@ -13,8 +13,8 @@ export class FaceEmbeddingSummaryDto {
   @ApiPropertyOptional({ example: 0.98 })
   qualityScore?: number | null;
 
-  @ApiPropertyOptional({ example: 321 })
-  sourceFileId?: number | null;
+  @ApiPropertyOptional({ example: 'b3a4c1d2-0000-4000-8000-000000000001' })
+  sourceFileId?: string | null;
 
   @ApiProperty({ example: '2026-04-22T10:00:00.000Z' })
   createdAt: Date;
@@ -45,6 +45,19 @@ export class ClassFaceEmbeddingsStudentDto {
 
   @ApiProperty({ example: 'face-api.js@1.7.14/ssd_mobilenetv1' })
   modelName: string;
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Whether the student has granted biometric consent. Frontend UIs should hide/disable enrollment when false.',
+  })
+  biometricConsent?: boolean;
+
+  @ApiPropertyOptional({
+    example: '2026-04-22T10:00:00.000Z',
+    description: 'When consent was last granted or revoked.',
+  })
+  biometricConsentAt?: Date | null;
 }
 
 export class ClassFaceEmbeddingsResponseDto {

@@ -10,6 +10,7 @@ import {
   Query,
   HttpStatus,
   HttpCode,
+  Request,
   SerializeOptions,
 } from '@nestjs/common';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
@@ -27,9 +28,24 @@ import { InfinityPaginationResponseDto } from '../utils/dto/infinity-pagination-
 import { NullableType } from '../utils/types/nullable.type';
 import { QueryAttendanceDto } from './dto/query-attendance.dto';
 import { Attendance } from './domain/attendance';
-import { AttendanceService } from './attendance.service';
+import { AttendanceService, BulkAttendanceItem } from './attendance.service';
 import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
+
+function actorFromRequest(req: any) {
+  return {
+    userId: req?.user?.id ?? null,
+    userEmail: req?.user?.email ?? null,
+    userRole:
+      (typeof req?.user?.role === 'object' ? req?.user?.role?.name : req?.user?.role) ??
+      null,
+    ipAddress:
+      req?.ip ??
+      (req?.headers?.['x-forwarded-for'] as string | undefined) ??
+      null,
+    userAgent: (req?.headers?.['user-agent'] as string | undefined) ?? null,
+  };
+}
 
 @ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -46,8 +62,12 @@ export class AttendanceController {
   @HttpCode(HttpStatus.CREATED)
   create(
     @Body() createAttendanceDto: CreateAttendanceDto,
+    @Request() req: any,
   ): Promise<Attendance> {
-    return this.attendanceService.create(createAttendanceDto);
+    return this.attendanceService.create(
+      createAttendanceDto,
+      actorFromRequest(req),
+    );
   }
 
   @Get()
@@ -209,10 +229,14 @@ export class AttendanceController {
   bulkUpdate(
     @Body()
     body: {
-      items: Array<Partial<Attendance> & { id?: number }>;
+      items: BulkAttendanceItem[];
     },
+    @Request() req: any,
   ): Promise<{ updated: number; created: number }> {
-    return this.attendanceService.bulkUpdate(body?.items ?? []);
+    return this.attendanceService.bulkUpdate(
+      body?.items ?? [],
+      actorFromRequest(req),
+    );
   }
 
   @Delete(':id')
