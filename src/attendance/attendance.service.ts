@@ -41,6 +41,7 @@ export class AttendanceService {
       date: createAttendanceDto.date,
       status: createAttendanceDto.status,
       notes: createAttendanceDto.notes,
+      matchedBy: createAttendanceDto.matchedBy,
       student: { id: createAttendanceDto.student } as any,
       class: { id: createAttendanceDto.class } as any,
     };

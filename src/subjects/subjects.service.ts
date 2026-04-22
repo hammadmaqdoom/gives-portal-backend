@@ -13,6 +13,7 @@ import { SubjectRepository } from './infrastructure/persistence/subject.reposito
 import { Subject } from './domain/subject';
 import { IPaginationOptions } from '../utils/types/pagination-options';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
+import { performBulkDelete } from '../utils/dto/bulk-delete.dto';
 
 @Injectable()
 export class SubjectsService {
@@ -111,6 +112,13 @@ export class SubjectsService {
         },
       });
     }
+  }
+
+  async bulkRemove(ids: Array<Subject['id']>) {
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('No subject ids provided');
+    }
+    return performBulkDelete(ids, (id) => this.remove(id));
   }
 
   async bulkCreateFromData(
