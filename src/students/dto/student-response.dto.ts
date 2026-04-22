@@ -35,6 +35,20 @@ export class StudentResponseDto {
   @ApiPropertyOptional()
   user?: any;
 
+  @ApiPropertyOptional({
+    description:
+      'Whether the student has granted biometric (face-recognition) consent.',
+  })
+  biometricConsent?: boolean;
+
+  @ApiPropertyOptional({ description: 'When consent was last granted/revoked.' })
+  biometricConsentAt?: Date | null;
+
+  @ApiPropertyOptional({
+    description: 'User id of the admin/guardian who recorded consent.',
+  })
+  biometricConsentBy?: number | null;
+
   @ApiProperty()
   createdAt: Date;
 

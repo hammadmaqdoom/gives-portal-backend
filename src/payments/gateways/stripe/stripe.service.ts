@@ -22,9 +22,7 @@ export class StripeService {
       throw new Error('Stripe secret key is required');
     }
 
-    return new Stripe(secretKey, {
-      apiVersion: '2025-12-15.clover', // Use latest stable API version
-    });
+    return new Stripe(secretKey);
   }
 
   /**
