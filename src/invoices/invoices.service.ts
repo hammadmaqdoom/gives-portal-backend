@@ -236,6 +236,10 @@ export class InvoicesService {
     return this.invoiceRepository.findByStudent(studentId);
   }
 
+  async findByStudentIds(studentIds: number[]): Promise<Invoice[]> {
+    return this.invoiceRepository.findByStudentIds(studentIds);
+  }
+
   async findByStudentUserId(userId: number): Promise<Invoice[]> {
     console.log(
       '🔍 findByStudentUserId - Looking for student with user ID:',
