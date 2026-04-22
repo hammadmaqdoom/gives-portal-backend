@@ -226,22 +226,13 @@ export class ChunkedUploadService implements OnModuleDestroy {
         );
       }
 
-      const buffer = await fs.promises.readFile(assembledPath);
-      const fakeMulterFile = {
-        fieldname: 'file',
-        originalname: session.fileName,
-        encoding: '7bit',
-        mimetype: session.mimeType,
-        size: buffer.length,
-        buffer,
-        destination: '',
-        filename: session.fileName,
-        path: assembledPath,
-        stream: null,
-      } as unknown as Express.Multer.File;
-
-      const result = await this.filesService.uploadFileWithContext(
-        fakeMulterFile,
+      const result = await this.filesService.uploadFileFromPathWithContext(
+        assembledPath,
+        {
+          originalName: session.fileName,
+          mimeType: session.mimeType,
+          size: stats.size,
+        },
         { ...session.context, userId: params.userId },
       );
 
