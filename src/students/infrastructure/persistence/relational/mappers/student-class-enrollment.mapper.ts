@@ -14,8 +14,16 @@ export class StudentClassEnrollmentMapper {
     enrollment.enrollmentDate = raw.enrollmentDate;
     enrollment.status = raw.status;
     enrollment.adminGrantedAccess = raw.adminGrantedAccess ?? false;
-    enrollment.customFeePKR = raw.customFeePKR ?? null;
-    enrollment.customFeeUSD = raw.customFeeUSD ?? null;
+    // TypeORM returns decimal columns as strings; coerce to numbers to prevent
+    // accidental string concatenation when these values flow into invoice math.
+    enrollment.customFeePKR =
+      raw.customFeePKR !== null && raw.customFeePKR !== undefined
+        ? Number(raw.customFeePKR)
+        : null;
+    enrollment.customFeeUSD =
+      raw.customFeeUSD !== null && raw.customFeeUSD !== undefined
+        ? Number(raw.customFeeUSD)
+        : null;
     enrollment.createdAt = raw.createdAt;
     enrollment.updatedAt = raw.updatedAt;
     enrollment.deletedAt = raw.deletedAt;

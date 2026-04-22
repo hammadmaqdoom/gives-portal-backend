@@ -11,6 +11,7 @@ import {
 } from '../../../../dto/query-invoice.dto';
 import { InvoiceMapper } from '../mappers/invoice.mapper';
 import { InvoiceItemMapper } from '../mappers/invoice-item.mapper';
+import { InvoiceItem } from '../../../../domain/invoice-item';
 
 @Injectable()
 export class InvoiceRepositoryImpl implements InvoiceRepository {
@@ -112,17 +113,32 @@ export class InvoiceRepositoryImpl implements InvoiceRepository {
     return InvoiceMapper.toDomain(updatedEntity);
   }
 
+  async addItem(id: Invoice['id'], item: Partial<InvoiceItem>): Promise<void> {
+    const invoiceEntity = await this.invoiceRepository.findOne({
+      where: { id },
+    });
+    if (!invoiceEntity) return;
+
+    const itemEntity = this.invoiceItemRepository.create({
+      invoice: invoiceEntity,
+      description: item.description,
+      quantity: Number(item.quantity) || 1,
+      unitPrice: Number(item.unitPrice) || 0,
+      total: Number(item.total) || 0,
+      classId: item.classId,
+      className: item.className,
+      teacherName: item.teacherName,
+    });
+    await this.invoiceItemRepository.save(itemEntity);
+  }
+
   async remove(id: Invoice['id']): Promise<void> {
     await this.invoiceRepository.softDelete(id);
   }
 
   async findByStudent(studentId: number): Promise<Invoice[]> {
-    console.log(
-      `🔍 InvoiceRepository.findByStudent called with studentId: ${studentId}`,
-    );
-
     const entities = await this.invoiceRepository.find({
-      where: { 
+      where: {
         student: { id: studentId },
         deletedAt: IsNull(), // Exclude soft-deleted invoices
       },
@@ -130,15 +146,22 @@ export class InvoiceRepositoryImpl implements InvoiceRepository {
       order: { createdAt: 'DESC' },
     });
 
-    console.log(`🔍 InvoiceRepository.findByStudent raw entities:`, entities);
-    console.log(
-      `🔍 InvoiceRepository.findByStudent found ${entities.length} invoices`,
-    );
+    return entities.map((entity) => InvoiceMapper.toDomain(entity));
+  }
 
-    const result = entities.map((entity) => InvoiceMapper.toDomain(entity));
-    console.log(`🔍 InvoiceRepository.findByStudent mapped result:`, result);
+  async findByStudentIds(studentIds: number[]): Promise<Invoice[]> {
+    if (!studentIds || studentIds.length === 0) return [];
+    const entities = await this.invoiceRepository
+      .createQueryBuilder('invoice')
+      .leftJoinAndSelect('invoice.student', 'student')
+      .leftJoinAndSelect('invoice.parent', 'parent')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .where('invoice.studentId IN (:...studentIds)', { studentIds })
+      .andWhere('invoice.deletedAt IS NULL')
+      .orderBy('invoice.createdAt', 'DESC')
+      .getMany();
 
-    return result;
+    return entities.map((entity) => InvoiceMapper.toDomain(entity));
   }
 
   async findByParent(parentId: number): Promise<Invoice[]> {

@@ -692,7 +692,13 @@ export class FilesController {
       },
     },
   })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      // Override the module-level Multer default (5MB) so videos up to 5GB
+      // are accepted by Multer before reaching the controller-level validators.
+      limits: { fileSize: 5368709120 }, // 5GB for videos
+    }),
+  )
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async uploadClassVideo(
     @UploadedFile(

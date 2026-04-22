@@ -47,6 +47,10 @@ import {
   StudentWithDetailsResponseDto,
 } from './dto/student-response.dto';
 import { BulkEnrollmentResultDto } from './dto/bulk-enrollment-response.dto';
+import {
+  BulkDeleteDto,
+  BulkDeleteResultDto,
+} from '../utils/dto/bulk-delete.dto';
 
 @ApiTags('Students')
 @Controller({
@@ -226,11 +230,31 @@ export class StudentsController {
   getAllEnrollments(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('classId') classId?: string,
   ) {
     return this.studentsService.getAllEnrollments({
       page: page ? +page : 1,
       limit: limit ? +limit : 10,
+      search: search?.trim() || undefined,
+      status: status?.trim() || undefined,
+      classId: classId ? +classId : undefined,
     });
+  }
+
+  @Post('enrollments/bulk-unenroll')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Enrollments unenrolled in bulk',
+  })
+  bulkUnenrollEnrollments(
+    @Body() body: { enrollmentIds: number[] },
+  ) {
+    return this.studentsService.bulkRemoveEnrollments(body?.enrollmentIds || []);
   }
 
   @Get('enrollments/stats')
@@ -307,6 +331,25 @@ export class StudentsController {
   })
   remove(@Param('id') id: string) {
     return this.studentsService.remove(+id);
+  }
+
+  @Post('bulk-delete')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Bulk delete students by id',
+    description:
+      'Deletes multiple students in one request. Returns per-id success/failure so partial failures can be surfaced to the caller.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Bulk deletion processed',
+    type: BulkDeleteResultDto,
+  })
+  bulkDelete(@Body() body: BulkDeleteDto): Promise<BulkDeleteResultDto> {
+    return this.studentsService.bulkRemove(body.ids);
   }
 
   // Enrollment Management Endpoints

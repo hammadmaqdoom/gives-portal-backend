@@ -346,7 +346,7 @@ jobs:
             "AZURE_BLOB_SAS_EXPIRY_SECONDS=${{ secrets.AZURE_BLOB_SAS_EXPIRY_SECONDS }}" \
             "AZURE_BLOB_PUBLIC_BASE_URL=${{ secrets.AZURE_BLOB_PUBLIC_BASE_URL }}" \
             "AUTH_JWT_SECRET=secret" \
-            "AUTH_JWT_TOKEN_EXPIRES_IN=15m" \
+            "AUTH_JWT_TOKEN_EXPIRES_IN=6h" \
             "AUTH_REFRESH_SECRET=secret_for_refresh" \
             "AUTH_REFRESH_TOKEN_EXPIRES_IN=3650d" \
             "AUTH_FORGOT_SECRET=secret_for_forgot" \
@@ -523,7 +523,7 @@ jobs:
               "AZURE_BLOB_SAS_EXPIRY_SECONDS=${{ secrets.AZURE_BLOB_SAS_EXPIRY_SECONDS }}" \
               "AZURE_BLOB_PUBLIC_BASE_URL=${{ secrets.AZURE_BLOB_PUBLIC_BASE_URL }}" \
               "AUTH_JWT_SECRET=secret" \
-              "AUTH_JWT_TOKEN_EXPIRES_IN=15m" \
+              "AUTH_JWT_TOKEN_EXPIRES_IN=6h" \
               "AUTH_REFRESH_SECRET=secret_for_refresh" \
               "AUTH_REFRESH_TOKEN_EXPIRES_IN=3650d" \
               "AUTH_FORGOT_SECRET=secret_for_forgot" \
