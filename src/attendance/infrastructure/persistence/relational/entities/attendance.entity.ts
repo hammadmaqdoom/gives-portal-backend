@@ -31,6 +31,9 @@ export class AttendanceEntity extends EntityRelationalHelper {
   @Column({ type: String, nullable: true })
   notes?: string | null;
 
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  matchedBy?: string | null;
+
   @ManyToOne(() => StudentEntity, {
     eager: true,
   })

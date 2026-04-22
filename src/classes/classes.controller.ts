@@ -47,6 +47,10 @@ import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
 import { BulkClassesResultDto } from './dto/bulk-classes-response.dto';
 import { BulkCreateClassesDto } from './dto/bulk-create-classes.dto';
+import {
+  BulkDeleteDto,
+  BulkDeleteResultDto,
+} from '../utils/dto/bulk-delete.dto';
 import { TeachersService } from '../teachers/teachers.service';
 
 @ApiBearerAuth()
@@ -219,8 +223,21 @@ export class ClassesController {
   @ApiOkResponse({
     description: 'Class enrollments retrieved successfully',
   })
-  getEnrollments(@Param('id') classId: string): Promise<any[]> {
-    return this.classesService.getEnrollments(+classId);
+  getEnrollments(
+    @Param('id') classId: string,
+    @Query('includeAccessStatus') includeAccessStatus?: string,
+  ): Promise<any[]> {
+    // Default = true (preserve existing behavior for the class roster view).
+    // Clients that only need the student/enrollment list (e.g. the admin
+    // "Manage Enrollments" modal) can pass ?includeAccessStatus=false to skip
+    // the expensive per-student access-status enrichment.
+    const include =
+      includeAccessStatus === 'false' || includeAccessStatus === '0'
+        ? false
+        : true;
+    return this.classesService.getEnrollments(+classId, {
+      includeAccessStatus: include,
+    });
   }
 
   // Bulk enroll endpoint
@@ -255,5 +272,24 @@ export class ClassesController {
       bulkCreateDto.classes,
       bulkCreateDto.duplicateHandling || 'skip',
     );
+  }
+
+  @Post('bulk-delete')
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Bulk delete classes by id',
+    description:
+      'Deletes multiple classes in one request. Returns per-id success/failure so partial failures can be surfaced to the caller.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Bulk deletion processed',
+    type: BulkDeleteResultDto,
+  })
+  async bulkDelete(
+    @Body() bulkDeleteDto: BulkDeleteDto,
+  ): Promise<BulkDeleteResultDto> {
+    return this.classesService.bulkRemove(bulkDeleteDto.ids);
   }
 }

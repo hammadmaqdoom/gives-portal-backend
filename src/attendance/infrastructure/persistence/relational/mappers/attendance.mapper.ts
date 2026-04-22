@@ -12,6 +12,7 @@ export class AttendanceMapper {
     attendance.date = raw.date;
     attendance.status = raw.status;
     attendance.notes = raw.notes;
+    attendance.matchedBy = raw.matchedBy ?? null;
     attendance.createdAt = raw.createdAt;
     attendance.updatedAt = raw.updatedAt;
     attendance.deletedAt = raw.deletedAt;
@@ -60,6 +61,9 @@ export class AttendanceMapper {
     }
     if (attendance.notes !== undefined) {
       attendanceEntity.notes = attendance.notes;
+    }
+    if (attendance.matchedBy !== undefined) {
+      attendanceEntity.matchedBy = attendance.matchedBy as string | null;
     }
     if (attendance.student !== undefined) {
       attendanceEntity.student = attendance.student as any;

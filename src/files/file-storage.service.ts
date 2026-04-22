@@ -185,6 +185,57 @@ export class FileStorageService {
   }
 
   /**
+   * Upload an existing file from disk with context awareness (without loading
+   * the whole file into memory).
+   */
+  async uploadFileFromPathWithContext(
+    sourcePath: string,
+    fileMeta: { originalName: string; mimeType: string; size: number },
+    context: FileUploadContext,
+  ): Promise<UploadedFileInfo> {
+    await this.ensureConfigLoaded();
+
+    // Validate using the same rules as regular uploads.
+    this.validateFile(
+      {
+        originalname: fileMeta.originalName,
+        mimetype: fileMeta.mimeType,
+        size: fileMeta.size,
+      } as Express.Multer.File,
+      context.type,
+    );
+
+    const uniqueFilename = this.generateUniqueFilename(fileMeta.originalName);
+    const contextFolderPath = this.createContextFolderPath(
+      context.type,
+      context.id,
+    );
+    await this.ensureFolderExists(contextFolderPath);
+
+    const filePath = await this.uploadFileFromPath(
+      sourcePath,
+      contextFolderPath,
+      uniqueFilename,
+      fileMeta.mimeType,
+      fileMeta.originalName,
+      fileMeta.size,
+    );
+
+    return {
+      id: uuidv4(),
+      filename: uniqueFilename,
+      originalName: fileMeta.originalName,
+      path: filePath,
+      size: fileMeta.size,
+      mimeType: fileMeta.mimeType,
+      uploadedBy: context.userId,
+      uploadedAt: new Date(),
+      contextType: context.type,
+      contextId: context.id,
+    };
+  }
+
+  /**
    * Upload multiple files with context
    */
   async uploadMultipleFilesWithContext(
@@ -268,6 +319,49 @@ export class FileStorageService {
       this.fileDriver === FileDriver.B2_PRESIGNED
     ) {
       return this.uploadToS3(file, folderPath, filename);
+    }
+
+    throw new BadRequestException('Invalid file driver configuration');
+  }
+
+  private async uploadFileFromPath(
+    sourcePath: string,
+    folderPath: string,
+    filename: string,
+    mimeType: string,
+    originalName: string,
+    size: number,
+  ): Promise<string> {
+    if (this.fileDriver === FileDriver.LOCAL) {
+      const fullPath = path.resolve(folderPath, filename);
+      const fullFolderPath = path.dirname(fullPath);
+      if (!fs.existsSync(fullFolderPath)) {
+        fs.mkdirSync(fullFolderPath, { recursive: true });
+      }
+      await fs.promises.copyFile(sourcePath, fullPath);
+      return path.join(folderPath, filename);
+    } else if (
+      this.fileDriver === FileDriver.S3 ||
+      this.fileDriver === FileDriver.S3_PRESIGNED ||
+      this.fileDriver === FileDriver.B2 ||
+      this.fileDriver === FileDriver.B2_PRESIGNED
+    ) {
+      await this.ensureConfigLoaded();
+      const s3Key = path.join(folderPath, filename).replace(/\\/g, '/');
+      await this.s3Client.send(
+        new PutObjectCommand({
+          Bucket: this.s3Bucket,
+          Key: s3Key,
+          Body: fs.createReadStream(sourcePath),
+          ContentType: mimeType,
+          ContentLength: size,
+          Metadata: {
+            originalName,
+            size: size.toString(),
+          },
+        }),
+      );
+      return s3Key;
     }
 
     throw new BadRequestException('Invalid file driver configuration');
