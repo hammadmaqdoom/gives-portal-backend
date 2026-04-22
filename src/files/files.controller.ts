@@ -39,6 +39,7 @@ import { FrontendOriginGuard } from './guards/frontend-origin.guard';
 import { FilesService } from './files.service';
 import { ConfigService } from '@nestjs/config';
 import { FileStorageService, FileUploadContext } from './file-storage.service';
+import { ChunkedUploadService } from './chunked-upload.service';
 import { FileDriver } from './config/file-config.type';
 import { User } from '../users/domain/user';
 import * as path from 'path';
@@ -67,6 +68,7 @@ export class FilesController {
     private readonly teachersService: TeachersService,
     @Inject(forwardRef(() => AssignmentsService))
     private readonly assignmentsService: AssignmentsService,
+    private readonly chunkedUploadService: ChunkedUploadService,
   ) { }
 
   /**
@@ -747,6 +749,126 @@ export class FilesController {
       uploadedAt: uploadedFile.uploadedAt,
       url: fileUrl,
     };
+  }
+
+  // ---------------------------------------------------------------------
+  // Chunked video upload
+  //
+  // The single-request `upload/video/:classId` path is limited in practice by
+  // whatever reverse proxy / CDN sits in front of the API (Cloudflare's free
+  // tier caps at 100 MB per request; nginx defaults to 1 MB). These endpoints
+  // accept a large video as many small chunks, reassemble on disk, and then
+  // flow through the exact same FilesService pipeline so the resulting File
+  // record is identical to a direct upload.
+  // ---------------------------------------------------------------------
+
+  @Post('upload/video/:classId/chunked/init')
+  @ApiOperation({ summary: 'Initialize a chunked video upload session' })
+  @ApiParam({ name: 'classId', description: 'Class ID' })
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
+  async initChunkedVideoUpload(
+    @Param('classId') classId: string,
+    @Body() body: { fileName: string; fileSize: number; mimeType: string },
+    @Req() req: any,
+  ) {
+    if (!body?.fileName || !body?.fileSize) {
+      throw new BadRequestException('fileName and fileSize are required');
+    }
+    const context: FileUploadContext = {
+      type: 'class',
+      id: classId,
+      userId: req.user?.id || 'unknown',
+    };
+    return this.chunkedUploadService.init({
+      fileName: body.fileName,
+      totalSize: Number(body.fileSize),
+      mimeType: body.mimeType || 'application/octet-stream',
+      context,
+    });
+  }
+
+  @Post('upload/video/:classId/chunked/:uploadId/chunk/:chunkIndex')
+  @ApiOperation({ summary: 'Upload a single chunk for a chunked video upload' })
+  @ApiParam({ name: 'classId', description: 'Class ID' })
+  @ApiParam({ name: 'uploadId', description: 'Chunked upload session id' })
+  @ApiParam({ name: 'chunkIndex', description: 'Zero-based chunk index' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      // Cap per-chunk size at 16 MB. The service itself uses 5 MB chunks, but
+      // allowing a little headroom avoids spurious 413s if a client ever
+      // negotiates a larger chunk size in the future.
+      limits: { fileSize: 16 * 1024 * 1024 },
+    }),
+  )
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
+  async uploadVideoChunk(
+    @UploadedFile() file: Express.Multer.File,
+    @Param('uploadId') uploadId: string,
+    @Param('chunkIndex') chunkIndex: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No chunk uploaded');
+    }
+    const index = Number(chunkIndex);
+    if (!Number.isInteger(index) || index < 0) {
+      throw new BadRequestException('Invalid chunk index');
+    }
+    return this.chunkedUploadService.appendChunk({
+      uploadId,
+      chunkIndex: index,
+      chunkBuffer: file.buffer,
+    });
+  }
+
+  @Post('upload/video/:classId/chunked/:uploadId/complete')
+  @ApiOperation({ summary: 'Finalize a chunked video upload' })
+  @ApiParam({ name: 'classId', description: 'Class ID' })
+  @ApiParam({ name: 'uploadId', description: 'Chunked upload session id' })
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
+  async completeChunkedVideoUpload(
+    @Param('uploadId') uploadId: string,
+    @Req() req: any,
+  ) {
+    const uploadedFile = await this.chunkedUploadService.complete({
+      uploadId,
+      userId: req.user?.id || 'unknown',
+    });
+
+    const fileUrl = await this.generateFileUrl(
+      uploadedFile.id,
+      uploadedFile.path,
+      uploadedFile.mimeType,
+    );
+
+    return {
+      id: uploadedFile.id,
+      filename: uploadedFile.filename,
+      originalName: uploadedFile.originalName,
+      path: uploadedFile.path,
+      size: uploadedFile.size,
+      mimeType: uploadedFile.mimeType,
+      uploadedAt: uploadedFile.uploadedAt,
+      url: fileUrl,
+    };
+  }
+
+  @Delete('upload/video/:classId/chunked/:uploadId')
+  @ApiOperation({ summary: 'Abort and clean up a chunked upload session' })
+  @ApiParam({ name: 'classId', description: 'Class ID' })
+  @ApiParam({ name: 'uploadId', description: 'Chunked upload session id' })
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
+  async abortChunkedVideoUpload(@Param('uploadId') uploadId: string) {
+    await this.chunkedUploadService.abort(uploadId);
+    return { message: 'Upload aborted' };
   }
 
   @Get('class/:classId')
