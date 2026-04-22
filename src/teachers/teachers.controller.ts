@@ -49,6 +49,10 @@ import { RolesGuard } from '../roles/roles.guard';
 import { infinityPagination } from '../utils/infinity-pagination';
 import { BulkTeachersResultDto } from './dto/bulk-teachers-response.dto';
 import { PublicTeacherDto } from './dto/public-teacher.dto';
+import {
+  BulkDeleteDto,
+  BulkDeleteResultDto,
+} from '../utils/dto/bulk-delete.dto';
 
 @ApiTags('Teachers')
 @Controller({
@@ -233,6 +237,25 @@ export class TeachersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id') id: string): Promise<void> {
     return this.teachersService.remove(+id);
+  }
+
+  @ApiBearerAuth()
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Post('bulk-delete')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Bulk delete teachers by id',
+    description:
+      'Deletes multiple teachers in one request. Returns per-id success/failure so partial failures can be surfaced to the caller.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Bulk deletion processed',
+    type: BulkDeleteResultDto,
+  })
+  bulkDelete(@Body() body: BulkDeleteDto): Promise<BulkDeleteResultDto> {
+    return this.teachersService.bulkRemove(body.ids);
   }
 
   @Post('bulk-create')

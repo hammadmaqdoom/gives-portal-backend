@@ -122,21 +122,33 @@ export class InvoicesService {
           createInvoiceDto.invoiceNumber ||
           (await this.invoiceRepository.generateInvoiceNumber());
 
+        // Coerce numeric fields defensively. Internal callers (e.g. the monthly
+        // invoice generator) bypass the class-validator @Transform pipeline, so
+        // a string like "4000.00" could otherwise flow through to TypeORM and
+        // get concatenated instead of summed downstream.
         const invoiceData: Partial<Invoice> = {
           invoiceNumber,
           studentId: student.id,
           studentName: student.name,
           parentId: parent?.id,
           parentName: parent?.fullName,
-          amount: createInvoiceDto.amount,
+          amount: Number(createInvoiceDto.amount) || 0,
           currency: createInvoiceDto.currency,
           status: createInvoiceDto.status,
           dueDate: new Date(createInvoiceDto.dueDate),
           generatedDate: new Date(),
           description: createInvoiceDto.description,
           notes: createInvoiceDto.notes,
-          originalPrice: createInvoiceDto.originalPrice,
-          discountAmount: createInvoiceDto.discountAmount,
+          originalPrice:
+            createInvoiceDto.originalPrice !== undefined &&
+            createInvoiceDto.originalPrice !== null
+              ? Number(createInvoiceDto.originalPrice)
+              : undefined,
+          discountAmount:
+            createInvoiceDto.discountAmount !== undefined &&
+            createInvoiceDto.discountAmount !== null
+              ? Number(createInvoiceDto.discountAmount)
+              : undefined,
           discountType: createInvoiceDto.discountType,
           classId: createInvoiceDto.classId,
           items:
@@ -144,9 +156,9 @@ export class InvoicesService {
               id: 0, // Will be set by database
               invoiceId: 0, // Will be set by database
               description: item.description,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              total: item.total,
+              quantity: Number(item.quantity) || 1,
+              unitPrice: Number(item.unitPrice) || 0,
+              total: Number(item.total) || 0,
               classId: item.classId,
               className: item.className,
               teacherName: item.teacherName,
@@ -335,7 +347,11 @@ export class InvoicesService {
       updateData.parentId = updateInvoiceDto.parentId;
     }
     if (updateInvoiceDto.amount !== undefined) {
-      updateData.amount = updateInvoiceDto.amount;
+      // Coerce to Number: callers that bypass the HTTP validator (e.g. the
+      // monthly invoice sync path) could otherwise pass through a decimal
+      // string, which TypeORM would persist as the wrong value after any
+      // arithmetic upstream.
+      updateData.amount = Number(updateInvoiceDto.amount) || 0;
     }
     if (updateInvoiceDto.currency !== undefined) {
       updateData.currency = updateInvoiceDto.currency;
@@ -351,6 +367,29 @@ export class InvoicesService {
     }
 
     return this.invoiceRepository.update(id, updateData);
+  }
+
+  /**
+   * Append a single line item to an existing invoice (e.g. when auto-syncing
+   * multiple class enrollments onto the same monthly invoice).
+   */
+  async addItem(
+    id: number,
+    item: {
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      total: number;
+      classId?: number;
+      className?: string;
+      teacherName?: string;
+    },
+  ): Promise<void> {
+    const invoice = await this.invoiceRepository.findById(id);
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+    await this.invoiceRepository.addItem(id, item as any);
   }
 
   async markAsPaid(

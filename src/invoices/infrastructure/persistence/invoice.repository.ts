@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Invoice } from '../../domain/invoice';
+import { InvoiceItem } from '../../domain/invoice-item';
 import { FilterInvoiceDto, SortInvoiceDto } from '../../dto/query-invoice.dto';
 
 export interface InvoiceRepository {
@@ -18,6 +19,7 @@ export interface InvoiceRepository {
     };
   }): Promise<Invoice[]>;
   update(id: Invoice['id'], payload: Partial<Invoice>): Promise<Invoice | null>;
+  addItem(id: Invoice['id'], item: Partial<InvoiceItem>): Promise<void>;
   remove(id: Invoice['id']): Promise<void>;
   findByStudent(studentId: number): Promise<Invoice[]>;
   findByStudentIds(studentIds: number[]): Promise<Invoice[]>;

@@ -11,6 +11,7 @@ import {
 } from '../../../../dto/query-invoice.dto';
 import { InvoiceMapper } from '../mappers/invoice.mapper';
 import { InvoiceItemMapper } from '../mappers/invoice-item.mapper';
+import { InvoiceItem } from '../../../../domain/invoice-item';
 
 @Injectable()
 export class InvoiceRepositoryImpl implements InvoiceRepository {
@@ -110,6 +111,25 @@ export class InvoiceRepositoryImpl implements InvoiceRepository {
 
     const updatedEntity = await this.invoiceRepository.save(entity);
     return InvoiceMapper.toDomain(updatedEntity);
+  }
+
+  async addItem(id: Invoice['id'], item: Partial<InvoiceItem>): Promise<void> {
+    const invoiceEntity = await this.invoiceRepository.findOne({
+      where: { id },
+    });
+    if (!invoiceEntity) return;
+
+    const itemEntity = this.invoiceItemRepository.create({
+      invoice: invoiceEntity,
+      description: item.description,
+      quantity: Number(item.quantity) || 1,
+      unitPrice: Number(item.unitPrice) || 0,
+      total: Number(item.total) || 0,
+      classId: item.classId,
+      className: item.className,
+      teacherName: item.teacherName,
+    });
+    await this.invoiceItemRepository.save(itemEntity);
   }
 
   async remove(id: Invoice['id']): Promise<void> {

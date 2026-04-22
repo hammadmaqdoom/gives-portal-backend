@@ -17,8 +17,10 @@ export class ClassMapper {
     classObj.timing = raw.timing || '';
     classObj.timezone = raw.timezone || 'Asia/Karachi';
     classObj.courseOutline = raw.courseOutline;
-    classObj.feeUSD = raw.feeUSD;
-    classObj.feePKR = raw.feePKR;
+    // TypeORM returns decimal columns as strings; coerce to numbers to prevent
+    // accidental string concatenation in downstream arithmetic (e.g. invoice totals).
+    classObj.feeUSD = raw.feeUSD !== null && raw.feeUSD !== undefined ? Number(raw.feeUSD) : (raw.feeUSD as any);
+    classObj.feePKR = raw.feePKR !== null && raw.feePKR !== undefined ? Number(raw.feePKR) : (raw.feePKR as any);
     classObj.classMode = raw.classMode;
     (classObj as any).isPublicForSale = raw.isPublicForSale || false;
     (classObj as any).thumbnailUrl = raw.thumbnailUrl;

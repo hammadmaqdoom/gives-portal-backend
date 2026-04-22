@@ -21,7 +21,12 @@ import {
   ApiParam,
   ApiTags,
   ApiResponse,
+  ApiOperation,
 } from '@nestjs/swagger';
+import {
+  BulkDeleteDto,
+  BulkDeleteResultDto,
+} from '../utils/dto/bulk-delete.dto';
 import { Roles } from '../roles/roles.decorator';
 import { RoleEnum } from '../roles/roles.enum';
 import { AuthGuard } from '@nestjs/passport';
@@ -164,6 +169,22 @@ export class ParentsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id') id: Parent['id']): Promise<void> {
     return this.parentsService.remove(id);
+  }
+
+  @Post('bulk-delete')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Bulk delete parents by id',
+    description:
+      'Deletes multiple parents in one request. Returns per-id success/failure so partial failures can be surfaced to the caller.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Bulk deletion processed',
+    type: BulkDeleteResultDto,
+  })
+  bulkDelete(@Body() body: BulkDeleteDto): Promise<BulkDeleteResultDto> {
+    return this.parentsService.bulkRemove(body.ids);
   }
 
   // New parent-student relationship endpoints
