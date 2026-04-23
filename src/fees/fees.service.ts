@@ -4,6 +4,7 @@ import {
   UnprocessableEntityException,
   Inject,
   forwardRef,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
@@ -21,6 +22,8 @@ import { DiscountAnalyticsDto } from './dto/discount-analytics.dto';
 
 @Injectable()
 export class FeesService {
+  private readonly logger = new Logger(FeesService.name);
+
   constructor(
     private readonly feeRepository: FeeRepository,
     @Inject(forwardRef(() => ParentsService))
@@ -146,65 +149,56 @@ export class FeesService {
   // Get fees for a parent's children
   async getFeesForParent(userId: number): Promise<Fee[]> {
     try {
-      console.log('getFeesForParent called with userId:', userId);
-
       if (!userId || isNaN(userId)) {
-        console.log('Invalid userId in getFeesForParent');
         return [];
       }
 
       const parent = await this.parentsService.findByUserId(userId);
       if (!parent) {
-        console.log('No parent found for userId:', userId);
+        this.logger.debug(`getFeesForParent: no parent for userId=${userId}`);
         return [];
       }
 
-      console.log('Found parent:', parent.id);
-
-      // Get all students linked to this parent
       const parentStudents = await this.parentsService.getStudents(parent.id);
-      console.log('Parent students:', parentStudents);
-
       const studentIds = parentStudents
         .map((ps) => ps.studentId)
         .filter((id) => id && !isNaN(id));
-      console.log('Valid student IDs:', studentIds);
 
-      // Get fees for all children
       const allFees: Fee[] = [];
       for (const studentId of studentIds) {
-        console.log('Getting fees for student ID:', studentId);
         const studentFees = await this.feeRepository.findByStudent(studentId);
         allFees.push(...studentFees);
       }
 
+      this.logger.debug(
+        `getFeesForParent userId=${userId} parentId=${parent.id} students=${studentIds.length} fees=${allFees.length}`,
+      );
       return allFees;
     } catch (error) {
-      console.error('Error getting fees for parent:', error);
+      this.logger.error(
+        `getFeesForParent failed: ${(error as Error).message}`,
+      );
       return [];
     }
   }
 
-  // Get fees for a student
   async getFeesForStudent(userId: number): Promise<Fee[]> {
     try {
-      console.log('getFeesForStudent called with userId:', userId);
-
       if (!userId || isNaN(userId)) {
-        console.log('Invalid userId in getFeesForStudent');
         return [];
       }
 
       const student = await this.studentsService.findByUserId(userId);
       if (!student) {
-        console.log('No student found for userId:', userId);
+        this.logger.debug(`getFeesForStudent: no student for userId=${userId}`);
         return [];
       }
 
-      console.log('Found student:', student.id);
       return this.feeRepository.findByStudent(student.id);
     } catch (error) {
-      console.error('Error getting fees for student:', error);
+      this.logger.error(
+        `getFeesForStudent failed: ${(error as Error).message}`,
+      );
       return [];
     }
   }

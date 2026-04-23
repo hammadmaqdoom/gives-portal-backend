@@ -727,22 +727,116 @@ DELETE /fees/{id}
 
 ### 📁 File Upload
 
-#### Upload File
+Base path: `POST /api/v1/files/...` (JWT required). Field name for binary uploads is **`file`** unless noted (multi-file routes accept multiple `file` parts).
+
+#### Upload general file
 ```http
 POST /files/upload
 ```
 
-**Request:** Multipart form data with file
+**Roles:** user, teacher, admin, superAdmin  
+
+**Request:** `multipart/form-data` with a single `file` (validated types such as PDF and images; max size enforced in API).
+
+**Response (example):**
+```json
+{
+  "id": "uuid-of-uploaded-file",
+  "fileId": "uuid-of-uploaded-file",
+  "filename": "stored-name.pdf",
+  "originalName": "notes.pdf",
+  "path": "general/general/uuid.pdf",
+  "size": 102400,
+  "mimeType": "application/pdf",
+  "uploadedAt": "2024-01-01T00:00:00.000Z",
+  "url": "https://example.com/files/..."
+}
+```
+
+#### Other single- or multi-file routes (multipart)
+
+| Route | Notes |
+|-------|--------|
+| `POST /files/upload/profile` | Profile picture |
+| `POST /files/upload/course/thumbnail` | Course thumbnail |
+| `POST /files/upload/course/cover` | Course cover |
+| `POST /files/upload/assignment/:assignmentId` | One or more files |
+| `POST /files/upload/submission/:submissionId` | One or more files |
+| `POST /files/upload/module/:moduleId` | One or more files |
+
+Multi-file responses wrap an array of file objects and a `message` field (see live Swagger for exact schema).
+
+#### Upload class video (single request)
+```http
+POST /files/upload/video/:classId
+```
+
+**Roles:** teacher, admin, superAdmin  
+
+**Request:** `multipart/form-data` with `file` (video types such as mp4, webm, mov; up to 5 GB if reverse proxy allows).
+
+**Response:** Same file metadata shape as general upload (including `url`).
+
+#### Chunked class video upload
+
+Use when proxies or CDNs cap request size (e.g. nginx `client_max_body_size`, Cloudflare limits). Fixed **5 MB** chunk size from the server; client sends parts until `received === total`.
+
+**1. Initialize**
+```http
+POST /files/upload/video/:classId/chunked/init
+Content-Type: application/json
+```
+
+**Body:**
+```json
+{
+  "fileName": "lesson.mp4",
+  "fileSize": 104857600,
+  "mimeType": "video/mp4"
+}
+```
+
+`fileName` and `fileSize` are required; `mimeType` optional.
 
 **Response:**
 ```json
 {
-  "file": {
-    "id": "uuid-of-uploaded-file",
-    "path": "/uploads/filename.jpg"
-  }
+  "uploadId": "session-uuid",
+  "chunkSize": 5242880,
+  "totalChunks": 20
 }
 ```
+
+**2. Upload chunk**
+```http
+POST /files/upload/video/:classId/chunked/:uploadId/chunk/:chunkIndex
+```
+
+`chunkIndex` is 0-based. **Request:** `multipart/form-data`, field `file` = raw bytes for that chunk (full chunk except the last, which may be shorter).
+
+**Response:**
+```json
+{
+  "received": 5,
+  "total": 20
+}
+```
+
+**3. Complete**
+```http
+POST /files/upload/video/:classId/chunked/:uploadId/complete
+```
+
+**Response:** Same as single-request class video upload when successful.
+
+**4. Abort**
+```http
+DELETE /files/upload/video/:classId/chunked/:uploadId
+```
+
+**Response:** `{ "message": "Upload aborted" }`
+
+**Behavioral notes:** Sessions are in-memory; server restarts invalidate `uploadId`. Max declared size 5 GB; allowed video extensions align with direct video upload.
 
 ## 🔧 Complete Features Implemented
 
@@ -778,7 +872,9 @@ POST /files/upload
 
 ### ✅ File Uploads
 - ✅ **Student photos** using existing files module
-- ✅ **Multiple storage drivers** (local, S3, S3-presigned)
+- ✅ **Multiple storage drivers** (local, S3, S3-presigned, B2, B2-presigned)
+- ✅ **Contextual routes** (assignments, submissions, modules, profile, course assets, class videos)
+- ✅ **Chunked class video uploads** for large files behind strict reverse proxies
 - ✅ **File validation** (type, size, format)
 - ✅ **UUID-based file identification**
 - ✅ **Secure file handling** with proper permissions

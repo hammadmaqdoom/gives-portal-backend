@@ -238,12 +238,18 @@ export class InvoicesController {
   })
   markAsPaid(
     @Param('id') id: string,
-    @Body() body: { paymentMethod: string; transactionId?: string },
+    @Body()
+    body: {
+      paymentMethod: string;
+      transactionId?: string;
+      paidDate?: string;
+    },
   ) {
     return this.invoicesService.markAsPaid(
       +id,
       body.paymentMethod,
       body.transactionId,
+      body.paidDate,
     );
   }
 

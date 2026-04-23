@@ -85,9 +85,17 @@ export class TeacherCommissionsRelationalRepository
       });
     }
 
-    queryBuilder
-      .skip(paginationOptions.page * paginationOptions.limit)
-      .take(paginationOptions.limit);
+    // This repo uses 0-indexed pages. Clamp limit to the shared ceiling but
+    // preserve the original page-offset math.
+    const rawLimit = Number(paginationOptions?.limit);
+    const rawPage = Number(paginationOptions?.page);
+    const limit =
+      Number.isFinite(rawLimit) && rawLimit > 0
+        ? Math.min(Math.floor(rawLimit), 100)
+        : 10;
+    const page =
+      Number.isFinite(rawPage) && rawPage >= 0 ? Math.floor(rawPage) : 0;
+    queryBuilder.skip(page * limit).take(limit);
 
     const commissions = await queryBuilder.getMany();
 

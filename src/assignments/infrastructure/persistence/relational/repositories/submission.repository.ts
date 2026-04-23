@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SubmissionEntity } from '../entities/submission.entity';
@@ -7,9 +7,12 @@ import { SubmissionMapper } from '../mappers/submission.mapper';
 import { SubmissionRepository } from '../../submission.repository';
 import { NullableType } from '../../../../../utils/types/nullable.type';
 import { IPaginationOptions } from '../../../../../utils/types/pagination-options';
+import { normalizePagination } from '../../../../../utils/normalize-pagination';
 
 @Injectable()
 export class SubmissionsRelationalRepository implements SubmissionRepository {
+  private readonly logger = new Logger(SubmissionsRelationalRepository.name);
+
   constructor(
     @InjectRepository(SubmissionEntity)
     private readonly submissionsRepository: Repository<SubmissionEntity>,
@@ -17,20 +20,12 @@ export class SubmissionsRelationalRepository implements SubmissionRepository {
   ) {}
 
   async create(data: Partial<Submission>): Promise<Submission> {
-    console.log('Creating submission with data:', data);
-
     const submissionEntity = this.submissionMapper.toPersistence(data);
-    console.log('Persistence entity:', submissionEntity);
-
     const newSubmission = await this.submissionsRepository.save(
       this.submissionsRepository.create(submissionEntity),
     );
-    console.log('Saved submission entity:', newSubmission);
-
-    const mappedSubmission = this.submissionMapper.toDomain(newSubmission);
-    console.log('Final mapped submission:', mappedSubmission);
-
-    return mappedSubmission;
+    this.logger.debug(`Created submission id=${newSubmission.id}`);
+    return this.submissionMapper.toDomain(newSubmission);
   }
 
   async findById(id: Submission['id']): Promise<NullableType<Submission>> {
@@ -131,21 +126,18 @@ export class SubmissionsRelationalRepository implements SubmissionRepository {
       queryBuilder.addOrderBy('submission.createdAt', 'DESC');
     }
 
-    console.log('Submission query SQL:', queryBuilder.getSql());
-    console.log('Submission query parameters:', queryBuilder.getParameters());
-
-    queryBuilder.skip((paginationOptions.page - 1) * paginationOptions.limit);
-    queryBuilder.take(paginationOptions.limit);
+    const { skip, take, page, limit } = normalizePagination(paginationOptions);
+    queryBuilder.skip(skip);
+    queryBuilder.take(take);
 
     const submissions = await queryBuilder.getMany();
-    console.log('Raw submissions from database:', submissions);
-
-    const mappedSubmissions = submissions.map((submission) =>
-      this.submissionMapper.toDomain(submission),
+    this.logger.debug(
+      `findManyWithPagination classId=${filterOptions?.classId ?? '-'} assignmentId=${filterOptions?.assignmentId ?? '-'} studentId=${filterOptions?.studentId ?? '-'} status=${filterOptions?.status ?? '-'} page=${page} limit=${limit} -> ${submissions.length} rows`,
     );
 
-    console.log('Mapped submissions:', mappedSubmissions);
-    return mappedSubmissions;
+    return submissions.map((submission) =>
+      this.submissionMapper.toDomain(submission),
+    );
   }
 
   async update(

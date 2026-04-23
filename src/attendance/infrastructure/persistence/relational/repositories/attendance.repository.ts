@@ -7,6 +7,7 @@ import { AttendanceMapper } from '../mappers/attendance.mapper';
 import { AttendanceRepository } from '../../attendance.repository';
 import { NullableType } from '../../../../../utils/types/nullable.type';
 import { IPaginationOptions } from '../../../../../utils/types/pagination-options';
+import { normalizePagination } from '../../../../../utils/normalize-pagination';
 import {
   FilterAttendanceDto,
   SortAttendanceDto,
@@ -149,8 +150,8 @@ export class AttendancesRelationalRepository implements AttendanceRepository {
       queryBuilder.addOrderBy('attendance.id', 'ASC');
     }
 
-    queryBuilder.skip((paginationOptions.page - 1) * paginationOptions.limit);
-    queryBuilder.take(paginationOptions.limit);
+    const { skip, take } = normalizePagination(paginationOptions);
+    queryBuilder.skip(skip).take(take);
 
     const attendances = await queryBuilder.getMany();
     return attendances.map((attendance) =>

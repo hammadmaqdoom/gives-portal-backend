@@ -17,6 +17,7 @@ import {
   ParseFilePipe,
   MaxFileSizeValidator,
   FileTypeValidator,
+  Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -58,6 +59,8 @@ import {
   version: '1',
 })
 export class StudentsController {
+  private readonly logger = new Logger(StudentsController.name);
+
   constructor(private readonly studentsService: StudentsService) {}
 
   @Get('test')
@@ -75,44 +78,37 @@ export class StudentsController {
     type: StudentResponseDto,
   })
   async getCurrentUserStudent(@Request() req) {
-    console.log(
-      `getCurrentUserStudent called with user ID: ${req.user.id}, email: ${req.user.email}`,
+    this.logger.debug(
+      `getCurrentUserStudent userId=${req.user.id} email=${req.user.email}`,
     );
 
-    // Check if user is superAdmin - don't auto-create student profiles for super admins
     const isSuperAdmin = req.user.role?.id === RoleEnum.superAdmin;
-    if (isSuperAdmin) {
-      console.log(`User is superAdmin, skipping student profile auto-creation`);
-    }
 
-    // Try to find student by user ID first
     let student = await this.studentsService.findByUserId(req.user.id);
-    console.log(`findByUserId result:`, student ? 'found' : 'not found');
 
-    // If not found by user ID, try by email
     if (!student && req.user.email) {
-      console.log(`Trying to find student by email: ${req.user.email}`);
       student = await this.studentsService.findByEmail(req.user.email);
-      console.log(`findByEmail result:`, student ? 'found' : 'not found');
     }
 
-    // If still not found, auto-create a student profile for the user (but not for super admins)
     if (!student) {
       if (isSuperAdmin) {
-        // Super admins don't need student profiles
-        throw new NotFoundException('Student profile not found for current user');
+        throw new NotFoundException(
+          'Student profile not found for current user',
+        );
       }
-      
-      console.log(`⚠️ Student profile not found, auto-creating for user ID: ${req.user.id}`);
+
       try {
-        student = await this.studentsService.ensureStudentProfileForUser(req.user.id);
-        console.log(`✅ Auto-created student profile with ID: ${student?.id}`);
+        student = await this.studentsService.ensureStudentProfileForUser(
+          req.user.id,
+        );
       } catch (error) {
-        console.error(`❌ Error auto-creating student profile:`, error);
+        this.logger.error(
+          `Error auto-creating student profile userId=${req.user.id}: ${(error as Error).message}`,
+        );
         throw error;
       }
     }
-    
+
     return student;
   }
 

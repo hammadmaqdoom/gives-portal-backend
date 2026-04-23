@@ -484,19 +484,16 @@ export class ZoomService {
 
   // Zoom Meeting Management
   async createMeeting(createDto: CreateZoomMeetingDto): Promise<ZoomMeeting> {
-    console.log('Creating Zoom meeting with DTO:', createDto);
-    console.log(
-      'Teacher ID type:',
-      typeof createDto.teacherId,
-      'Value:',
-      createDto.teacherId,
+    this.logger.log(
+      `createMeeting teacherId=${createDto.teacherId} topic=${createDto.topic ?? '-'}`,
     );
 
-    // Get teacher's Zoom credentials
     const credentials = await this.zoomCredentialsRepository.findByTeacherId(
       createDto.teacherId,
     );
-    console.log('Found credentials:', credentials);
+    this.logger.debug(
+      `Zoom credentials lookup teacherId=${createDto.teacherId} -> ${credentials ? 'found' : 'not found'}`,
+    );
 
     if (!credentials) {
       throw new BadRequestException(

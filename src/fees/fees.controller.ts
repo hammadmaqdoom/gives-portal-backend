@@ -12,6 +12,7 @@ import {
   HttpCode,
   SerializeOptions,
   Request,
+  Logger,
 } from '@nestjs/common';
 import { CreateFeeDto } from './dto/create-fee.dto';
 import { UpdateFeeDto } from './dto/update-fee.dto';
@@ -45,6 +46,8 @@ import { DiscountAnalyticsDto } from './dto/discount-analytics.dto';
   version: '1',
 })
 export class FeesController {
+  private readonly logger = new Logger(FeesController.name);
+
   constructor(private readonly feesService: FeesService) {}
 
   @Post()
@@ -154,39 +157,21 @@ export class FeesController {
     groups: ['admin'],
   })
   async getMyFees(@Request() req): Promise<Fee[]> {
-    console.log('getMyFees - req.user:', req.user);
-    console.log('getMyFees - req.user type:', typeof req.user);
-
     const userId = req.user?.id;
-    console.log(
-      'getMyFees called with userId:',
-      userId,
-      'userId type:',
-      typeof userId,
-    );
+    this.logger.debug(`getMyFees userId=${userId}`);
 
     if (!userId || isNaN(userId)) {
-      console.log('Invalid userId, returning empty array');
       return [];
     }
 
-    // Check if user is a parent
-    const isParent = await this.feesService.isUserParent(userId);
-    console.log('Is parent:', isParent);
-
-    if (isParent) {
+    if (await this.feesService.isUserParent(userId)) {
       return this.feesService.getFeesForParent(userId);
     }
 
-    // Check if user is a student
-    const isStudent = await this.feesService.isUserStudent(userId);
-    console.log('Is student:', isStudent);
-
-    if (isStudent) {
+    if (await this.feesService.isUserStudent(userId)) {
       return this.feesService.getFeesForStudent(userId);
     }
 
-    console.log('User is neither parent nor student, returning empty array');
     return [];
   }
 
@@ -202,11 +187,7 @@ export class FeesController {
     groups: ['admin'],
   })
   findOne(@Param('id') id: string): Promise<NullableType<Fee>> {
-    console.log('findOne called with id:', id, 'type:', typeof id);
-    console.log('findOne converted id:', +id, 'type:', typeof +id);
-
     if (!id || isNaN(+id)) {
-      console.log('Invalid id in findOne, returning null');
       return Promise.resolve(null);
     }
 

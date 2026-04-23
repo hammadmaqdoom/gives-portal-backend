@@ -6,6 +6,9 @@
 
 - [File uploading](#file-uploading)
   - [Drivers support](#drivers-support)
+  - [LMS upload endpoints (API)](#lms-upload-endpoints-api)
+  - [Chunked class video uploads](#chunked-class-video-uploads)
+    - [Operational notes](#operational-notes)
   - [Uploading and attach file flow for `local` driver](#uploading-and-attach-file-flow-for-local-driver)
     - [An example of uploading an avatar to a user profile (local)](#an-example-of-uploading-an-avatar-to-a-user-profile-local)
     - [Video example](#video-example)
@@ -31,6 +34,84 @@
 Out-of-box boilerplate supports the following drivers: `local`, `s3`, `s3-presigned`, `b2`, and `b2-presigned`. You can set it in the `.env` file, variable `FILE_DRIVER`. If you want to use another service for storing files, you can extend it.
 
 > For production we recommend using the "s3-presigned" or "b2-presigned" driver to offload your server.
+
+---
+
+## LMS upload endpoints (API)
+
+The portal exposes several authenticated routes under `POST /api/v1/files/...` (JWT in `Authorization: Bearer <token>`). Each route applies its own file-type and size rules via validation pipes.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/api/v1/files/upload/assignment/:assignmentId` | Multiple files for an assignment |
+| `POST` | `/api/v1/files/upload/submission/:submissionId` | Multiple files for a submission |
+| `POST` | `/api/v1/files/upload/module/:moduleId` | Multiple files for a module |
+| `POST` | `/api/v1/files/upload/profile` | Profile image |
+| `POST` | `/api/v1/files/upload/course/thumbnail` | Course thumbnail |
+| `POST` | `/api/v1/files/upload/course/cover` | Course cover image |
+| `POST` | `/api/v1/files/upload` | General documents (PDF, Office, images; size capped in controller) |
+| `POST` | `/api/v1/files/upload/video/:classId` | Single-request class video (up to 5 GB if the reverse proxy allows) |
+
+Successful uploads return file metadata including `id`, `path`, `mimeType`, `size`, `uploadedAt`, and a resolved `url` where applicable. After upload, attach the returned `id` to domain entities (students, courses, etc.) as your feature requires.
+
+---
+
+## Chunked class video uploads
+
+Large class videos should use the **chunked** flow when a single `POST` would exceed limits imposed by nginx (`client_max_body_size`), Cloudflare, or other proxies. The API splits the file into **5 MB** chunks, reassembles them on disk, then runs the same storage pipeline as `POST /api/v1/files/upload/video/:classId`, so the resulting `File` record is the same as a direct upload.
+
+The LMS frontend uses the **single-request** class video endpoint for files up to **200 MB** and automatically switches to this chunked flow for larger files (see `uploadClassVideo` in `lms-portal-frontend/src/api/files.ts`). Custom clients can choose either path explicitly.
+
+**Roles:** teacher, admin, or superAdmin (same as direct class video upload).
+
+### Endpoints
+
+All paths are prefixed with `/api/v1/files`.
+
+1. **Initialize session** — `POST /upload/video/:classId/chunked/init`  
+   **JSON body:**
+
+   ```json
+   {
+     "fileName": "lecture.mp4",
+     "fileSize": 524288000,
+     "mimeType": "video/mp4"
+   }
+   ```
+
+   `fileName` and `fileSize` are required. `mimeType` is optional (defaults when omitted).  
+   **Response:**
+
+   ```json
+   {
+     "uploadId": "<uuid>",
+     "chunkSize": 5242880,
+     "totalChunks": 100
+   }
+   ```
+
+2. **Upload each chunk** — `POST /upload/video/:classId/chunked/:uploadId/chunk/:chunkIndex`  
+   - `chunkIndex` is zero-based and must match the size rules: every part except the last is exactly `chunkSize` bytes; the last part holds the remainder of `fileSize`.  
+   - **Multipart form** field name: `file` (binary body of that chunk only).  
+   - **Response:** `{ "received": 3, "total": 100 }` (progress counters). Chunks may be sent **out of order**.
+
+3. **Complete** — `POST /upload/video/:classId/chunked/:uploadId/complete`  
+   Reassembles parts, persists via configured `FILE_DRIVER`, returns the same shape as a successful direct video upload (`id`, `filename`, `path`, `url`, etc.). The temporary session and chunk files are removed after completion.
+
+4. **Abort** — `DELETE /upload/video/:classId/chunked/:uploadId`  
+   Drops the session and temp data. Response: `{ "message": "Upload aborted" }`.
+
+### Limits and validation
+
+- Maximum declared file size: **5 GB** (same order of magnitude as direct video upload).
+- Allowed extensions for the declared `fileName`: `mp4`, `webm`, `mov`, `avi`, `mkv`, `flv`, `wmv`, `m4v` (case-insensitive).
+- Chunk temp files live under `uploads/.chunks/<uploadId>/` relative to the app working directory.
+
+### Operational notes
+
+- **In-memory sessions:** Upload state is kept in process memory. A **process restart** during an in-flight chunked upload invalidates `uploadId`; the client should restart from `init`. Stale sessions are garbage-collected on a timer.
+- **nginx:** Example deployment config sets `client_max_body_size` to **250M** for direct uploads while individual chunk requests stay small (~5 MB). If nginx still uses a **1 MB** default elsewhere, raise it so chunk `POST`s are not rejected with `413`.
+- **Production path:** Prefer chunked (or presigned direct-to-object-storage flows where implemented) when users upload very large videos through constrained networks or CDNs.
 
 ---
 

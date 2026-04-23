@@ -7,6 +7,7 @@ import { FeeMapper } from '../mappers/fee.mapper';
 import { FeeRepository } from '../../fee.repository';
 import { NullableType } from '../../../../../utils/types/nullable.type';
 import { IPaginationOptions } from '../../../../../utils/types/pagination-options';
+import { normalizePagination } from '../../../../../utils/normalize-pagination';
 import { FilterFeeDto, SortFeeDto } from '../../../../dto/query-fee.dto';
 
 @Injectable()
@@ -26,10 +27,7 @@ export class FeesRelationalRepository implements FeeRepository {
   }
 
   async findById(id: Fee['id']): Promise<NullableType<Fee>> {
-    console.log('findById called with id:', id, 'type:', typeof id);
-
     if (!id || isNaN(id)) {
-      console.log('Invalid id, returning null');
       return null;
     }
 
@@ -40,15 +38,7 @@ export class FeesRelationalRepository implements FeeRepository {
   }
 
   async findByStudent(studentId: number): Promise<Fee[]> {
-    console.log(
-      'findByStudent called with studentId:',
-      studentId,
-      'type:',
-      typeof studentId,
-    );
-
     if (!studentId || isNaN(studentId)) {
-      console.log('Invalid studentId, returning empty array');
       return [];
     }
 
@@ -168,8 +158,8 @@ export class FeesRelationalRepository implements FeeRepository {
       queryBuilder.addOrderBy('fee.id', 'ASC');
     }
 
-    queryBuilder.skip((paginationOptions.page - 1) * paginationOptions.limit);
-    queryBuilder.take(paginationOptions.limit);
+    const { skip, take } = normalizePagination(paginationOptions);
+    queryBuilder.skip(skip).take(take);
 
     const fees = await queryBuilder.getMany();
     return fees.map((fee) => this.feeMapper.toDomain(fee));

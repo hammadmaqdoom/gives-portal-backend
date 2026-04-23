@@ -9,6 +9,7 @@ import { User } from '../../../../domain/user';
 import { UserRepository } from '../../user.repository';
 import { UserMapper } from '../mappers/user.mapper';
 import { IPaginationOptions } from '../../../../../utils/types/pagination-options';
+import { normalizePagination } from '../../../../../utils/normalize-pagination';
 
 @Injectable()
 export class UsersRelationalRepository implements UserRepository {
@@ -65,9 +66,9 @@ export class UsersRelationalRepository implements UserRepository {
       queryBuilder.addOrderBy('user.createdAt', 'DESC');
     }
 
-    // Add pagination
-    const skip = (paginationOptions.page - 1) * paginationOptions.limit;
-    queryBuilder.skip(skip).take(paginationOptions.limit);
+    // Add pagination (server-side clamped to MAX_PAGINATION_LIMIT)
+    const { skip, take } = normalizePagination(paginationOptions);
+    queryBuilder.skip(skip).take(take);
 
     const [entities, total] = await queryBuilder.getManyAndCount();
 
