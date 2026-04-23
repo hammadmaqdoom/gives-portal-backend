@@ -38,6 +38,11 @@ services:
       dockerfile: Dockerfile.prod
     container_name: backend_app
     restart: unless-stopped
+    # Memory ceiling. Keep this >= (max-old-space-size in Dockerfile.prod) + ~500MB headroom
+    # for native allocations (Buffer pool, DNS cache, etc.). Raise both together if
+    # you move to a bigger droplet.
+    mem_limit: 2g
+    memswap_limit: 2g
     environment:
       - NODE_ENV=production
     env_file:

@@ -2,9 +2,10 @@
 import './polyfills';
 import 'dotenv/config';
 import * as Sentry from '@sentry/node';
-import { nodeProfilingIntegration } from '@sentry/profiling-node';
+import type { Integration } from '@sentry/types';
 import {
   ClassSerializerInterceptor,
+  Logger,
   ValidationPipe,
   VersioningType,
 } from '@nestjs/common';
@@ -23,19 +24,76 @@ async function bootstrap() {
   const sentryEnabled = process.env.SENTRY_ENABLED === 'true' || !!sentryDsn;
 
   if (sentryEnabled && sentryDsn) {
+    // Profiling relies on a native prebuilt binary that may not exist for
+    // the current Node ABI (e.g. Node 25). Load it defensively so a missing
+    // binary disables profiling instead of crashing the process on boot.
+    const integrations: Integration[] = [];
+    let profilingLoaded = false;
+    try {
+      const { nodeProfilingIntegration } = require('@sentry/profiling-node');
+      integrations.push(nodeProfilingIntegration());
+      profilingLoaded = true;
+    } catch (err) {
+      console.warn(
+        `[sentry] profiling-node unavailable, continuing without profiling: ${(err as Error).message}`,
+      );
+    }
+
     Sentry.init({
       dsn: sentryDsn,
       environment:
         process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development',
-      integrations: [nodeProfilingIntegration()],
+      integrations,
       tracesSampleRate: process.env.SENTRY_TRACES_SAMPLE_RATE
         ? parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE)
         : 0.1,
-      profilesSampleRate: process.env.SENTRY_PROFILES_SAMPLE_RATE
-        ? parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE)
-        : 0.1,
+      profilesSampleRate: profilingLoaded
+        ? process.env.SENTRY_PROFILES_SAMPLE_RATE
+          ? parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE)
+          : 0.1
+        : 0,
     });
   }
+
+  // Crash-safety: make sure we always flush to Sentry before the process
+  // dies on an unhandled rejection / uncaught exception. Without this, OOMs
+  // and async bugs leave no trace beyond the container logs.
+  const processLogger = new Logger('Process');
+
+  const flushAndExit = async (code: number) => {
+    try {
+      if (sentryEnabled && sentryDsn) {
+        await Sentry.close(2000);
+      }
+    } catch {
+      // best-effort — never block shutdown on Sentry
+    } finally {
+      process.exit(code);
+    }
+  };
+
+  process.on('unhandledRejection', (reason: unknown) => {
+    processLogger.error(
+      `Unhandled promise rejection: ${
+        reason instanceof Error ? reason.stack : String(reason)
+      }`,
+    );
+    if (sentryEnabled && sentryDsn) {
+      Sentry.captureException(reason);
+    }
+    // Do not exit here — let the request finish. If the process is truly
+    // wedged, the container healthcheck / orchestrator will restart it.
+  });
+
+  process.on('uncaughtException', (err: Error) => {
+    processLogger.error(`Uncaught exception: ${err.stack ?? err.message}`);
+    if (sentryEnabled && sentryDsn) {
+      Sentry.captureException(err);
+    }
+    // Uncaught exceptions leave the process in an undefined state per
+    // Node docs — flush Sentry then exit so the orchestrator restarts us.
+    void flushAndExit(1);
+  });
 
   const app = await NestFactory.create(AppModule);
 

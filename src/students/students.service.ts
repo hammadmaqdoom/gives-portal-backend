@@ -5,6 +5,7 @@ import {
   Inject,
   forwardRef,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import * as XLSX from 'xlsx';
 import { CreateStudentDto } from './dto/create-student.dto';
@@ -34,9 +35,12 @@ import { MailService } from '../mail/mail.service';
 import { randomStringGenerator } from '../utils/random-string-generator';
 import { RoleEnum } from '../roles/roles.enum';
 import { StatusEnum } from '../statuses/statuses.enum';
+import { performBulkDelete } from '../utils/dto/bulk-delete.dto';
 
 @Injectable()
 export class StudentsService {
+  private readonly logger = new Logger(StudentsService.name);
+
   constructor(
     private readonly studentsRepository: StudentRepository,
     private readonly enrollmentRepository: StudentClassEnrollmentRepository,
@@ -111,8 +115,8 @@ export class StudentsService {
         status: { id: StatusEnum.active },
       });
 
-      console.log(
-        `Student user account created: ${createStudentDto.email} with role: ${user.role?.name}`,
+      this.logger.log(
+        `Student user account created email=${createStudentDto.email} role=${user.role?.name}`,
       );
 
       // Send account credentials email to the student
@@ -124,8 +128,8 @@ export class StudentsService {
           tempPassword,
           isParent: false,
         });
-        console.log(
-          `Account credentials email sent to student: ${createStudentDto.email}`,
+        this.logger.log(
+          `Account credentials email sent to student=${createStudentDto.email}`,
         );
       } catch (emailError) {
         console.error(
@@ -204,25 +208,18 @@ export class StudentsService {
   }
 
   async findByUserId(userId: number): Promise<NullableType<Student>> {
-    console.log(
-      `🔍 StudentsService.findByUserId called with userId: ${userId}`,
-    );
-
     const student = await this.studentsRepository.findByUserId(userId);
-
-    console.log(`🔍 StudentsService.findByUserId result:`, student);
-    console.log(
-      `🔍 StudentsService.findByUserId result userId:`,
-      student?.userId,
+    this.logger.debug(
+      `findByUserId userId=${userId} -> ${student ? `id=${student.id}` : 'not found'}`,
     );
-
     return student;
   }
 
   async findByEmail(email: string): Promise<NullableType<Student>> {
-    console.log(`StudentsService.findByEmail called with email: ${email}`);
     const student = await this.studentsRepository.findByEmail(email);
-    console.log(`StudentsService.findByEmail result:`, student);
+    this.logger.debug(
+      `findByEmail email=${email} -> ${student ? `id=${student.id}` : 'not found'}`,
+    );
     return student;
   }
 
@@ -231,22 +228,18 @@ export class StudentsService {
    * Note: This method will NOT create profiles for superAdmin users
    */
   async ensureStudentProfileForUser(userId: number): Promise<Student> {
-    console.log(`🔧 ensureStudentProfileForUser called with userId: ${userId}`);
-    
-    // Try to find existing student profile
+    this.logger.debug(`ensureStudentProfileForUser userId=${userId}`);
+
     let student = await this.findByUserId(userId);
-    console.log(`🔧 ensureStudentProfileForUser - findByUserId result:`, student ? 'found' : 'not found');
-    
     if (student) {
-      console.log(`🔧 ensureStudentProfileForUser - Returning existing student: ${student.id}`);
       return student;
     }
 
-    // Get the full user object
-    console.log(`🔧 ensureStudentProfileForUser - Fetching user with ID: ${userId}`);
     const user = await this.usersService.findById(userId);
     if (!user) {
-      console.error(`🔧 ensureStudentProfileForUser - User not found with ID: ${userId}`);
+      this.logger.error(
+        `ensureStudentProfileForUser: user not found userId=${userId}`,
+      );
       throw new UnprocessableEntityException({
         status: HttpStatus.UNPROCESSABLE_ENTITY,
         errors: {
@@ -255,9 +248,7 @@ export class StudentsService {
       });
     }
 
-    // Don't create student profiles for super admins
     if (user.role?.id === RoleEnum.superAdmin) {
-      console.log(`🔧 ensureStudentProfileForUser - User is superAdmin, skipping auto-creation`);
       throw new UnprocessableEntityException({
         status: HttpStatus.UNPROCESSABLE_ENTITY,
         errors: {
@@ -266,37 +257,29 @@ export class StudentsService {
       });
     }
 
-    console.log(`🔧 ensureStudentProfileForUser - User found: ${user.email || 'no email'}, firstName: ${user.firstName || 'none'}, lastName: ${user.lastName || 'none'}`);
-
-    // Try to find by email as well
     if (user.email) {
-      console.log(`🔧 ensureStudentProfileForUser - Trying to find student by email: ${user.email}`);
       student = await this.findByEmail(user.email);
       if (student) {
-        console.log(`🔧 ensureStudentProfileForUser - Found student by email, linking to user`);
-        // Link the student to the user if not already linked
         if (!student.userId && user.id) {
           await this.update(student.id, {
             user: { id: Number(user.id) },
           });
-          // Re-fetch to get the updated student
           const updatedStudent = await this.findById(student.id);
           if (updatedStudent) {
             student = updatedStudent;
           }
         }
-        console.log(`🔧 ensureStudentProfileForUser - Returning linked student: ${student.id}`);
         return student;
       }
     }
 
-    // Create a new student profile from user data
-    const studentName = 
-      (user.firstName && user.lastName) 
+    const studentName =
+      user.firstName && user.lastName
         ? `${user.firstName} ${user.lastName}`.trim()
-        : user.firstName || user.lastName || user.email?.split('@')[0] || 'Student';
-
-    console.log(`🔧 ensureStudentProfileForUser - Creating new student profile with name: ${studentName}`);
+        : user.firstName ||
+          user.lastName ||
+          user.email?.split('@')[0] ||
+          'Student';
 
     const createStudentDto: CreateStudentDto = {
       name: studentName,
@@ -308,9 +291,10 @@ export class StudentsService {
       user: { id: Number(user.id) },
     };
 
-    console.log(`🔧 ensureStudentProfileForUser - Calling create with DTO:`, JSON.stringify(createStudentDto, null, 2));
     const result = await this.create(createStudentDto);
-    console.log(`🔧 ensureStudentProfileForUser - Student created successfully with ID: ${result.student.id}`);
+    this.logger.log(
+      `Auto-created student profile id=${result.student.id} for userId=${userId}`,
+    );
     return result.student;
   }
 
@@ -462,6 +446,13 @@ export class StudentsService {
     await this.studentsRepository.remove(id);
   }
 
+  async bulkRemove(ids: Array<Student['id']>) {
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('No student ids provided');
+    }
+    return performBulkDelete(ids, (id) => this.remove(id));
+  }
+
   async enrollInClass(
     studentId: number,
     createEnrollmentDto: CreateEnrollmentDto,
@@ -548,6 +539,107 @@ export class StudentsService {
     );
 
     return updatedEnrollment;
+  }
+
+  async bulkRemoveEnrollments(
+    enrollmentIds: number[],
+  ): Promise<{
+    removed: number;
+    skipped: number;
+    studentsAffected: number;
+    classesAffected: number;
+    results: Array<{
+      enrollmentId: number;
+      studentId?: number;
+      classId?: number;
+      success: boolean;
+      reason?: string;
+    }>;
+  }> {
+    // Dedupe to avoid processing the same enrollment twice when the client
+    // accidentally sends duplicates.
+    const uniqueIds = Array.from(
+      new Set((enrollmentIds || []).filter((id) => Number.isFinite(id))),
+    );
+
+    const results: Array<{
+      enrollmentId: number;
+      studentId?: number;
+      classId?: number;
+      success: boolean;
+      reason?: string;
+    }> = [];
+    const studentSet = new Set<number>();
+    const classSet = new Set<number>();
+    let removed = 0;
+    let skipped = 0;
+
+    for (const id of uniqueIds) {
+      try {
+        const enrollment = await this.enrollmentRepository.findById(id);
+        if (!enrollment) {
+          skipped++;
+          results.push({
+            enrollmentId: id,
+            success: false,
+            reason: 'notFound',
+          });
+          continue;
+        }
+
+        // Skip already-dropped enrollments so the counter stays accurate and
+        // we don't send a duplicate notification.
+        if (enrollment.status === 'dropped') {
+          skipped++;
+          results.push({
+            enrollmentId: id,
+            studentId: enrollment.studentId,
+            classId: enrollment.classId,
+            success: false,
+            reason: 'alreadyDropped',
+          });
+          continue;
+        }
+
+        await this.enrollmentRepository.remove(enrollment.id);
+        removed++;
+        studentSet.add(enrollment.studentId);
+        classSet.add(enrollment.classId);
+        results.push({
+          enrollmentId: id,
+          studentId: enrollment.studentId,
+          classId: enrollment.classId,
+          success: true,
+        });
+
+        // Best-effort notification; don't fail the batch if it throws.
+        try {
+          await this.sendUnenrollmentNotification(
+            enrollment.studentId,
+            enrollment.classId,
+            'Student unenrolled from class (bulk)',
+          );
+        } catch (error) {
+          console.error('Bulk unenroll notification error:', error);
+        }
+      } catch (error: any) {
+        console.error(`Bulk unenroll failed for enrollment ${id}:`, error);
+        skipped++;
+        results.push({
+          enrollmentId: id,
+          success: false,
+          reason: error?.message || 'error',
+        });
+      }
+    }
+
+    return {
+      removed,
+      skipped,
+      studentsAffected: studentSet.size,
+      classesAffected: classSet.size,
+      results,
+    };
   }
 
   async removeEnrollment(studentId: number, classId: number): Promise<void> {
@@ -649,18 +741,28 @@ export class StudentsService {
   async getAllEnrollments(options?: {
     page?: number;
     limit?: number;
+    search?: string;
+    status?: string;
+    classId?: number;
   }): Promise<{ data: any[]; total: number; page: number; limit: number }> {
     const page = options?.page || 1;
     const limit = options?.limit || 10;
     const skip = (page - 1) * limit;
+
+    const filters = {
+      search: options?.search,
+      status: options?.status,
+      classId: options?.classId,
+    };
 
     const [enrollments, total] = await Promise.all([
       this.enrollmentRepository.findAll({
         skip,
         take: limit,
         order: { enrollmentDate: 'DESC' },
+        ...filters,
       }),
-      this.enrollmentRepository.count(),
+      this.enrollmentRepository.countAll(filters),
     ]);
     
     // Enrich classes with image URLs
@@ -823,59 +925,116 @@ export class StudentsService {
     classId: number,
   ): Promise<void> {
     try {
-      console.log(
-        `Generating monthly invoice for student ${studentId}, class ${classId}`,
+      this.logger.log(
+        `Generating monthly invoice student=${studentId} class=${classId}`,
       );
 
       // Get student details
       const student = await this.studentsRepository.findById(studentId);
       if (!student) {
-        console.log(`Student ${studentId} not found`);
+        this.logger.warn(`Student ${studentId} not found`);
         return;
       }
 
       // Get class details to get fee information
       const classDetails = await this.classesService.findById(classId);
       if (!classDetails) {
-        console.log(`Class ${classId} not found`);
+        this.logger.warn(`Class ${classId} not found`);
         return;
       }
 
       // Determine currency based on student's country using utility function
       const currency = this.currencyService.getCurrencyForCountry(student.country ?? undefined);
 
-      // Get the appropriate fee based on currency
-      const classFee =
-        currency === 'PKR' ? classDetails.feePKR : classDetails.feeUSD;
+      // Look up enrollment to respect any custom fee overrides. Decimal columns
+      // come back from TypeORM as strings, so we must coerce to Number to avoid
+      // accidental string concatenation (e.g. "4000" + 4000 = "40004000").
+      const enrollment = await this.enrollmentRepository.findByStudentAndClass(
+        studentId,
+        classId,
+      );
+
+      const defaultFeePKR = Number(classDetails.feePKR) || 0;
+      const defaultFeeUSD = Number(classDetails.feeUSD) || 0;
+      const customFeePKR =
+        enrollment?.customFeePKR !== null && enrollment?.customFeePKR !== undefined
+          ? Number(enrollment.customFeePKR)
+          : null;
+      const customFeeUSD =
+        enrollment?.customFeeUSD !== null && enrollment?.customFeeUSD !== undefined
+          ? Number(enrollment.customFeeUSD)
+          : null;
+
+      const classFee = Number(
+        currency === 'PKR'
+          ? customFeePKR ?? defaultFeePKR
+          : customFeeUSD ?? defaultFeeUSD,
+      ) || 0;
+
+      // Skip generation entirely when the class has no fee configured -
+      // prevents zero-amount and junk invoices.
+      if (classFee <= 0) {
+        console.warn(
+          `Skipping monthly invoice for student ${studentId}, class ${classId}: fee is 0 for currency ${currency}`,
+        );
+        return;
+      }
 
       // Get current month and year for invoice
       const now = new Date();
       const currentMonth = now.getMonth() + 1; // 1-12
       const currentYear = now.getFullYear();
 
-      // Check if invoice already exists for this month
+      // Check if invoice already exists for this month (and same currency)
       const existingInvoices =
         await this.invoicesService.findByStudent(studentId);
       const monthlyInvoice = existingInvoices.find((invoice) => {
         const invoiceDate = new Date(invoice.generatedDate);
         return (
           invoiceDate.getMonth() + 1 === currentMonth &&
-          invoiceDate.getFullYear() === currentYear
+          invoiceDate.getFullYear() === currentYear &&
+          invoice.currency === currency
         );
       });
 
       if (monthlyInvoice) {
-        console.log(
-          `Monthly invoice already exists for student ${studentId}, month ${currentMonth}/${currentYear}`,
+        // If this class is already billed on the existing invoice, don't add it again.
+        const alreadyHasClass = (monthlyInvoice.items || []).some(
+          (item) => item.classId === classId,
         );
-        // Add class fee to existing invoice
-        const updatedAmount = monthlyInvoice.amount + classFee;
+        if (alreadyHasClass) {
+          this.logger.debug(
+            `Monthly invoice ${monthlyInvoice.invoiceNumber} already contains class ${classId}; skipping duplicate append`,
+          );
+          return;
+        }
+
+        this.logger.debug(
+          `Monthly invoice already exists student=${studentId} ${currentMonth}/${currentYear}`,
+        );
+
+        // Explicitly coerce both operands to Number before adding. Without this,
+        // `monthlyInvoice.amount + classFee` could perform string concatenation
+        // (the historical bug that produced totals like "40004000").
+        const existingAmount = Number(monthlyInvoice.amount) || 0;
+        const updatedAmount = existingAmount + classFee;
+
+        await this.invoicesService.addItem(monthlyInvoice.id, {
+          description: `Monthly tuition fee for ${classDetails.name}`,
+          quantity: 1,
+          unitPrice: classFee,
+          total: classFee,
+          classId: classDetails.id,
+          className: classDetails.name,
+          teacherName: (classDetails as any).teacher?.name ?? undefined,
+        });
+
         await this.invoicesService.update(monthlyInvoice.id, {
           amount: updatedAmount,
           description: `${monthlyInvoice.description} + ${classDetails.name} fee`,
         });
-        console.log(
-          `Updated existing invoice ${monthlyInvoice.invoiceNumber} with additional fee ${classFee} ${currency}`,
+        this.logger.log(
+          `Updated invoice ${monthlyInvoice.invoiceNumber}: ${existingAmount} + ${classFee} = ${updatedAmount} ${currency}`,
         );
         return;
       }
@@ -886,25 +1045,35 @@ export class StudentsService {
       // Calculate due date (end of current month)
       const dueDate = new Date(currentYear, currentMonth, 0); // Last day of current month
 
-      // Create invoice
+      // Create invoice. `amount` is explicitly a Number here to avoid any
+      // decimal-as-string leakage ending up in the DB.
       const invoiceData = {
         invoiceNumber,
         studentId,
-        parentId: undefined, // Will be set if parent exists
-        amount: 0, // Will be set based on class fee
+        parentId: undefined,
+        amount: classFee,
         currency,
         status: 'draft' as any,
         dueDate: dueDate.toISOString().split('T')[0],
         description: `Monthly tuition fee for ${classDetails.name} - ${currentMonth}/${currentYear}`,
         notes: `Auto-generated invoice for class enrollment in ${classDetails.name}`,
+        classId: classDetails.id,
+        items: [
+          {
+            description: `Monthly tuition fee for ${classDetails.name}`,
+            quantity: 1,
+            unitPrice: classFee,
+            total: classFee,
+            classId: classDetails.id,
+            className: classDetails.name,
+            teacherName: (classDetails as any).teacher?.name ?? undefined,
+          },
+        ],
       };
 
-      // Set the actual class fee
-      invoiceData.amount = classFee;
-
-      const invoice = await this.invoicesService.create(invoiceData);
-      console.log(
-        `Generated invoice ${invoiceNumber} for student ${studentId}`,
+      await this.invoicesService.create(invoiceData);
+      this.logger.log(
+        `Generated invoice ${invoiceNumber} student=${studentId} amount=${classFee} ${currency}`,
       );
     } catch (error) {
       console.error(
@@ -1063,18 +1232,18 @@ export class StudentsService {
               userId: Number(user.id),
             });
             linked++;
-            console.log(
-              `✅ Linked student "${student.name}" to user ID ${user.id}`,
+            this.logger.log(
+              `Linked student "${student.name}" to userId=${user.id}`,
             );
           } else {
             notFound++;
-            console.log(
-              `❌ No user found for student "${student.name}" with email ${student.email}`,
+            this.logger.warn(
+              `No user found for student "${student.name}" email=${student.email}`,
             );
           }
         } else {
           notFound++;
-          console.log(`❌ Student "${student.name}" has no email address`);
+          this.logger.warn(`Student "${student.name}" has no email address`);
         }
       } catch (error) {
         errors++;

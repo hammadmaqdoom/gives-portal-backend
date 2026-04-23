@@ -10,6 +10,7 @@ import {
   SortParentDto,
 } from '../../../../dto/query-parent.dto';
 import { IPaginationOptions } from '../../../../../utils/types/pagination-options';
+import { normalizePagination } from '../../../../../utils/normalize-pagination';
 
 @Injectable()
 export class ParentsRelationalRepository {
@@ -79,10 +80,8 @@ export class ParentsRelationalRepository {
       queryBuilder.addOrderBy('parent.createdAt', 'DESC');
     }
 
-    const { page, limit } = paginationOptions;
-    const skip = (page - 1) * limit;
-
-    queryBuilder.skip(skip).take(limit);
+    const { skip, take } = normalizePagination(paginationOptions);
+    queryBuilder.skip(skip).take(take);
 
     const parents = await queryBuilder.getMany();
 

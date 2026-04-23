@@ -4,7 +4,10 @@ import {
   UnprocessableEntityException,
   Inject,
   forwardRef,
+  BadRequestException,
+  Logger,
 } from '@nestjs/common';
+import { performBulkDelete } from '../utils/dto/bulk-delete.dto';
 import { CreateParentDto } from './dto/create-parent.dto';
 import { NullableType } from '../utils/types/nullable.type';
 import { FilterParentDto, SortParentDto } from './dto/query-parent.dto';
@@ -23,6 +26,8 @@ import { StatusEnum } from '../statuses/statuses.enum';
 
 @Injectable()
 export class ParentsService {
+  private readonly logger = new Logger(ParentsService.name);
+
   constructor(
     private readonly parentsRepository: ParentRepository,
     private readonly parentStudentRepository: ParentStudentRepository,
@@ -35,13 +40,14 @@ export class ParentsService {
   async create(
     createParentDto: CreateParentDto,
   ): Promise<{ parent: Parent; user: any; tempPassword: string | null }> {
-    console.log('ParentsService.create called with:', createParentDto);
+    this.logger.debug(
+      `create email=${createParentDto.email ?? '-'} fullName=${createParentDto.fullName}`,
+    );
 
     let user: User | undefined = undefined;
     let tempPassword: string | null = null;
 
     if (createParentDto.user?.id) {
-      console.log('Using existing user ID:', createParentDto.user.id);
       const userObject = await this.usersService.findById(
         createParentDto.user.id,
       );
@@ -55,11 +61,6 @@ export class ParentsService {
       }
       user = userObject;
     } else if (createParentDto.email) {
-      console.log(
-        'Creating new user account for parent with email:',
-        createParentDto.email,
-      );
-      // Create user account for parent if email is provided
       tempPassword = randomStringGenerator();
       const firstName =
         createParentDto.fullName.split(' ')[0] || createParentDto.fullName;
@@ -72,15 +73,14 @@ export class ParentsService {
           password: tempPassword,
           firstName,
           lastName,
-          role: { id: RoleEnum.user }, // Parents get user role
+          role: { id: RoleEnum.user },
           status: { id: StatusEnum.active },
         });
 
-        console.log(
-          `Parent user account created: ${createParentDto.email} with role: ${user.role?.name}`,
+        this.logger.log(
+          `Parent user account created email=${createParentDto.email} role=${user.role?.name}`,
         );
 
-        // Send account credentials email to the parent
         try {
           await this.mailService.sendAccountCredentials({
             to: createParentDto.email,
@@ -89,23 +89,22 @@ export class ParentsService {
             tempPassword,
             isParent: true,
           });
-          console.log(
-            `Account credentials email sent to parent: ${createParentDto.email}`,
+          this.logger.log(
+            `Account credentials email sent to parent=${createParentDto.email}`,
           );
         } catch (emailError) {
-          console.error(
-            `Failed to send account credentials email to parent ${createParentDto.email}:`,
-            emailError,
+          this.logger.error(
+            `Failed to send account credentials email to parent ${createParentDto.email}: ${(emailError as Error).message}`,
           );
-          // Don't throw - user account is created, email failure shouldn't block the process
         }
       } catch (error) {
-        console.error('Error creating parent user account:', error);
+        this.logger.error(
+          `Error creating parent user account: ${(error as Error).message}`,
+        );
         throw error;
       }
     }
 
-    console.log('Creating parent record...');
     try {
       const parent = await this.parentsRepository.create({
         fullName: createParentDto.fullName,
@@ -121,24 +120,20 @@ export class ParentsService {
         user,
       });
 
-      console.log('Parent record created successfully:', parent);
+      this.logger.log(`Parent record created id=${parent.id}`);
 
-      // Handle student relationships if provided
       if (createParentDto.students && createParentDto.students.length > 0) {
-        console.log('Linking parent to students:', createParentDto.students);
         for (const studentDto of createParentDto.students) {
           if (studentDto.id) {
             try {
               await this.linkStudent(parent.id, studentDto.id);
-              console.log(
+              this.logger.debug(
                 `Parent ${parent.id} linked to student ${studentDto.id}`,
               );
             } catch (error) {
-              console.error(
-                `Error linking parent ${parent.id} to student ${studentDto.id}:`,
-                error,
+              this.logger.error(
+                `Error linking parent ${parent.id} to student ${studentDto.id}: ${(error as Error).message}`,
               );
-              // Don't throw here, just log the error and continue
             }
           }
         }
@@ -146,7 +141,9 @@ export class ParentsService {
 
       return { parent, user, tempPassword };
     } catch (error) {
-      console.error('Error creating parent record:', error);
+      this.logger.error(
+        `Error creating parent record: ${(error as Error).message}`,
+      );
       throw error;
     }
   }
@@ -221,6 +218,13 @@ export class ParentsService {
 
   async remove(id: Parent['id']): Promise<void> {
     await this.parentsRepository.remove(id);
+  }
+
+  async bulkRemove(ids: Array<Parent['id']>) {
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('No parent ids provided');
+    }
+    return performBulkDelete(ids, (id) => this.parentsRepository.remove(id));
   }
 
   // New methods for managing parent-student relationships

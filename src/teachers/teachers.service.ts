@@ -3,6 +3,7 @@ import {
   Injectable,
   UnprocessableEntityException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import * as XLSX from 'xlsx';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
@@ -23,9 +24,12 @@ import { PublicTeacherDto } from './dto/public-teacher.dto';
 import { FileStorageService } from '../files/file-storage.service';
 import { ConfigService } from '@nestjs/config';
 import { FileDriver } from '../files/config/file-config.type';
+import { performBulkDelete } from '../utils/dto/bulk-delete.dto';
 
 @Injectable()
 export class TeachersService {
+  private readonly logger = new Logger(TeachersService.name);
+
   constructor(
     private readonly teachersRepository: TeacherRepository,
     private readonly usersService: UsersService,
@@ -101,12 +105,12 @@ export class TeachersService {
         ...({ mustChangePassword: true } as any),
       });
 
-      console.log(
-        `Teacher user account created: ${user.email} with role: ${user.role?.name}`,
+      this.logger.log(
+        `Teacher user account created email=${user.email} role=${user.role?.name}`,
       );
     } else {
-      console.log(
-        `Teacher created without email - no user account created for: ${createTeacherDto.name}`,
+      this.logger.debug(
+        `Teacher created without email, no user account created name=${createTeacherDto.name}`,
       );
     }
 
@@ -241,21 +245,19 @@ export class TeachersService {
             firstName,
             lastName,
           });
-          console.log(
-            `Teacher update: ${updateTeacherDto.email} - user account role updated to teacher`,
+          this.logger.log(
+            `Teacher update email=${updateTeacherDto.email} role -> teacher`,
           );
         } else {
-          // Update name if changed
           await this.usersService.update(existingUser.id, {
             firstName,
             lastName,
           });
-          console.log(
-            `Teacher update: ${updateTeacherDto.email} - user account name updated`,
+          this.logger.debug(
+            `Teacher update email=${updateTeacherDto.email} name updated`,
           );
         }
       } else {
-        // Create new user account
         tempPassword = randomStringGenerator();
         userAccountCreated = true;
         await this.usersService.create({
@@ -266,14 +268,12 @@ export class TeachersService {
           role: { id: RoleEnum.teacher },
           status: { id: StatusEnum.active },
         });
-        console.log(
-          `Teacher update: ${updateTeacherDto.email} - new user account created with temp password`,
+        this.logger.log(
+          `Teacher update email=${updateTeacherDto.email} new user account created`,
         );
       }
     } else if (currentTeacher.email && !updateTeacherDto.email) {
-      // Email was removed - we could optionally disable the user account
-      // For now, we'll just log this case
-      console.log(
+      this.logger.debug(
         `Teacher update: email removed for teacher ${currentTeacher.name} - user account remains active`,
       );
     }
@@ -287,6 +287,13 @@ export class TeachersService {
 
   async remove(id: Teacher['id']): Promise<void> {
     return this.teachersRepository.remove(id);
+  }
+
+  async bulkRemove(ids: Array<Teacher['id']>) {
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('No teacher ids provided');
+    }
+    return performBulkDelete(ids, (id) => this.teachersRepository.remove(id));
   }
 
   async resetPassword(id: Teacher['id']): Promise<{ tempPassword: string }> {
@@ -320,11 +327,8 @@ export class TeachersService {
         // Ensure forced reset after admin-generated temporary password
         ...({ mustChangePassword: true } as any),
       });
-      console.log(
-        `Teacher password reset: ${teacher.email} - user account updated`,
-      );
+      this.logger.log(`Teacher password reset email=${teacher.email}`);
     } else {
-      // If user doesn't exist, create one
       await this.usersService.create({
         email: teacher.email,
         password: tempPassword,
@@ -334,8 +338,8 @@ export class TeachersService {
         status: { id: StatusEnum.active },
         ...({ mustChangePassword: true } as any),
       });
-      console.log(
-        `Teacher password reset: ${teacher.email} - new user account created`,
+      this.logger.log(
+        `Teacher password reset email=${teacher.email} new user account created`,
       );
     }
 

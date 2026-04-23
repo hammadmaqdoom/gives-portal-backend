@@ -17,6 +17,7 @@ import {
   ParseFilePipe,
   MaxFileSizeValidator,
   FileTypeValidator,
+  Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -47,6 +48,10 @@ import {
   StudentWithDetailsResponseDto,
 } from './dto/student-response.dto';
 import { BulkEnrollmentResultDto } from './dto/bulk-enrollment-response.dto';
+import {
+  BulkDeleteDto,
+  BulkDeleteResultDto,
+} from '../utils/dto/bulk-delete.dto';
 
 @ApiTags('Students')
 @Controller({
@@ -54,6 +59,8 @@ import { BulkEnrollmentResultDto } from './dto/bulk-enrollment-response.dto';
   version: '1',
 })
 export class StudentsController {
+  private readonly logger = new Logger(StudentsController.name);
+
   constructor(private readonly studentsService: StudentsService) {}
 
   @Get('test')
@@ -71,44 +78,37 @@ export class StudentsController {
     type: StudentResponseDto,
   })
   async getCurrentUserStudent(@Request() req) {
-    console.log(
-      `getCurrentUserStudent called with user ID: ${req.user.id}, email: ${req.user.email}`,
+    this.logger.debug(
+      `getCurrentUserStudent userId=${req.user.id} email=${req.user.email}`,
     );
 
-    // Check if user is superAdmin - don't auto-create student profiles for super admins
     const isSuperAdmin = req.user.role?.id === RoleEnum.superAdmin;
-    if (isSuperAdmin) {
-      console.log(`User is superAdmin, skipping student profile auto-creation`);
-    }
 
-    // Try to find student by user ID first
     let student = await this.studentsService.findByUserId(req.user.id);
-    console.log(`findByUserId result:`, student ? 'found' : 'not found');
 
-    // If not found by user ID, try by email
     if (!student && req.user.email) {
-      console.log(`Trying to find student by email: ${req.user.email}`);
       student = await this.studentsService.findByEmail(req.user.email);
-      console.log(`findByEmail result:`, student ? 'found' : 'not found');
     }
 
-    // If still not found, auto-create a student profile for the user (but not for super admins)
     if (!student) {
       if (isSuperAdmin) {
-        // Super admins don't need student profiles
-        throw new NotFoundException('Student profile not found for current user');
+        throw new NotFoundException(
+          'Student profile not found for current user',
+        );
       }
-      
-      console.log(`⚠️ Student profile not found, auto-creating for user ID: ${req.user.id}`);
+
       try {
-        student = await this.studentsService.ensureStudentProfileForUser(req.user.id);
-        console.log(`✅ Auto-created student profile with ID: ${student?.id}`);
+        student = await this.studentsService.ensureStudentProfileForUser(
+          req.user.id,
+        );
       } catch (error) {
-        console.error(`❌ Error auto-creating student profile:`, error);
+        this.logger.error(
+          `Error auto-creating student profile userId=${req.user.id}: ${(error as Error).message}`,
+        );
         throw error;
       }
     }
-    
+
     return student;
   }
 
@@ -226,11 +226,31 @@ export class StudentsController {
   getAllEnrollments(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('classId') classId?: string,
   ) {
     return this.studentsService.getAllEnrollments({
       page: page ? +page : 1,
       limit: limit ? +limit : 10,
+      search: search?.trim() || undefined,
+      status: status?.trim() || undefined,
+      classId: classId ? +classId : undefined,
     });
+  }
+
+  @Post('enrollments/bulk-unenroll')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Enrollments unenrolled in bulk',
+  })
+  bulkUnenrollEnrollments(
+    @Body() body: { enrollmentIds: number[] },
+  ) {
+    return this.studentsService.bulkRemoveEnrollments(body?.enrollmentIds || []);
   }
 
   @Get('enrollments/stats')
@@ -307,6 +327,25 @@ export class StudentsController {
   })
   remove(@Param('id') id: string) {
     return this.studentsService.remove(+id);
+  }
+
+  @Post('bulk-delete')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RoleEnum.admin, RoleEnum.superAdmin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Bulk delete students by id',
+    description:
+      'Deletes multiple students in one request. Returns per-id success/failure so partial failures can be surfaced to the caller.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Bulk deletion processed',
+    type: BulkDeleteResultDto,
+  })
+  bulkDelete(@Body() body: BulkDeleteDto): Promise<BulkDeleteResultDto> {
+    return this.studentsService.bulkRemove(body.ids);
   }
 
   // Enrollment Management Endpoints

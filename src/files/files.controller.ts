@@ -20,6 +20,7 @@ import {
   Head,
   Query,
   HttpException,
+  Logger,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import {
@@ -39,6 +40,7 @@ import { FrontendOriginGuard } from './guards/frontend-origin.guard';
 import { FilesService } from './files.service';
 import { ConfigService } from '@nestjs/config';
 import { FileStorageService, FileUploadContext } from './file-storage.service';
+import { ChunkedUploadService } from './chunked-upload.service';
 import { FileDriver } from './config/file-config.type';
 import { User } from '../users/domain/user';
 import * as path from 'path';
@@ -57,6 +59,8 @@ import { AssignmentsService } from '../assignments/assignments.service';
   version: '1',
 })
 export class FilesController {
+  private readonly logger = new Logger(FilesController.name);
+
   constructor(
     private readonly filesService: FilesService,
     private readonly fileStorageService: FileStorageService,
@@ -67,6 +71,7 @@ export class FilesController {
     private readonly teachersService: TeachersService,
     @Inject(forwardRef(() => AssignmentsService))
     private readonly assignmentsService: AssignmentsService,
+    private readonly chunkedUploadService: ChunkedUploadService,
   ) { }
 
   /**
@@ -692,7 +697,13 @@ export class FilesController {
       },
     },
   })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      // Override the module-level Multer default (5MB) so videos up to 5GB
+      // are accepted by Multer before reaching the controller-level validators.
+      limits: { fileSize: 5368709120 }, // 5GB for videos
+    }),
+  )
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async uploadClassVideo(
     @UploadedFile(
@@ -741,6 +752,126 @@ export class FilesController {
       uploadedAt: uploadedFile.uploadedAt,
       url: fileUrl,
     };
+  }
+
+  // ---------------------------------------------------------------------
+  // Chunked video upload
+  //
+  // The single-request `upload/video/:classId` path is limited in practice by
+  // whatever reverse proxy / CDN sits in front of the API (Cloudflare's free
+  // tier caps at 100 MB per request; nginx defaults to 1 MB). These endpoints
+  // accept a large video as many small chunks, reassemble on disk, and then
+  // flow through the exact same FilesService pipeline so the resulting File
+  // record is identical to a direct upload.
+  // ---------------------------------------------------------------------
+
+  @Post('upload/video/:classId/chunked/init')
+  @ApiOperation({ summary: 'Initialize a chunked video upload session' })
+  @ApiParam({ name: 'classId', description: 'Class ID' })
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
+  async initChunkedVideoUpload(
+    @Param('classId') classId: string,
+    @Body() body: { fileName: string; fileSize: number; mimeType: string },
+    @Req() req: any,
+  ) {
+    if (!body?.fileName || !body?.fileSize) {
+      throw new BadRequestException('fileName and fileSize are required');
+    }
+    const context: FileUploadContext = {
+      type: 'class',
+      id: classId,
+      userId: req.user?.id || 'unknown',
+    };
+    return this.chunkedUploadService.init({
+      fileName: body.fileName,
+      totalSize: Number(body.fileSize),
+      mimeType: body.mimeType || 'application/octet-stream',
+      context,
+    });
+  }
+
+  @Post('upload/video/:classId/chunked/:uploadId/chunk/:chunkIndex')
+  @ApiOperation({ summary: 'Upload a single chunk for a chunked video upload' })
+  @ApiParam({ name: 'classId', description: 'Class ID' })
+  @ApiParam({ name: 'uploadId', description: 'Chunked upload session id' })
+  @ApiParam({ name: 'chunkIndex', description: 'Zero-based chunk index' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      // Cap per-chunk size at 16 MB. The service itself uses 5 MB chunks, but
+      // allowing a little headroom avoids spurious 413s if a client ever
+      // negotiates a larger chunk size in the future.
+      limits: { fileSize: 16 * 1024 * 1024 },
+    }),
+  )
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
+  async uploadVideoChunk(
+    @UploadedFile() file: Express.Multer.File,
+    @Param('uploadId') uploadId: string,
+    @Param('chunkIndex') chunkIndex: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No chunk uploaded');
+    }
+    const index = Number(chunkIndex);
+    if (!Number.isInteger(index) || index < 0) {
+      throw new BadRequestException('Invalid chunk index');
+    }
+    return this.chunkedUploadService.appendChunk({
+      uploadId,
+      chunkIndex: index,
+      chunkBuffer: file.buffer,
+    });
+  }
+
+  @Post('upload/video/:classId/chunked/:uploadId/complete')
+  @ApiOperation({ summary: 'Finalize a chunked video upload' })
+  @ApiParam({ name: 'classId', description: 'Class ID' })
+  @ApiParam({ name: 'uploadId', description: 'Chunked upload session id' })
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
+  async completeChunkedVideoUpload(
+    @Param('uploadId') uploadId: string,
+    @Req() req: any,
+  ) {
+    const uploadedFile = await this.chunkedUploadService.complete({
+      uploadId,
+      userId: req.user?.id || 'unknown',
+    });
+
+    const fileUrl = await this.generateFileUrl(
+      uploadedFile.id,
+      uploadedFile.path,
+      uploadedFile.mimeType,
+    );
+
+    return {
+      id: uploadedFile.id,
+      filename: uploadedFile.filename,
+      originalName: uploadedFile.originalName,
+      path: uploadedFile.path,
+      size: uploadedFile.size,
+      mimeType: uploadedFile.mimeType,
+      uploadedAt: uploadedFile.uploadedAt,
+      url: fileUrl,
+    };
+  }
+
+  @Delete('upload/video/:classId/chunked/:uploadId')
+  @ApiOperation({ summary: 'Abort and clean up a chunked upload session' })
+  @ApiParam({ name: 'classId', description: 'Class ID' })
+  @ApiParam({ name: 'uploadId', description: 'Chunked upload session id' })
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
+  async abortChunkedVideoUpload(@Param('uploadId') uploadId: string) {
+    await this.chunkedUploadService.abort(uploadId);
+    return { message: 'Upload aborted' };
   }
 
   @Get('class/:classId')
@@ -829,18 +960,13 @@ export class FilesController {
     @Param('contextType') contextType: string,
     @Param('contextId') contextId: string,
   ) {
-    console.log(
-      `Getting files for context: ${contextType} with ID: ${contextId}`,
-    );
-
     const files = await this.filesService.getFilesByContext(
       contextType,
       contextId,
     );
-    console.log(
-      `Found ${files.length} files for context ${contextType}:${contextId}`,
+    this.logger.debug(
+      `getFilesByContext ${contextType}:${contextId} -> ${files.length} files`,
     );
-    console.log('Files:', files);
 
     // Generate proper URLs for all files
     const filesWithUrls = await Promise.all(
@@ -868,42 +994,26 @@ export class FilesController {
   @Roles(RoleEnum.user, RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async getFileByPath(@Query('path') filePath: string) {
     try {
-      console.log(`Looking for file with path: ${filePath}`);
+      this.logger.debug(`getFileByPath request path=${filePath}`);
 
-      // Decode the path if it's URL encoded
       const decodedPath = decodeURIComponent(filePath);
-      console.log(`Decoded path: ${decodedPath}`);
 
-      // Try to find file by exact path first
       let file = await this.filesService.getFileByPath(decodedPath);
 
-      // If not found, try without the 'uploads/' prefix
       if (!file && decodedPath.startsWith('uploads/')) {
-        const pathWithoutUploads = decodedPath.substring(8); // Remove 'uploads/'
-        console.log(`Trying without uploads prefix: ${pathWithoutUploads}`);
+        const pathWithoutUploads = decodedPath.substring(8);
         file = await this.filesService.getFileByPath(pathWithoutUploads);
       }
 
-      // If still not found, try with just the filename
       if (!file) {
         const filename = decodedPath.split('/').pop();
         if (filename) {
-          console.log(`Trying with just filename: ${filename}`);
           file = await this.filesService.getFileByFilename(filename);
         }
       }
 
       if (!file) {
-        // List all files in database for debugging
-        const allFiles = await this.filesService.getAllFiles();
-        console.log(
-          'All files in database:',
-          allFiles.map((f) => ({
-            id: f.id,
-            path: f.path,
-            filename: f.filename,
-          })),
-        );
+        this.logger.warn(`File not found for path=${decodedPath}`);
         throw new BadRequestException('File not found in database');
       }
 
@@ -1011,7 +1121,7 @@ export class FilesController {
         }
       }
 
-      console.log(`Serving file: ${file.filename} from path: ${file.path}`);
+      this.logger.debug(`Serving file id=${file.id} path=${file.path}`);
 
       // Get allowed origin for CORS
       const allowedOrigin = this.getAllowedOrigin(req);
@@ -1070,15 +1180,11 @@ export class FilesController {
 
       // Get the full file path
       const fullPath = this.filesService.getFullFilePath(file.path);
-      console.log(`Full file path: ${fullPath}`);
-      console.log(`Current working directory: ${process.cwd()}`);
 
       // Check if file exists
       const fs = require('fs');
-      console.log(`File exists check: ${fs.existsSync(fullPath)}`);
-
       if (!fs.existsSync(fullPath)) {
-        console.log(`File not found at path: ${fullPath}`);
+        this.logger.warn(`File not found on disk at ${fullPath}`);
         throw new NotFoundException('File not found on disk');
       }
 
@@ -1490,9 +1596,7 @@ export class FilesController {
   @ApiOperation({ summary: 'Get total file count for debugging' })
   @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.superAdmin)
   async getFileCount() {
-    console.log('Debug: Getting file count');
     const allFiles = await this.filesService.getAllFiles();
-    console.log(`Debug: Total files in database: ${allFiles.length}`);
 
     // Group by context type
     const contextCounts = allFiles.reduce(
@@ -1503,7 +1607,9 @@ export class FilesController {
       {} as Record<string, number>,
     );
 
-    console.log('Debug: Files by context type:', contextCounts);
+    this.logger.debug(
+      `getFileCount total=${allFiles.length} contextCounts=${JSON.stringify(contextCounts)}`,
+    );
 
     return {
       totalFiles: allFiles.length,

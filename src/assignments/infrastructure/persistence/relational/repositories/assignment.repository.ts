@@ -7,6 +7,7 @@ import { AssignmentMapper } from '../mappers/assignment.mapper';
 import { AssignmentRepository } from '../../assignment.repository';
 import { NullableType } from '../../../../../utils/types/nullable.type';
 import { IPaginationOptions } from '../../../../../utils/types/pagination-options';
+import { normalizePagination } from '../../../../../utils/normalize-pagination';
 import {
   FilterAssignmentDto,
   SortAssignmentDto,
@@ -106,8 +107,8 @@ export class AssignmentsRelationalRepository implements AssignmentRepository {
       queryBuilder.addOrderBy('assignment.id', 'ASC');
     }
 
-    queryBuilder.skip((paginationOptions.page - 1) * paginationOptions.limit);
-    queryBuilder.take(paginationOptions.limit);
+    const { skip, take } = normalizePagination(paginationOptions);
+    queryBuilder.skip(skip).take(take);
 
     const assignments = await queryBuilder.getMany();
     return assignments.map((assignment) =>

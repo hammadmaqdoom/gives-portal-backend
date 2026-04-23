@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { SubmissionEntity } from '../entities/submission.entity';
 import { Submission } from '../../../../domain/submission';
 import { Student } from '../../../../../students/domain/student';
@@ -6,9 +6,9 @@ import { Assignment } from '../../../../domain/assignment';
 
 @Injectable()
 export class SubmissionMapper {
-  toDomain(raw: SubmissionEntity): Submission {
-    // console.log('Mapping submission entity:', raw);
+  private readonly logger = new Logger(SubmissionMapper.name);
 
+  toDomain(raw: SubmissionEntity): Submission {
     const submission = new Submission();
     submission.id = raw.id;
     submission.status = raw.status;
@@ -28,7 +28,6 @@ export class SubmissionMapper {
     submission.deletedAt = raw.deletedAt;
 
     if (raw.student) {
-      // console.log('Mapping student:', raw.student);
       submission.student = {
         id: raw.student.id,
         name: raw.student.name,
@@ -43,11 +42,10 @@ export class SubmissionMapper {
         deletedAt: raw.student.deletedAt,
       } as Student;
     } else {
-      console.log('No student data found in submission');
+      this.logger.verbose(`Submission id=${raw.id} missing student relation`);
     }
 
     if (raw.assignment) {
-      // console.log('Mapping assignment:', raw.assignment);
       submission.assignment = {
         id: raw.assignment.id,
         title: raw.assignment.title,
@@ -64,16 +62,13 @@ export class SubmissionMapper {
         class: raw.assignment.class ? { id: raw.assignment.class.id } : undefined,
       } as Assignment;
     } else {
-      console.log('No assignment data found in submission');
+      this.logger.verbose(`Submission id=${raw.id} missing assignment relation`);
     }
 
-    // console.log('Final mapped submission:', submission);
     return submission;
   }
 
   toPersistence(submission: Partial<Submission>): Partial<SubmissionEntity> {
-    // console.log('Converting submission to persistence entity:', submission);
-
     const submissionEntity = new SubmissionEntity();
 
     if (submission.id !== undefined) {
@@ -113,15 +108,12 @@ export class SubmissionMapper {
       submissionEntity.gradedAt = submission.gradedAt;
     }
     if (submission.student !== undefined) {
-      console.log('Setting student relationship:', submission.student);
       submissionEntity.student = submission.student as any;
     }
     if (submission.assignment !== undefined) {
-      console.log('Setting assignment relationship:', submission.assignment);
       submissionEntity.assignment = submission.assignment as any;
     }
 
-    // console.log('Final persistence entity:', submissionEntity);
     return submissionEntity;
   }
 }

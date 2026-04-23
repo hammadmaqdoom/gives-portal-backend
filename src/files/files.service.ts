@@ -1,4 +1,10 @@
-import { Injectable, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  Inject,
+  forwardRef,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FileRepository } from './infrastructure/persistence/relational/repositories/file.repository';
 import { File } from './domain/file';
@@ -15,6 +21,8 @@ import { SubmissionsService } from '../assignments/submissions.service';
 
 @Injectable()
 export class FilesService {
+  private readonly logger = new Logger(FilesService.name);
+
   constructor(
     private readonly fileRepository: FileRepository,
     private readonly fileStorageService: FileStorageService,
@@ -59,6 +67,37 @@ export class FilesService {
     return fileRecord;
   }
 
+  async uploadFileFromPathWithContext(
+    sourcePath: string,
+    fileMeta: { originalName: string; mimeType: string; size: number },
+    context: FileUploadContext,
+  ): Promise<File> {
+    const uploadedFileInfo =
+      await this.fileStorageService.uploadFileFromPathWithContext(
+        sourcePath,
+        fileMeta,
+        context,
+      );
+
+    const fileUrl = this.fileStorageService.getFileUrl(uploadedFileInfo.path);
+
+    const fileRecord = await this.fileRepository.create({
+      id: uploadedFileInfo.id,
+      filename: uploadedFileInfo.filename,
+      originalName: uploadedFileInfo.originalName,
+      path: uploadedFileInfo.path,
+      url: fileUrl,
+      size: uploadedFileInfo.size,
+      mimeType: uploadedFileInfo.mimeType,
+      uploadedBy: uploadedFileInfo.uploadedBy.toString(),
+      uploadedAt: uploadedFileInfo.uploadedAt,
+      contextType: uploadedFileInfo.contextType,
+      contextId: uploadedFileInfo.contextId.toString(),
+    });
+
+    return fileRecord;
+  }
+
   /**
    * Upload multiple files with context
    */
@@ -80,9 +119,8 @@ export class FilesService {
    * Get all files (for debugging)
    */
   async getAllFiles(): Promise<File[]> {
-    console.log('FilesService: Getting all files');
     const files = await this.fileRepository.findAll();
-    console.log(`FilesService: Found ${files.length} total files`);
+    this.logger.debug(`getAllFiles -> ${files.length} files`);
     return files;
   }
 
@@ -93,15 +131,13 @@ export class FilesService {
     contextType: string,
     contextId: string,
   ): Promise<File[]> {
-    console.log(
-      `FilesService: Getting files for context ${contextType}:${contextId}`,
-    );
     const files = await this.fileRepository.findByContext(
       contextType,
       contextId,
     );
-    console.log(`FilesService: Found ${files.length} files`);
-    console.log('FilesService: Files:', files);
+    this.logger.debug(
+      `getFilesByContext ${contextType}:${contextId} -> ${files.length} files`,
+    );
     return files;
   }
 
@@ -130,9 +166,10 @@ export class FilesService {
    * Get file by path (for backward compatibility)
    */
   async getFileByPath(filePath: string): Promise<File | null> {
-    console.log(`FilesService: Looking for file with path: ${filePath}`);
     const file = await this.fileRepository.findByPath(filePath);
-    console.log(`FilesService: File found:`, file ? file.id : 'not found');
+    this.logger.debug(
+      `getFileByPath ${filePath} -> ${file ? file.id : 'not found'}`,
+    );
     return file;
   }
 
@@ -140,11 +177,9 @@ export class FilesService {
    * Get file by filename
    */
   async getFileByFilename(filename: string): Promise<File | null> {
-    console.log(`FilesService: Looking for file with filename: ${filename}`);
     const file = await this.fileRepository.findByFilename(filename);
-    console.log(
-      `FilesService: File found by filename:`,
-      file ? file.id : 'not found',
+    this.logger.debug(
+      `getFileByFilename ${filename} -> ${file ? file.id : 'not found'}`,
     );
     return file;
   }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FileEntity } from '../entities/file.entity';
@@ -7,6 +7,8 @@ import { FileMapper } from '../mappers/file.mapper';
 
 @Injectable()
 export class FileRepository {
+  private readonly logger = new Logger(FileRepository.name);
+
   constructor(
     @InjectRepository(FileEntity)
     private readonly fileRepository: Repository<FileEntity>,
@@ -25,28 +27,22 @@ export class FileRepository {
   }
 
   async findAll(): Promise<File[]> {
-    console.log('FileRepository: Finding all files');
     const files = await this.fileRepository.find({
       order: { uploadedAt: 'DESC' },
     });
-    console.log(`FileRepository: Raw files from database:`, files);
-    const mappedFiles = files.map((file) => this.fileMapper.toDomain(file));
-    console.log(`FileRepository: Mapped files:`, mappedFiles);
-    return mappedFiles;
+    this.logger.debug(`findAll -> ${files.length} files`);
+    return files.map((file) => this.fileMapper.toDomain(file));
   }
 
   async findByContext(contextType: string, contextId: string): Promise<File[]> {
-    console.log(
-      `FileRepository: Finding files for context ${contextType}:${contextId}`,
-    );
     const files = await this.fileRepository.find({
       where: { contextType, contextId },
       order: { uploadedAt: 'DESC' },
     });
-    console.log(`FileRepository: Raw files from database:`, files);
-    const mappedFiles = files.map((file) => this.fileMapper.toDomain(file));
-    console.log(`FileRepository: Mapped files:`, mappedFiles);
-    return mappedFiles;
+    this.logger.debug(
+      `findByContext ${contextType}:${contextId} -> ${files.length} files`,
+    );
+    return files.map((file) => this.fileMapper.toDomain(file));
   }
 
   async findByIds(ids: string[]): Promise<File[]> {
@@ -63,22 +59,21 @@ export class FileRepository {
   }
 
   async findByPath(filePath: string): Promise<File | null> {
-    console.log(`FileRepository: Looking for file with path: ${filePath}`);
     const file = await this.fileRepository.findOne({
       where: { path: filePath },
     });
-    console.log(`FileRepository: File found:`, file ? file.id : 'not found');
+    this.logger.debug(
+      `findByPath ${filePath} -> ${file ? file.id : 'not found'}`,
+    );
     return file ? this.fileMapper.toDomain(file) : null;
   }
 
   async findByFilename(filename: string): Promise<File | null> {
-    console.log(`FileRepository: Looking for file with filename: ${filename}`);
     const file = await this.fileRepository.findOne({
       where: { filename },
     });
-    console.log(
-      `FileRepository: File found by filename:`,
-      file ? file.id : 'not found',
+    this.logger.debug(
+      `findByFilename ${filename} -> ${file ? file.id : 'not found'}`,
     );
     return file ? this.fileMapper.toDomain(file) : null;
   }

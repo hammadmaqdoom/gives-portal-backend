@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Inject,
   forwardRef,
+  Logger,
 } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
 import { InvoiceRepositoryImpl } from './infrastructure/persistence/relational/repositories/invoice.repository';
@@ -68,6 +69,8 @@ function getImageDimensionsFromDataUrl(dataUrl: string): { width: number; height
 
 @Injectable()
 export class InvoicesService {
+  private readonly logger = new Logger(InvoicesService.name);
+
   constructor(
     private readonly invoiceRepository: InvoiceRepositoryImpl,
     @Inject(forwardRef(() => StudentsService))
@@ -122,21 +125,33 @@ export class InvoicesService {
           createInvoiceDto.invoiceNumber ||
           (await this.invoiceRepository.generateInvoiceNumber());
 
+        // Coerce numeric fields defensively. Internal callers (e.g. the monthly
+        // invoice generator) bypass the class-validator @Transform pipeline, so
+        // a string like "4000.00" could otherwise flow through to TypeORM and
+        // get concatenated instead of summed downstream.
         const invoiceData: Partial<Invoice> = {
           invoiceNumber,
           studentId: student.id,
           studentName: student.name,
           parentId: parent?.id,
           parentName: parent?.fullName,
-          amount: createInvoiceDto.amount,
+          amount: Number(createInvoiceDto.amount) || 0,
           currency: createInvoiceDto.currency,
           status: createInvoiceDto.status,
           dueDate: new Date(createInvoiceDto.dueDate),
           generatedDate: new Date(),
           description: createInvoiceDto.description,
           notes: createInvoiceDto.notes,
-          originalPrice: createInvoiceDto.originalPrice,
-          discountAmount: createInvoiceDto.discountAmount,
+          originalPrice:
+            createInvoiceDto.originalPrice !== undefined &&
+            createInvoiceDto.originalPrice !== null
+              ? Number(createInvoiceDto.originalPrice)
+              : undefined,
+          discountAmount:
+            createInvoiceDto.discountAmount !== undefined &&
+            createInvoiceDto.discountAmount !== null
+              ? Number(createInvoiceDto.discountAmount)
+              : undefined,
           discountType: createInvoiceDto.discountType,
           classId: createInvoiceDto.classId,
           items:
@@ -144,9 +159,9 @@ export class InvoicesService {
               id: 0, // Will be set by database
               invoiceId: 0, // Will be set by database
               description: item.description,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              total: item.total,
+              quantity: Number(item.quantity) || 1,
+              unitPrice: Number(item.unitPrice) || 0,
+              total: Number(item.total) || 0,
               classId: item.classId,
               className: item.className,
               teacherName: item.teacherName,
@@ -236,24 +251,17 @@ export class InvoicesService {
     return this.invoiceRepository.findByStudent(studentId);
   }
 
+  async findByStudentIds(studentIds: number[]): Promise<Invoice[]> {
+    return this.invoiceRepository.findByStudentIds(studentIds);
+  }
+
   async findByStudentUserId(userId: number): Promise<Invoice[]> {
-    console.log(
-      '🔍 findByStudentUserId - Looking for student with user ID:',
-      userId,
-    );
-
-    // First find the student by user ID, auto-create if doesn't exist
-    const student = await this.studentsService.ensureStudentProfileForUser(userId);
-    console.log('🔍 findByStudentUserId - Found/created student:', student);
-
-    // Then get invoices for that student
-    console.log(
-      '🔍 findByStudentUserId - Getting invoices for student ID:',
-      student.id,
-    );
+    const student =
+      await this.studentsService.ensureStudentProfileForUser(userId);
     const invoices = await this.invoiceRepository.findByStudent(student.id);
-    console.log('🔍 findByStudentUserId - Found invoices:', invoices);
-
+    this.logger.debug(
+      `findByStudentUserId userId=${userId} studentId=${student.id} -> ${invoices.length} invoices`,
+    );
     return invoices;
   }
 
@@ -331,7 +339,11 @@ export class InvoicesService {
       updateData.parentId = updateInvoiceDto.parentId;
     }
     if (updateInvoiceDto.amount !== undefined) {
-      updateData.amount = updateInvoiceDto.amount;
+      // Coerce to Number: callers that bypass the HTTP validator (e.g. the
+      // monthly invoice sync path) could otherwise pass through a decimal
+      // string, which TypeORM would persist as the wrong value after any
+      // arithmetic upstream.
+      updateData.amount = Number(updateInvoiceDto.amount) || 0;
     }
     if (updateInvoiceDto.currency !== undefined) {
       updateData.currency = updateInvoiceDto.currency;
@@ -349,19 +361,49 @@ export class InvoicesService {
     return this.invoiceRepository.update(id, updateData);
   }
 
+  /**
+   * Append a single line item to an existing invoice (e.g. when auto-syncing
+   * multiple class enrollments onto the same monthly invoice).
+   */
+  async addItem(
+    id: number,
+    item: {
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      total: number;
+      classId?: number;
+      className?: string;
+      teacherName?: string;
+    },
+  ): Promise<void> {
+    const invoice = await this.invoiceRepository.findById(id);
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+    await this.invoiceRepository.addItem(id, item as any);
+  }
+
   async markAsPaid(
     id: number,
     paymentMethod: string,
     transactionId?: string,
+    paidDate?: string | Date,
   ): Promise<Invoice | null> {
     const invoice = await this.invoiceRepository.findById(id);
     if (!invoice) {
       throw new NotFoundException('Invoice not found');
     }
 
+    const resolvedPaidDate = paidDate
+      ? paidDate instanceof Date
+        ? paidDate
+        : new Date(paidDate)
+      : new Date();
+
     const updateData: Partial<Invoice> = {
       status: InvoiceStatus.PAID,
-      paidDate: new Date(),
+      paidDate: resolvedPaidDate,
       paymentMethod: paymentMethod as any,
       transactionId,
     };
@@ -603,12 +645,37 @@ export class InvoicesService {
       });
     };
 
+    const isPaid = invoice.status === InvoiceStatus.PAID;
+    const paymentMethodLabel = (method?: string | null): string => {
+      switch ((method || '').toLowerCase()) {
+        case 'cash':
+          return 'Cash';
+        case 'bank_transfer':
+          return 'Bank Transfer';
+        case 'check':
+        case 'cheque':
+          return 'Cheque';
+        case 'online':
+          return 'Payment Gateway';
+        case 'credit_card':
+          return 'Credit Card';
+        case 'debit_card':
+          return 'Debit Card';
+        default:
+          return method ? String(method) : '-';
+      }
+    };
+
     // Prepare template data
     const templateData = {
       invoiceNumber: invoice.invoiceNumber,
       issueDate: formatDate(invoice.generatedDate),
       dueDate: formatDate(invoice.dueDate),
       status: invoice.status.toUpperCase(),
+      isPaid,
+      paidDate: invoice.paidDate ? formatDate(invoice.paidDate) : null,
+      paymentMethod: paymentMethodLabel(invoice.paymentMethod),
+      transactionId: invoice.transactionId || null,
       studentId: student.studentId || String(student.id).padStart(6, '0'),
       student: {
         name: student.name,
@@ -963,41 +1030,162 @@ export class InvoicesService {
     doc.text(`${templateData.currency} ${templateData.total.toFixed(2)}`, pageWidth - 20, yPosition + 3, { align: 'right' });
     yPosition += 20;
 
-    // Footer - Payment Information
-    doc.setFillColor(248, 249, 250);
-    doc.rect(leftMargin, yPosition, pageWidth - 30, 40, 'F');
-    
-    doc.setFontSize(10);
-    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
-    doc.setFont('helvetica', 'bold');
-    doc.text('PAYMENT INFORMATION', leftMargin + 5, yPosition + 8);
-    
-    yPosition += 12;
-    doc.setFontSize(8);
-    doc.setTextColor(52, 73, 94);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Payment is due within 30 days from the invoice date.', leftMargin + 5, yPosition);
+    // Footer - Payment Information (or Payment Receipt when paid)
+    if (templateData.isPaid) {
+      // Payment Receipt block
+      const receiptBoxHeight = 44;
+      doc.setFillColor(232, 245, 233); // light green
+      doc.setDrawColor(46, 125, 50); // dark green border
+      doc.setLineWidth(0.5);
+      doc.rect(leftMargin, yPosition, pageWidth - 30, receiptBoxHeight, 'FD');
 
-    if (templateData.bankDetails) {
-      yPosition += 8;
+      doc.setFontSize(10);
+      doc.setTextColor(27, 94, 32); // #1B5E20
       doc.setFont('helvetica', 'bold');
-      doc.text('Bank Transfer Details:', leftMargin + 5, yPosition);
-      yPosition += 5;
+      doc.text('PAYMENT RECEIPT', leftMargin + 5, yPosition + 8);
+
+      const receiptBodyY = yPosition + 14;
+      const labelX = leftMargin + 5;
+      const valueX = leftMargin + 42;
+      const rightLabelX = leftMargin + (pageWidth - 30) / 2 + 5;
+      const rightValueX = rightLabelX + 37;
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(52, 73, 94);
+
+      // Left column: Amount Paid, Payment Method
+      doc.text('Amount Paid:', labelX, receiptBodyY);
       doc.setFont('helvetica', 'normal');
-      if (templateData.bankDetails.name) {
-        doc.text(`Bank Name: ${templateData.bankDetails.name}`, leftMargin + 5, yPosition);
-        yPosition += 4;
+      doc.setTextColor(27, 94, 32);
+      doc.text(
+        `${templateData.currency} ${templateData.total.toFixed(2)}`,
+        valueX,
+        receiptBodyY,
+      );
+
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(52, 73, 94);
+      doc.text('Balance Due:', labelX, receiptBodyY + 6);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(27, 94, 32);
+      doc.text(`${templateData.currency} 0.00`, valueX, receiptBodyY + 6);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(52, 73, 94);
+      doc.text('Payment Method:', labelX, receiptBodyY + 12);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(44, 62, 80);
+      doc.text(templateData.paymentMethod, valueX, receiptBodyY + 12);
+
+      // Right column: Payment Date, Reference / Transaction ID
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(52, 73, 94);
+      doc.text('Payment Date:', rightLabelX, receiptBodyY);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(44, 62, 80);
+      doc.text(templateData.paidDate || '-', rightValueX, receiptBodyY);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(52, 73, 94);
+      doc.text('Reference #:', rightLabelX, receiptBodyY + 6);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(44, 62, 80);
+      const refMaxWidth = (pageWidth - 30) / 2 - 42;
+      const refLines = doc.splitTextToSize(
+        templateData.transactionId || '-',
+        refMaxWidth,
+      );
+      doc.text(refLines, rightValueX, receiptBodyY + 6);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(52, 73, 94);
+      doc.text('Invoice Total:', rightLabelX, receiptBodyY + 12);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(44, 62, 80);
+      doc.text(
+        `${templateData.currency} ${templateData.total.toFixed(2)}`,
+        rightValueX,
+        receiptBodyY + 12,
+      );
+
+      yPosition += receiptBoxHeight + 5;
+
+      // Large diagonal PAID stamp (drawn last so it sits on top)
+      doc.saveGraphicsState();
+      const stampCx = pageWidth / 2;
+      const stampCy = pageHeight / 2;
+      doc.setFontSize(80);
+      doc.setFont('helvetica', 'bold');
+      // semi-transparent green via GState
+      try {
+        const gState = new (doc as any).GState({ opacity: 0.18 });
+        (doc as any).setGState(gState);
+      } catch {
+        // Older jsPDF may not support GState; fallback to lighter color
       }
-      if (templateData.bankDetails.accountNumber) {
-        doc.text(`Account: ${templateData.bankDetails.accountNumber}`, leftMargin + 5, yPosition);
-        yPosition += 4;
-      }
-      if (templateData.bankDetails.iban) {
-        doc.text(`IBAN: ${templateData.bankDetails.iban}`, leftMargin + 5, yPosition);
-        yPosition += 4;
-      }
-      if (templateData.bankDetails.swiftCode) {
-        doc.text(`SWIFT: ${templateData.bankDetails.swiftCode}`, leftMargin + 5, yPosition);
+      doc.setTextColor(46, 125, 50);
+      doc.text('PAID', stampCx, stampCy, {
+        align: 'center',
+        angle: -20,
+      });
+      doc.restoreGraphicsState();
+    } else {
+      doc.setFillColor(248, 249, 250);
+      doc.rect(leftMargin, yPosition, pageWidth - 30, 40, 'F');
+
+      doc.setFontSize(10);
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PAYMENT INFORMATION', leftMargin + 5, yPosition + 8);
+
+      yPosition += 12;
+      doc.setFontSize(8);
+      doc.setTextColor(52, 73, 94);
+      doc.setFont('helvetica', 'normal');
+      doc.text(
+        'Payment is due within 30 days from the invoice date.',
+        leftMargin + 5,
+        yPosition,
+      );
+
+      if (templateData.bankDetails) {
+        yPosition += 8;
+        doc.setFont('helvetica', 'bold');
+        doc.text('Bank Transfer Details:', leftMargin + 5, yPosition);
+        yPosition += 5;
+        doc.setFont('helvetica', 'normal');
+        if (templateData.bankDetails.name) {
+          doc.text(
+            `Bank Name: ${templateData.bankDetails.name}`,
+            leftMargin + 5,
+            yPosition,
+          );
+          yPosition += 4;
+        }
+        if (templateData.bankDetails.accountNumber) {
+          doc.text(
+            `Account: ${templateData.bankDetails.accountNumber}`,
+            leftMargin + 5,
+            yPosition,
+          );
+          yPosition += 4;
+        }
+        if (templateData.bankDetails.iban) {
+          doc.text(
+            `IBAN: ${templateData.bankDetails.iban}`,
+            leftMargin + 5,
+            yPosition,
+          );
+          yPosition += 4;
+        }
+        if (templateData.bankDetails.swiftCode) {
+          doc.text(
+            `SWIFT: ${templateData.bankDetails.swiftCode}`,
+            leftMargin + 5,
+            yPosition,
+          );
+        }
       }
     }
 

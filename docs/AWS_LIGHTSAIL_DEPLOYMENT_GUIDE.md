@@ -119,7 +119,7 @@ DATABASE_MAX_CONNECTIONS=100
 DATABASE_SSL_ENABLED=false
 DATABASE_REJECT_UNAUTHORIZED=false
 AUTH_JWT_SECRET=secret
-AUTH_JWT_TOKEN_EXPIRES_IN=15m
+AUTH_JWT_TOKEN_EXPIRES_IN=6h
 AUTH_REFRESH_SECRET=secret_for_refresh
 AUTH_REFRESH_TOKEN_EXPIRES_IN=3650d
 AUTH_FORGOT_SECRET=secret_for_forgot
@@ -196,6 +196,8 @@ The deployment creates the following Docker services:
 - **backend_postgres**: PostgreSQL database (internal port 5432)
 - **backend_redis**: Redis cache (internal port 6379)
 - **backend_nginx**: Nginx reverse proxy (ports 80, 443)
+
+Large class videos can use **chunked upload** API routes so each request stays small; repo `nginx/nginx.conf` and `nginx/conf.d/backend.conf` set `client_max_body_size` (e.g. 250M) for direct uploads and long `client_body_timeout` / proxy timeouts. If you change nginx limits, keep them aligned with [File uploading](file-uploading.md) so single-request uploads and chunk posts do not fail with `413`.
 
 ## SSL Certificates
 

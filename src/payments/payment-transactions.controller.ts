@@ -171,15 +171,9 @@ export class PaymentTransactionsController {
       throw new Error('No active credentials found for this gateway');
     }
 
-    // Debug: Log payment details
-    console.log('🔍 Payment Details:', {
-      gatewayId,
-      invoiceId,
-      amount,
-      currency,
-      studentId,
-      parentId,
-    });
+    this.logger.debug(
+      `Payment details gatewayId=${gatewayId} invoiceId=${invoiceId} amount=${amount} currency=${currency} studentId=${studentId ?? '-'} parentId=${parentId ?? '-'}`,
+    );
 
     // Create transaction record
     const transactionId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

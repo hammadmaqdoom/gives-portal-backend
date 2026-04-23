@@ -42,6 +42,7 @@ import { CartModule } from './cart/cart.module';
 import { CheckoutModule } from './checkout/checkout.module';
 import { AccessControlModule } from './access-control/access-control.module';
 import { FeatureModulesModule } from './feature-modules/feature-modules.module';
+import { HealthModule } from './health/health.module';
 import { AppDataSource } from './database/data-source';
 import authConfig from './auth/config/auth.config';
 import { DataSource, DataSourceOptions } from 'typeorm';
@@ -111,6 +112,7 @@ import sentryConfig from './config/sentry.config';
     AccessControlModule,
     FeatureModulesModule,
     AuditLogsModule,
+    HealthModule,
   ],
   providers: [
     {
