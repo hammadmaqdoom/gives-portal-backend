@@ -7,6 +7,7 @@ import { SubjectMapper } from '../mappers/subject.mapper';
 import { SubjectRepository } from '../../subject.repository';
 import { NullableType } from '../../../../../utils/types/nullable.type';
 import { IPaginationOptions } from '../../../../../utils/types/pagination-options';
+import { normalizePagination } from '../../../../../utils/normalize-pagination';
 import {
   FilterSubjectDto,
   SortSubjectDto,
@@ -84,8 +85,8 @@ export class SubjectsRelationalRepository implements SubjectRepository {
       queryBuilder.addOrderBy('subject.id', 'ASC');
     }
 
-    queryBuilder.skip((paginationOptions.page - 1) * paginationOptions.limit);
-    queryBuilder.take(paginationOptions.limit);
+    const { skip, take } = normalizePagination(paginationOptions);
+    queryBuilder.skip(skip).take(take);
 
     const subjects = await queryBuilder.getMany();
     return subjects.map((subject) => this.subjectMapper.toDomain(subject));

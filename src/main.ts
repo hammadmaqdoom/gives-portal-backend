@@ -5,6 +5,7 @@ import * as Sentry from '@sentry/node';
 import type { Integration } from '@sentry/types';
 import {
   ClassSerializerInterceptor,
+  Logger,
   ValidationPipe,
   VersioningType,
 } from '@nestjs/common';
@@ -53,6 +54,46 @@ async function bootstrap() {
         : 0,
     });
   }
+
+  // Crash-safety: make sure we always flush to Sentry before the process
+  // dies on an unhandled rejection / uncaught exception. Without this, OOMs
+  // and async bugs leave no trace beyond the container logs.
+  const processLogger = new Logger('Process');
+
+  const flushAndExit = async (code: number) => {
+    try {
+      if (sentryEnabled && sentryDsn) {
+        await Sentry.close(2000);
+      }
+    } catch {
+      // best-effort — never block shutdown on Sentry
+    } finally {
+      process.exit(code);
+    }
+  };
+
+  process.on('unhandledRejection', (reason: unknown) => {
+    processLogger.error(
+      `Unhandled promise rejection: ${
+        reason instanceof Error ? reason.stack : String(reason)
+      }`,
+    );
+    if (sentryEnabled && sentryDsn) {
+      Sentry.captureException(reason);
+    }
+    // Do not exit here — let the request finish. If the process is truly
+    // wedged, the container healthcheck / orchestrator will restart it.
+  });
+
+  process.on('uncaughtException', (err: Error) => {
+    processLogger.error(`Uncaught exception: ${err.stack ?? err.message}`);
+    if (sentryEnabled && sentryDsn) {
+      Sentry.captureException(err);
+    }
+    // Uncaught exceptions leave the process in an undefined state per
+    // Node docs — flush Sentry then exit so the orchestrator restarts us.
+    void flushAndExit(1);
+  });
 
   const app = await NestFactory.create(AppModule);
 

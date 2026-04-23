@@ -7,6 +7,7 @@ import { PerformanceMapper } from '../mappers/performance.mapper';
 import { PerformanceRepository } from '../../performance.repository';
 import { NullableType } from '../../../../../utils/types/nullable.type';
 import { IPaginationOptions } from '../../../../../utils/types/pagination-options';
+import { normalizePagination } from '../../../../../utils/normalize-pagination';
 import {
   FilterPerformanceDto,
   SortPerformanceDto,
@@ -142,8 +143,8 @@ export class PerformancesRelationalRepository implements PerformanceRepository {
       queryBuilder.addOrderBy('performance.id', 'ASC');
     }
 
-    queryBuilder.skip((paginationOptions.page - 1) * paginationOptions.limit);
-    queryBuilder.take(paginationOptions.limit);
+    const { skip, take } = normalizePagination(paginationOptions);
+    queryBuilder.skip(skip).take(take);
 
     const performances = await queryBuilder.getMany();
     return performances.map((performance) =>

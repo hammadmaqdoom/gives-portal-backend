@@ -39,12 +39,12 @@ export class SentryService implements OnModuleInit, OnModuleDestroy {
           : 0,
       });
 
-      console.log(
-        `✅ Sentry initialized for environment: ${sentryConfig.environment}`,
+      this.logger.log(
+        `Sentry initialized for environment: ${sentryConfig.environment}`,
       );
     } else {
-      console.log(
-        'ℹ️  Sentry is disabled (no DSN provided or SENTRY_ENABLED=false)',
+      this.logger.log(
+        'Sentry is disabled (no DSN provided or SENTRY_ENABLED=false)',
       );
     }
   }
@@ -52,7 +52,7 @@ export class SentryService implements OnModuleInit, OnModuleDestroy {
   onModuleDestroy() {
     // Flush any pending events before shutdown
     void Sentry.close(2000).then(() => {
-      console.log('Sentry closed');
+      this.logger.log('Sentry closed');
     });
   }
 }

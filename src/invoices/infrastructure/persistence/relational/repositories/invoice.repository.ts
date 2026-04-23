@@ -12,6 +12,7 @@ import {
 import { InvoiceMapper } from '../mappers/invoice.mapper';
 import { InvoiceItemMapper } from '../mappers/invoice-item.mapper';
 import { InvoiceItem } from '../../../../domain/invoice-item';
+import { normalizePagination } from '../../../../../utils/normalize-pagination';
 
 @Injectable()
 export class InvoiceRepositoryImpl implements InvoiceRepository {
@@ -357,8 +358,7 @@ export class InvoiceRepositoryImpl implements InvoiceRepository {
     queryBuilder: SelectQueryBuilder<InvoiceEntity>,
     paginationOptions: { page: number; limit: number },
   ): void {
-    const { page, limit } = paginationOptions;
-    const offset = (page - 1) * limit;
-    queryBuilder.skip(offset).take(limit);
+    const { skip, take } = normalizePagination(paginationOptions);
+    queryBuilder.skip(skip).take(take);
   }
 }

@@ -7,6 +7,7 @@ import { ClassMapper } from '../mappers/class.mapper';
 import { ClassRepository } from '../../class.repository';
 import { NullableType } from '../../../../../utils/types/nullable.type';
 import { IPaginationOptions } from '../../../../../utils/types/pagination-options';
+import { normalizePagination } from '../../../../../utils/normalize-pagination';
 import { FilterClassDto, SortClassDto } from '../../../../dto/query-class.dto';
 import { ClassScheduleRepository } from './class-schedule.repository';
 
@@ -124,8 +125,8 @@ export class ClassesRelationalRepository implements ClassRepository {
       queryBuilder.addOrderBy('class.id', 'ASC');
     }
 
-    queryBuilder.skip((paginationOptions.page - 1) * paginationOptions.limit);
-    queryBuilder.take(paginationOptions.limit);
+    const { skip, take } = normalizePagination(paginationOptions);
+    queryBuilder.skip(skip).take(take);
 
     const classes = await queryBuilder.getMany();
     return classes.map((classObj) => this.classMapper.toDomain(classObj));

@@ -18,7 +18,7 @@ Frontend (React, Next.js): <https://github.com/brocoders/extensive-react-boilerp
 - [x] Social sign in (Apple, Facebook, Google).
 - [x] Admin and User roles.
 - [x] Internationalization/Translations (I18N) ([nestjs-i18n](https://www.npmjs.com/package/nestjs-i18n)).
-- [x] File uploads. Support local and Amazon S3 drivers.
+- [x] File uploads. Local, Amazon S3, S3 presigned, Backblaze B2, and B2 presigned drivers; contextual LMS routes; chunked class video uploads for large files behind strict proxies.
 - [x] Swagger.
 - [x] Support E2E and units tests.
 - [x] Docker.

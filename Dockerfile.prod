@@ -99,6 +99,15 @@ USER nestjs
 # Expose port
 EXPOSE 3000
 
+# Heap tuning: set old-space ceiling slightly below the container memory limit
+# so V8 triggers GC before the cgroup OOM-killer does, and drop a heap
+# snapshot if we ever get close to the limit so leaks can be investigated
+# offline (requires a writable /tmp, which we already have).
+#
+# Tune together with docker-compose `mem_limit`/`deploy.resources.limits.memory`.
+# Rule of thumb: max-old-space-size ~= 75% of container memory in MB.
+ENV NODE_OPTIONS="--max-old-space-size=1536 --heapsnapshot-near-heap-limit=1"
+
 # Health check (respect API prefix)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -sf http://localhost:3000/api/v1/health || exit 1

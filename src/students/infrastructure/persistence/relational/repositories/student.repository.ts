@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { StudentEntity } from '../entities/student.entity';
@@ -10,9 +10,12 @@ import {
   SortStudentDto,
 } from '../../../../dto/query-student.dto';
 import { IPaginationOptions } from '../../../../../utils/types/pagination-options';
+import { normalizePagination } from '../../../../../utils/normalize-pagination';
 
 @Injectable()
 export class StudentsRelationalRepository {
+  private readonly logger = new Logger(StudentsRelationalRepository.name);
+
   constructor(
     @InjectRepository(StudentEntity)
     private readonly studentsRepository: Repository<StudentEntity>,
@@ -81,23 +84,26 @@ export class StudentsRelationalRepository {
       queryBuilder.addOrderBy('student.createdAt', 'DESC');
     }
 
-    // Add pagination
-    const { page, limit } = paginationOptions;
-    const skip = (page - 1) * limit;
-
-    queryBuilder.skip(skip).take(limit);
+    // Add pagination (server-side clamped to MAX_PAGINATION_LIMIT)
+    const { skip, take, page, limit } = normalizePagination(paginationOptions);
+    queryBuilder.skip(skip).take(take);
 
     try {
       const students = await queryBuilder.getMany();
+      this.logger.debug(
+        `findManyWithPagination page=${page} limit=${limit} -> ${students.length} rows`,
+      );
       return students.map((student) => this.studentMapper.toDomain(student));
     } catch (error) {
-      console.error('Error in findManyWithPagination:', error);
+      this.logger.error(
+        `findManyWithPagination failed: ${(error as Error).message}`,
+      );
       // Fallback to simple query if complex query fails
       const fallbackQuery = this.studentsRepository
         .createQueryBuilder('student')
         .orderBy('student.createdAt', 'DESC')
         .skip(skip)
-        .take(limit);
+        .take(take);
 
       const students = await fallbackQuery.getMany();
       return students.map((student) => this.studentMapper.toDomain(student));
@@ -121,10 +127,6 @@ export class StudentsRelationalRepository {
   }
 
   async findByUserId(userId: number): Promise<NullableType<Student>> {
-    console.log(
-      `🔍 StudentRepository.findByUserId called with userId: ${userId}`,
-    );
-
     const student = await this.studentsRepository.findOne({
       where: { userId: userId },
       relations: [
@@ -137,24 +139,14 @@ export class StudentsRelationalRepository {
       ],
     });
 
-    console.log(`🔍 StudentRepository.findByUserId raw result:`, student);
-    console.log(
-      `🔍 StudentRepository.findByUserId raw result userId:`,
-      student?.userId,
+    this.logger.debug(
+      `findByUserId userId=${userId} -> ${student ? `id=${student.id}` : 'not found'}`,
     );
 
-    const result = student ? this.studentMapper.toDomain(student) : null;
-    console.log(`🔍 StudentRepository.findByUserId mapped result:`, result);
-    console.log(
-      `🔍 StudentRepository.findByUserId mapped result userId:`,
-      result?.userId,
-    );
-
-    return result;
+    return student ? this.studentMapper.toDomain(student) : null;
   }
 
   async findByEmail(email: string): Promise<NullableType<Student>> {
-    console.log(`StudentRepository.findByEmail called with email: ${email}`);
     const student = await this.studentsRepository.findOne({
       where: [{ email: email }, { user: { email: email } }],
       relations: [
@@ -166,10 +158,10 @@ export class StudentsRelationalRepository {
         'parentStudents.parent',
       ],
     });
-    console.log(`StudentRepository.findByEmail raw result:`, student);
-    const result = student ? this.studentMapper.toDomain(student) : null;
-    console.log(`StudentRepository.findByEmail mapped result:`, result);
-    return result;
+    this.logger.debug(
+      `findByEmail email=${email} -> ${student ? `id=${student.id}` : 'not found'}`,
+    );
+    return student ? this.studentMapper.toDomain(student) : null;
   }
 
   async findByContact(contact: string): Promise<NullableType<Student>> {

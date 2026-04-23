@@ -7,6 +7,7 @@ import { TeacherMapper } from '../mappers/teacher.mapper';
 import { TeacherRepository } from '../../teacher.repository';
 import { NullableType } from '../../../../../utils/types/nullable.type';
 import { IPaginationOptions } from '../../../../../utils/types/pagination-options';
+import { normalizePagination } from '../../../../../utils/normalize-pagination';
 import {
   FilterTeacherDto,
   SortTeacherDto,
@@ -101,8 +102,8 @@ export class TeachersRelationalRepository implements TeacherRepository {
       queryBuilder.addOrderBy('teacher.id', 'ASC');
     }
 
-    queryBuilder.skip((paginationOptions.page - 1) * paginationOptions.limit);
-    queryBuilder.take(paginationOptions.limit);
+    const { skip, take } = normalizePagination(paginationOptions);
+    queryBuilder.skip(skip).take(take);
 
     const teachers = await queryBuilder.getMany();
     return teachers.map((teacher) => this.teacherMapper.toDomain(teacher));
